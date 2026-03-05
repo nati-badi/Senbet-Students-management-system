@@ -1,75 +1,185 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Layout, Menu, Button, Space, Typography, ConfigProvider, theme, Badge, Tooltip, message } from 'antd';
+import {
+  BookOutlined,
+  UserOutlined,
+  TeamOutlined,
+  GlobalOutlined,
+  CloudOutlined,
+  DatabaseOutlined,
+  SyncOutlined,
+  HomeOutlined,
+  MoonOutlined,
+  SunOutlined
+} from '@ant-design/icons';
 import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
-import { BookOpen, Users, GraduationCap } from 'lucide-react';
+import { syncData } from './utils/sync';
 
-function App() {
+const { Header, Content, Footer } = Layout;
+const { Title, Text } = Typography;
+
+export default function App() {
   const { t, i18n } = useTranslation();
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const toggleLanguage = () => {
     const newLang = i18n.language.startsWith('am') ? 'en' : 'am';
     i18n.changeLanguage(newLang);
   };
 
-  return (
-    <Router>
-      <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
-        <header className="bg-white shadow-sm sticky top-0 z-10 w-full">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16 items-center">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-8 w-8 text-forest-700" style={{ color: 'var(--color-forest)' }} />
-                <span className="font-bold text-xl tracking-tight" style={{ color: 'var(--color-navy)' }}>{t('app.title')}</span>
-              </div>
-              <nav className="flex items-center gap-2 md:gap-4">
-                <Link to="/admin" className="hidden md:flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-                  <Users className="h-4 w-4" /> {t('app.adminPortal')}
-                </Link>
-                <Link to="/teacher" className="hidden md:flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-                  <GraduationCap className="h-4 w-4" /> {t('app.teacherPortal')}
-                </Link>
-                <button
-                  onClick={toggleLanguage}
-                  className="ml-2 px-3 py-1 bg-slate-100 text-slate-700 font-bold rounded-md hover:bg-slate-200 transition-colors shadow-sm"
-                >
-                  {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
-                </button>
-              </nav>
-            </div>
-          </div>
-        </header>
+  const handleSync = async () => {
+    if (!isOnline || isSyncing) return;
+    setIsSyncing(true);
+    const result = await syncData();
+    setIsSyncing(false);
+    if (result.success) {
+      message.success('Synchronization completed successfully!');
+    } else {
+      message.error("Sync failed: " + (result.error || "Check server connection"));
+    }
+  };
 
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  return (
+    <ConfigProvider
+      theme={{
+        algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        token: {
+          colorPrimary: isDarkMode ? '#22c55e' : '#166534',
+          borderRadius: 8,
+          fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
+          colorBgContainer: isDarkMode ? '#1e293b' : '#ffffff',
+          colorBgLayout: isDarkMode ? '#0f172a' : '#f8fafc',
+        },
+        components: {
+          Layout: {
+            headerBg: isDarkMode ? '#1e293b' : '#ffffff',
+            siderBg: isDarkMode ? '#1e293b' : '#ffffff',
+          },
+          Menu: {
+            itemBg: 'transparent',
+            subMenuItemBg: 'transparent',
+          }
+        }
+      }}
+    >
+      <Layout className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+        <Header
+          className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm transition-colors duration-300 bg-white border-b border-slate-100 dark:bg-slate-800 dark:border-slate-700"
+          style={{ height: '64px' }}
+        >
+          <Space align="center" size="middle">
+            <Link to="/" className="flex items-center gap-2 notranslate" translate="no">
+              <BookOutlined style={{ fontSize: '24px', color: isDarkMode ? '#22c55e' : '#166534' }} />
+              <Title level={4} style={{ margin: 0, fontSize: '1.25rem' }}>
+                በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት
+              </Title>
+            </Link>
+          </Space>
+
+          <div className="flex items-center gap-4">
+            <Space size="small">
+              <Tooltip title={isOnline ? 'Network Online' : 'Network Offline'}>
+                <Badge
+                  status={isSyncing ? 'processing' : isOnline ? 'success' : 'warning'}
+                  text={
+                    <Button
+                      type="text"
+                      onClick={handleSync}
+                      disabled={!isOnline || isSyncing}
+                      className="flex items-center gap-1.5 p-0 hover:text-forest-700"
+                    >
+                      {isSyncing ? <SyncOutlined spin /> : isOnline ? <CloudOutlined /> : <DatabaseOutlined />}
+                      <span className="text-xs font-medium">
+                        {isSyncing ? 'Syncing...' : isOnline ? 'Sync Ready' : t('teacher.savedLocal')}
+                      </span>
+                    </Button>
+                  }
+                />
+              </Tooltip>
+
+              <Button
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
+                className="ml-2"
+                type="text"
+              />
+
+              <Button
+                onClick={toggleLanguage}
+                icon={<GlobalOutlined />}
+                className="font-bold ml-2"
+              >
+                {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
+              </Button>
+            </Space>
+          </div>
+        </Header>
+
+        <Content className="p-4 md:p-8 max-w-7xl mx-auto w-full">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/admin/*" element={<AdminDashboard />} />
             <Route path="/teacher/*" element={<TeacherDashboard />} />
           </Routes>
-        </main>
-      </div>
-    </Router>
+        </Content>
+
+        <Footer className="text-center text-slate-400 bg-slate-50 dark:bg-slate-900 transition-colors duration-300 notranslate" translate="no">
+          በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት ©{new Date().getFullYear()}
+        </Footer>
+      </Layout>
+    </ConfigProvider>
   );
 }
 
 function Home() {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <h1 className="text-4xl font-bold mb-4" style={{ color: 'var(--color-navy)' }}>{t('app.welcome')}</h1>
-      <p className="text-lg text-slate-600 max-w-2xl mb-8">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
+      <Title level={1} style={{ marginBottom: '16px' }}>{t('app.welcome')}</Title>
+      <Text type="secondary" style={{ fontSize: '1.125rem', maxWidth: '600px', marginBottom: '32px' }}>
         {t('app.description')}
-      </p>
-      <div className="flex gap-4">
-        <Link to="/admin" className="px-6 py-3 bg-slate-900 text-white rounded-lg font-medium shadow-sm hover:bg-slate-800 transition-colors">
-          {t('app.adminPortal')}
+      </Text>
+      <Space size="large">
+        <Link to="/admin">
+          <Button type="primary" size="large" className="px-8 flex items-center gap-2">
+            <UserOutlined />
+            {t('app.adminPortal')}
+          </Button>
         </Link>
-        <Link to="/teacher" className="px-6 py-3 border border-slate-300 bg-white text-slate-700 rounded-lg font-medium shadow-sm hover:bg-slate-50 transition-colors">
-          {t('app.teacherPortal')}
+        <Link to="/teacher">
+          <Button size="large" className="px-8 flex items-center gap-2">
+            <TeamOutlined />
+            {t('app.teacherPortal')}
+          </Button>
         </Link>
-      </div>
+      </Space>
     </div>
-  )
+  );
 }
-
-export default App;

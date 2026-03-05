@@ -18,3 +18,22 @@ db.version(2).stores({
     student.baptismalName = student.baptismalName || "";
   });
 });
+
+db.version(3).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, parentContact",
+}).upgrade(trans => {
+  return trans.students.toCollection().modify(student => {
+    student.gender = student.gender || "Male";
+    student.academicYear = student.academicYear || new Date().getFullYear().toString();
+  });
+});
+
+db.version(4).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, parentContact, synced",
+  attendance: "++id, studentId, date, status, synced",
+  marks: "++id, studentId, assessmentDate, subject, score, synced"
+}).upgrade(trans => {
+  trans.students.toCollection().modify(s => { s.synced = s.synced || 0; });
+  trans.attendance.toCollection().modify(a => { a.synced = a.synced || 0; });
+  trans.marks.toCollection().modify(m => { m.synced = m.synced || 0; });
+});

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --color-holy-white: #fdfdfd;
   --color-navy: #0f172a;
@@ -12,4 +14,20 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Global Pointer Cursor for Interactive Elements */
+button,
+[role="button"],
+.ant-btn,
+.ant-radio-button-wrapper,
+.ant-select-selector,
+.ant-picker,
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+.ant-btn:disabled,
+.ant-btn-disabled {
+  cursor: not-allowed !important;
 }

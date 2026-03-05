@@ -6,7 +6,7 @@ const resources = {
     en: {
         translation: {
             "app": {
-                "title": "B/G/D/A/Q/Arsema Finote Birhan S/Bet",
+                "title": "በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት",
                 "welcome": "Welcome to B/G/D/A/Q/Arsema Finote Birhan S/Bet",
                 "description": "The zero-cost, offline-first student management system designed for pure simplicity.",
                 "adminPortal": "Admin Portal",
@@ -34,6 +34,16 @@ const resources = {
                 "parentContact": "Parent Contact",
                 "contactPlaceholder": "e.g. 0911...",
                 "saveStudent": "Save Student",
+                "gender": "Gender",
+                "male": "Male",
+                "female": "Female",
+                "academicYear": "Academic Year",
+                "importData": "Import Excel/CSV",
+                "searchPlaceholder": "Search by name or phone...",
+                "allGrades": "All Grades",
+                "edit": "Edit",
+                "cancel": "Cancel",
+                "saveChanges": "Save Changes",
                 "enrolledStudents": "Enrolled Students",
                 "noStudentsYet": "No students registered yet.",
                 "name": "Name",
@@ -79,7 +89,7 @@ const resources = {
             "common": {
                 "comingSoon": "በቅርቡ የሚመጣ",
                 "save": "አስቀምጥ",
-                "actions": "ድርጊቶች",
+                "actions": "እርምጃዎች",
                 "delete": "ሰርዝ"
             },
             "admin": {
@@ -98,6 +108,16 @@ const resources = {
                 "parentContact": "የወላጅ ስልክ ቁጥር",
                 "contactPlaceholder": "ለምሳሌ 0911...",
                 "saveStudent": "ተማሪ መዝግብ",
+                "gender": "ፆታ",
+                "male": "ወንድ",
+                "female": "ሴት",
+                "academicYear": "የትምህርት ዘመን",
+                "importData": "ከ Excel/CSV አስገባ",
+                "searchPlaceholder": "በስም ወይም በስልክ ቁጥር ፈልግ...",
+                "allGrades": "ሁሉም ክፍሎች",
+                "edit": "አስተካክል",
+                "cancel": "ሰርዝ",
+                "saveChanges": "ለውጦችን አስቀምጥ",
                 "enrolledStudents": "የተመዘገቡ ተማሪዎች",
                 "noStudentsYet": "እስካሁን ምንም ተማሪ አልተመዘገበም።",
                 "name": "ስም",
