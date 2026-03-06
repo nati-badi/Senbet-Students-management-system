@@ -70,6 +70,7 @@ export default function App() {
     <ConfigProvider
       theme={{
         algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        cssVar: true,
         token: {
           colorPrimary: isDarkMode ? '#22c55e' : '#166534',
           borderRadius: 8,
@@ -89,9 +90,9 @@ export default function App() {
         }
       }}
     >
-      <Layout className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+      <Layout className="min-h-screen flex-1 w-full flex flex-col bg-slate-50 dark:bg-slate-900">
         <Header
-          className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm transition-colors duration-300 bg-white border-b border-slate-100 dark:bg-slate-800 dark:border-slate-700"
+          className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-800 dark:border-slate-700"
           style={{ height: '64px' }}
         >
           <Space align="center" size="middle">
@@ -113,7 +114,7 @@ export default function App() {
                       type="text"
                       onClick={handleSync}
                       disabled={!isOnline || isSyncing}
-                      className="flex items-center gap-1.5 p-0 hover:text-forest-700"
+                      className="flex items-center gap-1.5 p-0 hover:text-forest-700 cursor-pointer"
                     >
                       {isSyncing ? <SyncOutlined spin /> : isOnline ? <CloudOutlined /> : <DatabaseOutlined />}
                       <span className="text-xs font-medium">
@@ -127,14 +128,14 @@ export default function App() {
               <Button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
-                className="ml-2"
+                className="ml-2 cursor-pointer"
                 type="text"
               />
 
               <Button
                 onClick={toggleLanguage}
                 icon={<GlobalOutlined />}
-                className="font-bold ml-2"
+                className="font-bold ml-2 cursor-pointer"
               >
                 {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
               </Button>
@@ -142,7 +143,7 @@ export default function App() {
           </div>
         </Header>
 
-        <Content className="p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <Content className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/admin/*" element={<AdminDashboard />} />
@@ -150,7 +151,7 @@ export default function App() {
           </Routes>
         </Content>
 
-        <Footer className="text-center text-slate-400 bg-slate-50 dark:bg-slate-900 transition-colors duration-300 notranslate" translate="no">
+        <Footer className="text-center text-slate-400 bg-slate-50 dark:bg-slate-900 notranslate" translate="no">
           በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት ©{new Date().getFullYear()}
         </Footer>
       </Layout>
@@ -162,7 +163,8 @@ function Home() {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
-      <Title level={1} style={{ marginBottom: '16px' }}>{t('app.welcome')}</Title>
+      {/* Bilingual title — always show both languages */}
+      <Title level={1} style={{ marginBottom: '16px' }}>ወደ በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት እንኳን በደህና መጡ</Title>
       <Text type="secondary" style={{ fontSize: '1.125rem', maxWidth: '600px', marginBottom: '32px' }}>
         {t('app.description')}
       </Text>

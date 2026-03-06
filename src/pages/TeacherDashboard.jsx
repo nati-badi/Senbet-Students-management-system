@@ -38,6 +38,23 @@ import dayjs from 'dayjs';
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 
+// Fixed grade options (must match AdminDashboard)
+const GRADE_OPTIONS = [
+    { value: '1ኛ ክፍል', label: '1ኛ ክፍል' },
+    { value: '2ኛ ክፍል', label: '2ኛ ክፍል' },
+    { value: '3ኛ ክፍል', label: '3ኛ ክፍል' },
+    { value: '4ኛ ክፍል', label: '4ኛ ክፍል' },
+    { value: '5ኛ ክፍል', label: '5ኛ ክፍል' },
+    { value: '6ኛ ክፍል', label: '6ኛ ክፍል' },
+    { value: '7ኛ ክፍል', label: '7ኛ ክፍል' },
+    { value: '8ኛ ክፍል', label: '8ኛ ክፍል' },
+    { value: '9ኛ ክፍል', label: '9ኛ ክፍል' },
+    { value: '10ኛ ክፍል', label: '10ኛ ክፍል' },
+    { value: '11ኛ ክፍል', label: '11ኛ ክፍል' },
+    { value: '12ኛ ክፍል', label: '12ኛ ክፍል' },
+    { value: '12+ (ሌላ)', label: '12+ (ሌላ)' },
+];
+
 export default function TeacherDashboard() {
     const location = useLocation();
     const { t } = useTranslation();
@@ -57,8 +74,12 @@ export default function TeacherDashboard() {
     ];
 
     return (
-        <Layout className="bg-transparent">
-            <Sider width={240} className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block transition-colors">
+        <Layout className="bg-transparent" style={{ overflow: 'hidden' }}>
+            <Sider
+                width={240}
+                style={{ flexShrink: 0 }}
+                className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block transition-colors"
+            >
                 <div style={{ padding: '16px' }}>
                     <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
                         {t('teacher.menu')}
@@ -91,7 +112,12 @@ function SpeedEntryMarks() {
     const [localMarks, setLocalMarks] = useState({});
 
     const allStudents = useLiveQuery(() => db.students.toArray()) || [];
-    const uniqueGrades = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
+    // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
+    const dbGrades = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
+    const gradeOptions = [
+        ...GRADE_OPTIONS,
+        ...dbGrades.filter(g => !GRADE_OPTIONS.some(o => o.value === g)).map(g => ({ value: g, label: g }))
+    ];
     const studentsInGrade = allStudents.filter(s => s.grade === selectedGrade);
 
     useEffect(() => {
@@ -175,8 +201,9 @@ function SpeedEntryMarks() {
                                 placeholder={t('teacher.selectGrade')}
                                 value={selectedGrade}
                                 onChange={setSelectedGrade}
-                                options={uniqueGrades.map(g => ({ value: g, label: g }))}
+                                options={gradeOptions}
                                 allowClear
+                                showSearch
                             />
                         </Form.Item>
                     </Col>
@@ -220,7 +247,12 @@ function AttendanceModule() {
     const [localAttendance, setLocalAttendance] = useState({});
 
     const allStudents = useLiveQuery(() => db.students.toArray()) || [];
-    const uniqueGrades = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
+    // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
+    const dbGrades2 = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
+    const gradeOptions2 = [
+        ...GRADE_OPTIONS,
+        ...dbGrades2.filter(g => !GRADE_OPTIONS.some(o => o.value === g)).map(g => ({ value: g, label: g }))
+    ];
     const studentsInGrade = allStudents.filter(s => s.grade === selectedGrade);
 
     useEffect(() => {
@@ -310,8 +342,9 @@ function AttendanceModule() {
                                 placeholder={t('teacher.selectGrade')}
                                 value={selectedGrade}
                                 onChange={setSelectedGrade}
-                                options={uniqueGrades.map(g => ({ value: g, label: g }))}
+                                options={gradeOptions2}
                                 allowClear
+                                showSearch
                             />
                         </Form.Item>
                     </Col>

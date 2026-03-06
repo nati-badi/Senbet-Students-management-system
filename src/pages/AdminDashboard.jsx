@@ -50,6 +50,40 @@ import * as XLSX from 'xlsx';
 const { Title, Text } = Typography;
 const { Content, Sider } = Layout;
 
+// Fixed grade options for 1-12 + extra
+const GRADE_OPTIONS = [
+    { value: '1ኛ ክፍል', label: '1ኛ ክፍል' },
+    { value: '2ኛ ክፍል', label: '2ኛ ክፍል' },
+    { value: '3ኛ ክፍል', label: '3ኛ ክፍል' },
+    { value: '4ኛ ክፍል', label: '4ኛ ክፍል' },
+    { value: '5ኛ ክፍል', label: '5ኛ ክፍል' },
+    { value: '6ኛ ክፍል', label: '6ኛ ክፍል' },
+    { value: '7ኛ ክፍል', label: '7ኛ ክፍል' },
+    { value: '8ኛ ክፍል', label: '8ኛ ክፍል' },
+    { value: '9ኛ ክፍል', label: '9ኛ ክፍል' },
+    { value: '10ኛ ክፍል', label: '10ኛ ክፍል' },
+    { value: '11ኛ ክፍል', label: '11ኛ ክፍል' },
+    { value: '12ኛ ክፍል', label: '12ኛ ክፍል' },
+    { value: '12+ (ሌላ)', label: '12+ (ሌላ)' },
+];
+
+// Validators
+const validateAmharic = (_, value) => {
+    if (!value) return Promise.resolve();
+    // Ethiopic Unicode block: U+1200–U+137F, spaces, and common punctuation allowed
+    const amharicOnly = /^[\u1200-\u137F\s\-/]+$/;
+    if (!amharicOnly.test(value)) return Promise.reject('ስም በአማርኛ ብቻ ይሁን');
+    return Promise.resolve();
+};
+
+const validateEthiopianPhone = (_, value) => {
+    if (!value) return Promise.resolve(); // optional field
+    const cleaned = value.replace(/\s/g, '');
+    if (!/^\d{10}$/.test(cleaned)) return Promise.reject('ስልክ ቁጥር 10 አሃዝ መሆን አለበት (ለምሳሌ 0911234567)');
+    if (!/^(09|07)/.test(cleaned)) return Promise.reject('ስልክ ቁጥር 09 ወይም 07 ሲጀምር ብቻ ትክክለኛ ነው');
+    return Promise.resolve();
+};
+
 export default function AdminDashboard() {
     const location = useLocation();
     const { t } = useTranslation();
@@ -74,8 +108,12 @@ export default function AdminDashboard() {
     ];
 
     return (
-        <Layout className="bg-transparent">
-            <Sider width={240} className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block transition-colors">
+        <Layout className="bg-transparent" style={{ overflow: 'hidden' }}>
+            <Sider
+                width={240}
+                style={{ flexShrink: 0 }}
+                className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block transition-colors"
+            >
                 <div style={{ padding: '16px' }}>
                     <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
                         {t('admin.menu')}
@@ -111,23 +149,28 @@ function SystemDataManagement() {
             await db.attendance.clear();
             await db.marks.clear();
 
-            // 2. Wipe central SQLite Database via API
-            const response = await fetch(`${API_BASE}/sync/clear`, {
-                method: 'DELETE',
-            });
-
-            if (!response.ok) {
-                throw new Error("Failed to reach server to wipe master database.");
+            // 2. Wipe central SQLite Database via API gracefully
+            if (navigator.onLine) {
+                try {
+                    const response = await fetch(`${API_BASE}/sync/clear`, {
+                        method: 'DELETE',
+                    });
+                    if (!response.ok) {
+                        console.warn("Server warning: wipe returned non-OK status.");
+                    }
+                } catch (netErr) {
+                    console.warn("Could not reach server to wipe master DB:", netErr);
+                    // Silently continue since local was wiped
+                }
             }
 
             notification.success({
                 message: 'Database Erased',
-                description: 'All local and server-side student data has been completely erased.',
+                description: 'All local data has been completely erased.',
                 placement: 'topRight',
                 duration: 5,
             });
         } catch (error) {
-            console.error(error);
             notification.error({
                 message: 'Wipe Failed',
                 description: 'Failed to completely wipe the database. Are you online?',
@@ -179,7 +222,7 @@ function SystemDataManagement() {
 }
 
 function StudentRegistration() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [form] = Form.useForm();
     const [editForm] = Form.useForm();
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -194,54 +237,70 @@ function StudentRegistration() {
         setIsFormValid(!!(allValues.name && allValues.grade));
     };
 
-    // Converts a Gregorian date to Ethiopian calendar date string
-    const getEthiopianDate = () => {
-        const now = new Date();
-        const gYear = now.getFullYear();
-        const gMonth = now.getMonth() + 1; // 1-indexed
-        const gDay = now.getDate();
+    // Precise Date Localization using native browser Intl
+    const formatEthiopianDate = (dateInput) => {
+        const dateObj = (dateInput && typeof dateInput === 'string' && dateInput.includes('T'))
+            ? new Date(dateInput)
+            : (dateInput ? null : new Date());
 
-        // Ethiopian New Year falls on Sep 11 (or Sep 12 in leap years)
-        const ethYear = (gMonth > 9 || (gMonth === 9 && gDay >= 11)) ? gYear - 7 : gYear - 8;
+        if (!dateObj || isNaN(dateObj.getTime())) return dateInput || '—';
 
-        const ethMonthNames = [
-            'መስከረም', 'ጥቅምት', 'ህዳር', 'ታህሳስ', 'ጥር', 'የካቲት',
-            'መጋቢት', 'ሚያዝያ', 'ግንቦት', 'ሰኔ', 'ሐምሌ', 'ነሐሴ', 'ጷጉሜ'
-        ];
+        const isAmharic = (i18n.language || 'am').startsWith('am');
+        const locale = isAmharic ? 'am-ET-u-ca-ethiopic' : 'en-ET-u-ca-ethiopic';
 
-        // Days from Ethiopian New Year (Sep 11) to now
-        const ethNewYear = new Date(gYear, 8, 11); // Sep 11 of current Gregorian year
-        let dayOfYear;
-        if (now >= ethNewYear) {
-            dayOfYear = Math.floor((now - ethNewYear) / 86400000);
-        } else {
-            const prevEthNewYear = new Date(gYear - 1, 8, 11);
-            dayOfYear = Math.floor((now - prevEthNewYear) / 86400000);
+        try {
+            const formatter = new Intl.DateTimeFormat(locale, {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            let formatted = formatter.format(dateObj);
+
+            // Clean up English suffix if it outputs generic eras
+            if (!isAmharic) {
+                formatted = formatted.replace(/(AM|PM|ERA1|ERA0)/gi, '').trim() + ' E.C.';
+            }
+            return formatted;
+        } catch (e) {
+            return dateInput || '—';
         }
-
-        const ethMonth = Math.floor(dayOfYear / 30);
-        const ethDay = (dayOfYear % 30) + 1;
-        const monthName = ethMonthNames[Math.min(ethMonth, 12)];
-
-        return `${ethDay} ${monthName} ${ethYear} ዓ.ም`;
     };
 
-    const ethiopianDate = getEthiopianDate();
+    const currentEthiopianDateDisplay = formatEthiopianDate();
 
     const handleRegister = async (values) => {
+        // Duplicate name check — warn admin but allow override
+        const existingWithSameName = students.filter(
+            s => s.name.trim().toLowerCase() === values.name.trim().toLowerCase()
+        );
+        if (existingWithSameName.length > 0) {
+            // Use Modal.confirm for a blocking confirmation
+            const confirmed = await new Promise(resolve => {
+                Modal.confirm({
+                    title: 'ይህ ስም በዳታባዚ ውስጥ ተመዘግቡዘል',
+                    content: `"‹${values.name}›" ዋነም በዳታባዜው Ꭻሎች ይገኙ። ዘመዘግብዘት ይፈልጋቸሎል?`,
+                    okText: 'ዘመዘግብ (ዱቤል)',
+                    cancelText: 'ተወሃ',
+                    onOk: () => resolve(true),
+                    onCancel: () => resolve(false),
+                });
+            });
+            if (!confirmed) return;
+        }
+
         try {
             await db.students.add({
                 id: crypto.randomUUID(),
                 ...values,
-                academicYear: ethiopianDate,
+                academicYear: new Date().toISOString(),
                 synced: 0,
             });
             form.resetFields();
             setIsFormValid(false);
-            message.success('Student registered successfully!');
+            message.success('ተማሪ በተሳካ ሁኙ ተመዘግቷል!');
         } catch (err) {
             console.error("Failed to add student:", err);
-            message.error('Failed to register student.');
+            message.error('ተማሪ መዘግበት አልታቸለም።');
         }
     };
 
@@ -273,17 +332,14 @@ function StudentRegistration() {
     };
 
     const downloadTemplate = () => {
-        // Generate a proper .xlsx file so each header is in its own column
-        const headers = [["Full Name", "Baptismal Name", "Gender", "Grade", "Parent Contact"]];
+        // Amharic column headers so the file matches the expected Ethiopian format
+        const headers = [['ሙሉ ስም', 'የክርስትና ስም', 'ፆታ', 'ክፍል', 'የወላጅ ስልክ ቁጥር']];
         const ws = XLSX.utils.aoa_to_sheet(headers);
-
-        // Set column widths for readability
         ws['!cols'] = [
-            { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 20 }
+            { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 22 }
         ];
-
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Students');
+        XLSX.utils.book_append_sheet(wb, ws, 'ተማሪዎች');
         XLSX.writeFile(wb, 'Senbet_Students_Template.xlsx');
     };
 
@@ -295,18 +351,35 @@ function StudentRegistration() {
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
             const keys = Object.keys(row);
-            const nameKey = keys.find(k => k.toLowerCase().includes('name') && !k.toLowerCase().includes('baptismal')) || keys[0];
-            const baptKey = keys.find(k => k.toLowerCase().includes('baptismal')) || keys[1];
-            const genderKey = keys.find(k => k.toLowerCase().includes('gender') || k.toLowerCase().includes('sex')) || keys[2];
-            const gradeKey = keys.find(k => k.toLowerCase().includes('grade') || k.toLowerCase().includes('class')) || keys[3];
-            const contactKey = keys.find(k => k.toLowerCase().includes('contact') || k.toLowerCase().includes('phone')) || keys[4];
-            // Check if file has a date/year column
-            const dateKey = keys.find(k =>
-                k.toLowerCase().includes('year') ||
-                k.toLowerCase().includes('date') ||
-                k.toLowerCase().includes('ዓ.ም') ||
-                k.toLowerCase().includes('academic')
-            );
+
+            // Detect columns — supports both English and Amharic headers
+            const nameKey = keys.find(k => {
+                const lk = k.toLowerCase();
+                return (lk.includes('name') && !lk.includes('baptismal')) ||
+                    lk.includes('ሙሉ ስም') || lk.includes('ስም');
+            }) || keys[0];
+            const baptKey = keys.find(k => {
+                const lk = k.toLowerCase();
+                return lk.includes('baptismal') || lk.includes('የክርስትና') || lk.includes('ክርስትና');
+            }) || keys[1];
+            const genderKey = keys.find(k => {
+                const lk = k.toLowerCase();
+                return lk.includes('gender') || lk.includes('sex') || lk.includes('ፆታ');
+            }) || keys[2];
+            const gradeKey = keys.find(k => {
+                const lk = k.toLowerCase();
+                return lk.includes('grade') || lk.includes('class') || lk.includes('ክፍል');
+            }) || keys[3];
+            const contactKey = keys.find(k => {
+                const lk = k.toLowerCase();
+                return lk.includes('contact') || lk.includes('phone') || lk.includes('ስልክ');
+            }) || keys[4];
+            // Check if file has a date/year column (English + Amharic)
+            const dateKey = keys.find(k => {
+                const lk = k.toLowerCase();
+                return lk.includes('year') || lk.includes('date') || lk.includes('ዓ.ም') ||
+                    lk.includes('academic') || lk.includes('ዓመት') || lk.includes('ቀን');
+            });
 
             const name = String(row[nameKey] ?? '').trim();
             const grade = String(row[gradeKey] ?? '').trim();
@@ -316,9 +389,20 @@ function StudentRegistration() {
             let gender = String(row[genderKey] ?? '').trim();
             gender = (gender && gender.toLowerCase().startsWith('f')) ? 'Female' : 'Male';
 
-            // Use date from file if column exists and has a value; otherwise leave empty
-            const academicYear = dateKey ? String(row[dateKey] ?? '').trim() : '';
-            if (!academicYear) missingDateCount++;
+            let contact = String(row[contactKey] ?? '').trim();
+            // Excel removes leading zeros; if it's 9 digits, it's missing the 0.
+            if (contact.length === 9 && !contact.startsWith('0')) {
+                contact = '0' + contact;
+            }
+
+            // Use date from file if column exists and has a value; otherwise use current date
+            let parsedDate = dateKey ? String(row[dateKey] ?? '').trim() : '';
+            // If parsedDate is Excel serial date (e.g. 43203) or just digits, fallback to current
+            if (parsedDate && /^\d{5}$/.test(parsedDate)) {
+                parsedDate = '';
+            }
+            const academicYear = parsedDate ? parsedDate : new Date().toISOString();
+            if (!parsedDate) missingDateCount++;
 
             bulkStudents.push({
                 id: crypto.randomUUID(),
@@ -327,7 +411,7 @@ function StudentRegistration() {
                 gender,
                 academicYear,
                 grade,
-                parentContact: String(row[contactKey] ?? '').trim(),
+                parentContact: contact,
                 synced: 0
             });
         }
@@ -421,10 +505,35 @@ function StudentRegistration() {
 
     const uniqueGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
 
+    // Merge DB grades with fixed GRADE_OPTIONS (keep consistent ordering)
+    const allGradeOptions = [
+        ...GRADE_OPTIONS,
+        ...uniqueGrades
+            .filter(g => !GRADE_OPTIONS.some(o => o.value === g))
+            .map(g => ({ value: g, label: g })),
+    ];
+
     const filteredStudents = students.filter(student => {
         const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (student.baptismalName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
             (student.parentContact || "").includes(searchQuery);
-        const matchesGrade = !filterGrade || student.grade === filterGrade;
+
+        const sGrade = String(student.grade).trim().toLowerCase();
+        const fGrade = String(filterGrade).trim().toLowerCase();
+
+        let matchesGrade = !filterGrade || sGrade === fGrade;
+        if (!filterGrade) matchesGrade = true;
+        else if (!matchesGrade) {
+            // Fallback match: if both contain same number and same '+' status
+            const num1 = sGrade.match(/\d+/);
+            const num2 = fGrade.match(/\d+/);
+            if (num1 && num2 && num1[0] === num2[0]) {
+                const hasPlus1 = sGrade.includes('+');
+                const hasPlus2 = fGrade.includes('+');
+                if (hasPlus1 === hasPlus2) matchesGrade = true;
+            }
+        }
+
         return matchesSearch && matchesGrade;
     });
 
@@ -441,9 +550,15 @@ function StudentRegistration() {
             title: t('admin.grade'),
             dataIndex: 'grade',
             key: 'grade',
-            render: (text) => <Tag color="forest">{text}</Tag>
+            render: (text) => <Tag color="green">{text}</Tag>
         },
         { title: t('admin.contact'), dataIndex: 'parentContact', key: 'parentContact' },
+        {
+            title: t('admin.dateOfEntry', 'Date of Entry'),
+            dataIndex: 'academicYear',
+            key: 'academicYear',
+            render: (text) => <span style={{ color: '#64748b', fontSize: '12px' }}>{formatEthiopianDate(text)}</span>
+        },
         {
             title: t('common.actions'),
             key: 'actions',
@@ -458,7 +573,7 @@ function StudentRegistration() {
                             className="cursor-pointer"
                         />
                     </Tooltip>
-                    <Popconfirm title="Delete this student?" onConfirm={() => handleDelete(record.id)}>
+                    <Popconfirm title="ተማሪውን ይዘርዘዘት?" onConfirm={() => handleDelete(record.id)}>
                         <Button
                             type="text"
                             danger
@@ -472,7 +587,7 @@ function StudentRegistration() {
     ];
 
     return (
-        <div className="flex flex-col gap-6 w-full">
+        <div className="flex flex-col gap-6 w-full min-h-[800px]">
             <div className="flex justify-between items-center mb-2">
                 <div>
                     <Title level={2}>{t('admin.registerNewStudent')}</Title>
@@ -490,17 +605,31 @@ function StudentRegistration() {
                 >
                     <Row gutter={16}>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.fullName')} name="name" rules={[{ required: true }]}>
-                                <Input placeholder={t('admin.namePlaceholder')} />
+                            <Form.Item
+                                label={t('admin.fullName')}
+                                name="name"
+                                rules={[
+                                    { required: true, message: 'ሙሉ ስም ያስፈልጋል' },
+                                    { validator: validateAmharic }
+                                ]}
+                            >
+                                <Input placeholder="ለምሳሌ፡ አበበ ከበደ" />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.baptismalNameField')} name="baptismalName">
-                                <Input placeholder={t('admin.baptismalPlaceholder')} />
+                            <Form.Item
+                                label={t('admin.baptismalNameField')}
+                                name="baptismalName"
+                                rules={[
+                                    { required: true, message: 'የክርስትና ስም ያስፈልጋል' },
+                                    { validator: validateAmharic }
+                                ]}
+                            >
+                                <Input placeholder="ለምሳሌ፡ ገብረ ማርያም" />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.gender')} name="gender">
+                            <Form.Item label={t('admin.gender')} name="gender" rules={[{ required: true }]}>
                                 <Select options={[
                                     { value: 'Male', label: t('admin.male') },
                                     { value: 'Female', label: t('admin.female') },
@@ -508,21 +637,29 @@ function StudentRegistration() {
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label="ዛሬ">
-                                <div className="flex items-center gap-2 h-8 px-3 bg-slate-100 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700">
-                                    <LockOutlined className="text-slate-400" />
-                                    <span className="text-slate-600 dark:text-slate-400 text-sm">{ethiopianDate}</span>
-                                </div>
+                            <Form.Item label={t('admin.dateOfEntry', 'Date of Entry')}>
+                                <Input disabled value={currentEthiopianDateDisplay} style={{ color: '#64748b', backgroundColor: 'transparent' }} />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.gradeClass')} name="grade" rules={[{ required: true }]}>
-                                <Input placeholder={t('admin.gradePlaceholder')} />
+                            <Form.Item label={t('admin.gradeClass')} name="grade" rules={[{ required: true, message: 'ክፍል ያስፈልጋል' }]}>
+                                <Select
+                                    placeholder="ክፍል ይምረጡ"
+                                    options={GRADE_OPTIONS}
+                                    showSearch
+                                />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.parentContact')} name="parentContact">
-                                <Input placeholder={t('admin.contactPlaceholder')} />
+                            <Form.Item
+                                label={t('admin.parentContact')}
+                                name="parentContact"
+                                rules={[
+                                    { required: true, message: 'ስልክ ቁጥር ያስፈልጋል' },
+                                    { validator: validateEthiopianPhone }
+                                ]}
+                            >
+                                <Input placeholder="ለምሳሌ፡ 0911234567" maxLength={10} />
                             </Form.Item>
                         </Col>
                     </Row>
@@ -558,12 +695,13 @@ function StudentRegistration() {
                 <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-between w-full mb-4 gap-4">
+            <div className="flex flex-col sm:flex-row justify-between w-full mb-4 gap-4 items-center">
                 <Input
                     prefix={<SearchOutlined />}
                     placeholder={t('admin.searchPlaceholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    allowClear
                     style={{ width: '100%', maxWidth: 400 }}
                 />
                 <Select
@@ -573,21 +711,23 @@ function StudentRegistration() {
                     style={{ width: '100%', maxWidth: 200 }}
                     allowClear
                     suffixIcon={<FilterOutlined />}
-                >
-                    {uniqueGrades.map(g => (
-                        <Select.Option key={g} value={g}>{g}</Select.Option>
-                    ))}
-                </Select>
+                    options={allGradeOptions}
+                />
             </div>
 
-            <Table
-                columns={columns}
-                dataSource={filteredStudents}
-                rowKey="id"
-                pagination={{ pageSize: 10 }}
-                className="shadow-sm rounded-lg overflow-hidden border border-slate-100"
-                locale={{ emptyText: <Empty description={t('admin.noStudentsYet')} /> }}
-            />
+            <div className="bg-white dark:bg-[#1e293b] rounded-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+                <div className="overflow-hidden">
+                    <Table
+                        columns={columns}
+                        dataSource={filteredStudents}
+                        rowKey="id"
+                        pagination={false}
+                        scroll={{ y: 500 }}
+                        className="students-table"
+                        locale={{ emptyText: <Empty description={t('admin.noStudentsYet')} /> }}
+                    />
+                </div>
+            </div>
 
             <Modal
                 title={t('admin.edit')}
@@ -600,17 +740,31 @@ function StudentRegistration() {
                 <Form form={editForm} layout="vertical">
                     <Row gutter={16}>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.fullName')} name="name" rules={[{ required: true }]}>
+                            <Form.Item
+                                label={t('admin.fullName')}
+                                name="name"
+                                rules={[
+                                    { required: true, message: 'ሙሉ ስም ያስፈልጋል' },
+                                    { validator: validateAmharic }
+                                ]}
+                            >
                                 <Input />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.baptismalNameField')} name="baptismalName">
+                            <Form.Item
+                                label={t('admin.baptismalNameField')}
+                                name="baptismalName"
+                                rules={[
+                                    { required: true, message: 'የክርስትና ስም ያስፈልጋል' },
+                                    { validator: validateAmharic }
+                                ]}
+                            >
                                 <Input />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.gender')} name="gender">
+                            <Form.Item label={t('admin.gender')} name="gender" rules={[{ required: true }]}>
                                 <Select options={[
                                     { value: 'Male', label: t('admin.male') },
                                     { value: 'Female', label: t('admin.female') },
@@ -618,13 +772,24 @@ function StudentRegistration() {
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.gradeClass')} name="grade" rules={[{ required: true }]}>
-                                <Input />
+                            <Form.Item label={t('admin.gradeClass')} name="grade" rules={[{ required: true, message: 'ክፍል ያስፈልጋል' }]}>
+                                <Select
+                                    placeholder="ክፍል ይምረጡ"
+                                    options={GRADE_OPTIONS}
+                                    showSearch
+                                />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.parentContact')} name="parentContact">
-                                <Input />
+                            <Form.Item
+                                label={t('admin.parentContact')}
+                                name="parentContact"
+                                rules={[
+                                    { required: true, message: 'ስልክ ቁጥር ያስፈልጋል' },
+                                    { validator: validateEthiopianPhone }
+                                ]}
+                            >
+                                <Input maxLength={10} />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>

@@ -98,28 +98,27 @@ app.post('/api/sync', (req, res) => {
 });
 
 // DELETE /api/sync/clear - Wipe all data from the master database
-app.delete('/api/sync/clear', (req, res) => {
+app.delete('/api/sync/clear', async (req, res) => {
     console.log('Incoming DELETE /api/sync/clear request - WIPING ALL DATA');
 
-    db.serialize(() => {
-        let errorOccurred = false;
-
-        db.run('DELETE FROM students', (err) => { if (err) errorOccurred = true; });
-        db.run('DELETE FROM attendance', (err) => { if (err) errorOccurred = true; });
-        db.run('DELETE FROM marks', (err) => { if (err) errorOccurred = true; });
-
-        // Reset sqlite sequences if they exist to start IDs over (optional but clean)
-        db.run('VACUUM', (err) => { if (err) console.error("Vacuum error:", err); });
-
-        if (errorOccurred) {
-            console.error('Failed to wipe some tables');
-            res.status(500).json({ error: 'Failed to wipe database entirely' });
-        } else {
-            console.log('Successfully Wiped Database');
-            res.json({ status: 'success', message: 'Database wiped clean' });
-        }
+    const run = (sql) => new Promise((resolve, reject) => {
+        db.run(sql, (err) => err ? reject(err) : resolve());
     });
+
+    try {
+        await run('DELETE FROM students');
+        await run('DELETE FROM attendance');
+        await run('DELETE FROM marks');
+        // Compact the DB file after a wipe
+        db.run('VACUUM', (err) => { if (err) console.error('Vacuum error:', err); });
+        console.log('Successfully Wiped Database');
+        res.json({ status: 'success', message: 'Database wiped clean' });
+    } catch (err) {
+        console.error('Failed to wipe database:', err);
+        res.status(500).json({ error: 'Failed to wipe database: ' + err.message });
+    }
 });
+
 
 app.listen(PORT, () => {
     console.log(`Senbet School Server running on http://localhost:${PORT}`);
