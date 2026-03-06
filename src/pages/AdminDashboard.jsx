@@ -289,6 +289,11 @@ function StudentRegistration() {
         }
     };
 
+    const disabledDate = (current) => {
+        // Can not select days after today
+        return current && current > dayjs().endOf('day');
+    };
+
     const handleRegister = async (values) => {
         // Duplicate name check — warn admin but allow override
         const existingWithSameName = students.filter(
@@ -678,6 +683,7 @@ function StudentRegistration() {
                                 <DatePicker
                                     className="w-full cursor-pointer"
                                     format="DD/MM/YYYY"
+                                    disabledDate={disabledDate}
                                 />
                             </Form.Item>
                         </Col>
@@ -841,6 +847,7 @@ function StudentRegistration() {
                                 <DatePicker
                                     className="w-full cursor-pointer"
                                     format="DD/MM/YYYY"
+                                    disabledDate={disabledDate}
                                 />
                             </Form.Item>
                         </Col>
