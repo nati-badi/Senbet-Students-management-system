@@ -391,32 +391,42 @@ function StudentRegistration() {
 
             // Detect columns — supports both English and Amharic headers
             const nameKey = keys.find(k => {
-                const lk = k.toLowerCase();
+                const lk = k.toLowerCase().trim();
                 return (lk.includes('name') && !lk.includes('baptismal')) ||
-                    lk.includes('ሙሉ ስም') || lk.includes('ስም');
-            }) || keys[0];
+                    lk.includes('ሙሉ ስም') || lk.includes('ስም') || lk.includes('name');
+            });
             const baptKey = keys.find(k => {
-                const lk = k.toLowerCase();
+                const lk = k.toLowerCase().trim();
                 return lk.includes('baptismal') || lk.includes('የክርስትና') || lk.includes('ክርስትና');
-            }) || keys[1];
+            });
             const genderKey = keys.find(k => {
-                const lk = k.toLowerCase();
+                const lk = k.toLowerCase().trim();
                 return lk.includes('gender') || lk.includes('sex') || lk.includes('ፆታ');
-            }) || keys[2];
+            });
             const gradeKey = keys.find(k => {
-                const lk = k.toLowerCase();
+                const lk = k.toLowerCase().trim();
                 return lk.includes('grade') || lk.includes('class') || lk.includes('ክፍል');
-            }) || keys[3];
+            });
             const contactKey = keys.find(k => {
-                const lk = k.toLowerCase();
+                const lk = k.toLowerCase().trim();
                 return lk.includes('contact') || lk.includes('phone') || lk.includes('ስልክ');
-            }) || keys[4];
+            });
             // Check if file has a date/year column (English + Amharic)
             const dateKey = keys.find(k => {
                 const lk = k.toLowerCase();
                 return lk.includes('year') || lk.includes('date') || lk.includes('ዓ.ም') ||
                     lk.includes('academic') || lk.includes('ዓመት') || lk.includes('ቀን');
             });
+
+            if (!nameKey || !gradeKey) {
+                notification.error({
+                    message: 'Missing Required Columns',
+                    description: "የተማሪ 'ስም' (Full Name) ወይም 'ክፍል' (Grade) ኮለሞች አልተገኙም። እባክዎ ፋይሉ ስም እና ክፍል እንዳለው ያረጋግጡ።",
+                    placement: 'topRight',
+                    duration: 10,
+                });
+                return; // Stop processing entirely if headers are missing
+            }
 
             const name = String(row[nameKey] ?? '').trim();
             const grade = String(row[gradeKey] ?? '').trim();
@@ -482,7 +492,7 @@ function StudentRegistration() {
         } else {
             notification.warning({
                 message: 'No Valid Data Found',
-                description: "Check your file format. It must have at least 'Full Name' and 'Grade' columns.",
+                description: "Check your file format. It must have 'Full Name' (ስም) and 'Grade' (ክፍል) columns.",
                 placement: 'topRight',
                 duration: 6,
             });
@@ -735,8 +745,11 @@ function StudentRegistration() {
             </Card>
 
             <div className="flex items-center gap-4 mt-2">
-                <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap' }}>
-                    {t('admin.enrolledStudents')} <Tag color="blue">{students.length}</Tag>
+                <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
+                    {t('admin.enrolledStudents')}
+                    <Tag color="blue" style={{ marginLeft: '12px' }}>
+                        {(searchQuery || filterGrade) ? `${filteredStudents.length} / ${students.length}` : students.length}
+                    </Tag>
                 </Title>
                 <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
             </div>
