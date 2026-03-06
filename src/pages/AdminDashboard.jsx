@@ -115,7 +115,7 @@ export default function AdminDashboard() {
             <Sider
                 width={240}
                 style={{ flexShrink: 0 }}
-                className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block"
+                className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden md:block"
             >
                 <div style={{ padding: '16px' }}>
                     <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
@@ -131,7 +131,7 @@ export default function AdminDashboard() {
                 />
             </Sider>
 
-            <Content className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-6 min-h-[600px]">
+            <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 min-h-[600px]">
                 <Routes>
                     <Route path="/" element={<StudentRegistration />} />
                     <Route path="/certificates" element={<CertificateGenerator />} />
@@ -645,7 +645,7 @@ function StudentRegistration() {
                 </div>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700">
+            <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Form
                     form={form}
                     onFinish={handleRegister}
@@ -777,7 +777,7 @@ function StudentRegistration() {
                 />
             </div>
 
-            <div className="bg-white dark:bg-[#1e293b] rounded-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
                 <div className="overflow-hidden">
                     {isLoadingStudents ? (
                         <div className="p-6 space-y-4">
@@ -955,7 +955,7 @@ function CertificateGenerator() {
                 <Text type="secondary">{t('admin.generatorDesc')}</Text>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700">
+            <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <div className="flex flex-col gap-4 w-full">
                     <div>
                         <Text strong style={{ display: 'block', marginBottom: '8px' }}>

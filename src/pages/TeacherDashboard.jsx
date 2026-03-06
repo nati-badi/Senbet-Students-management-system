@@ -79,7 +79,7 @@ export default function TeacherDashboard() {
             <Sider
                 width={240}
                 style={{ flexShrink: 0 }}
-                className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block"
+                className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden md:block"
             >
                 <div style={{ padding: '16px' }}>
                     <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
@@ -95,7 +95,7 @@ export default function TeacherDashboard() {
                 />
             </Sider>
 
-            <Content className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-6 min-h-[600px]">
+            <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 min-h-[600px]">
                 <Routes>
                     <Route path="/" element={<SpeedEntryMarks />} />
                     <Route path="/attendance" element={<AttendanceModule />} />
@@ -196,7 +196,7 @@ function SpeedEntryMarks() {
                 <Text type="secondary">{t('teacher.enterMarksInfo')}</Text>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700">
+            <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Row gutter={16}>
                     <Col xs={24} md={8}>
                         <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
@@ -345,7 +345,7 @@ function AttendanceModule() {
                 <Text type="secondary">{t('teacher.recordAttendanceInfo')}</Text>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700">
+            <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Row gutter={16}>
                     <Col xs={24} md={12}>
                         <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
@@ -372,7 +372,7 @@ function AttendanceModule() {
             </Card>
 
             {isLoading ? (
-                <div className="bg-white dark:bg-[#1e293b] p-6 rounded-lg border border-slate-100 dark:border-slate-700 space-y-4 shadow-sm text-center">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-lg border border-slate-100 dark:border-slate-800 space-y-4 shadow-sm text-center">
                     <Skeleton active paragraph={{ rows: 5 }} />
                 </div>
             ) : (

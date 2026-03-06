@@ -75,15 +75,15 @@ export default function App() {
           colorPrimary: isDarkMode ? '#22c55e' : '#166534',
           borderRadius: 8,
           fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
-          colorBgContainer: isDarkMode ? '#1e293b' : '#ffffff',
-          colorBgLayout: isDarkMode ? '#0f172a' : '#f8fafc',
+          colorBgContainer: isDarkMode ? '#0f172a' : '#ffffff',
+          colorBgLayout: isDarkMode ? '#020617' : '#f8fafc',
           colorBgElevated: isDarkMode ? '#1e293b' : '#ffffff',
           colorTextHeading: isDarkMode ? '#f8fafc' : '#0f172a',
         },
         components: {
           Layout: {
-            headerBg: isDarkMode ? '#1e293b' : '#ffffff',
-            siderBg: isDarkMode ? '#1e293b' : '#ffffff',
+            headerBg: isDarkMode ? '#0f172a' : '#ffffff',
+            siderBg: isDarkMode ? '#0f172a' : '#ffffff',
           },
           Menu: {
             itemBg: 'transparent',
@@ -92,9 +92,9 @@ export default function App() {
         }
       }}
     >
-      <Layout className="min-h-screen flex-1 w-full flex flex-col bg-slate-50 dark:bg-slate-900">
+      <Layout className="min-h-screen flex-1 w-full flex flex-col bg-slate-50 dark:bg-slate-950">
         <Header
-          className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-800 dark:border-slate-700"
+          className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800"
           style={{ height: '64px' }}
         >
           <Space align="center" size="middle">
