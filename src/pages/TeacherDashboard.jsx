@@ -26,6 +26,7 @@ import {
     Tag,
     Divider,
     message,
+    Skeleton,
     Empty,
     Radio,
     DatePicker
@@ -78,7 +79,7 @@ export default function TeacherDashboard() {
             <Sider
                 width={240}
                 style={{ flexShrink: 0 }}
-                className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block transition-colors"
+                className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block"
             >
                 <div style={{ padding: '16px' }}>
                     <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
@@ -94,7 +95,7 @@ export default function TeacherDashboard() {
                 />
             </Sider>
 
-            <Content className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-6 min-h-[600px] transition-colors">
+            <Content className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-6 min-h-[600px]">
                 <Routes>
                     <Route path="/" element={<SpeedEntryMarks />} />
                     <Route path="/attendance" element={<AttendanceModule />} />
@@ -111,7 +112,9 @@ function SpeedEntryMarks() {
     const [assessmentDate, setAssessmentDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [localMarks, setLocalMarks] = useState({});
 
-    const allStudents = useLiveQuery(() => db.students.toArray()) || [];
+    const allStudentsData = useLiveQuery(() => db.students.toArray());
+    const allStudents = allStudentsData || [];
+    const isLoading = allStudentsData === undefined;
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
     const dbGrades = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
     const gradeOptions = [
@@ -193,7 +196,7 @@ function SpeedEntryMarks() {
                 <Text type="secondary">{t('teacher.enterMarksInfo')}</Text>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700 transition-colors">
+            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700">
                 <Row gutter={16}>
                     <Col xs={24} md={8}>
                         <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
@@ -228,14 +231,20 @@ function SpeedEntryMarks() {
                 </Row>
             </Card>
 
-            <Table
-                columns={columns}
-                dataSource={studentsInGrade}
-                rowKey="id"
-                pagination={false}
-                className="shadow-sm rounded-lg overflow-hidden border border-slate-100"
-                locale={{ emptyText: <Empty description={selectedGrade ? t('teacher.noStudentsInGrade') : t('teacher.selectGrade')} /> }}
-            />
+            {isLoading ? (
+                <div className="bg-white dark:bg-[#1e293b] p-6 rounded-lg border border-slate-100 dark:border-slate-700 space-y-4 shadow-sm text-center">
+                    <Skeleton active paragraph={{ rows: 5 }} />
+                </div>
+            ) : (
+                <Table
+                    columns={columns}
+                    dataSource={studentsInGrade}
+                    rowKey="id"
+                    pagination={false}
+                    className="shadow-sm rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700"
+                    locale={{ emptyText: <Empty description={selectedGrade ? t('teacher.noStudentsInGrade') : t('teacher.selectGrade')} /> }}
+                />
+            )}
         </div>
     );
 }
@@ -246,7 +255,9 @@ function AttendanceModule() {
     const [attendanceDate, setAttendanceDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [localAttendance, setLocalAttendance] = useState({});
 
-    const allStudents = useLiveQuery(() => db.students.toArray()) || [];
+    const allStudentsData = useLiveQuery(() => db.students.toArray());
+    const allStudents = allStudentsData || [];
+    const isLoading = allStudentsData === undefined;
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
     const dbGrades2 = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
     const gradeOptions2 = [
@@ -334,7 +345,7 @@ function AttendanceModule() {
                 <Text type="secondary">{t('teacher.recordAttendanceInfo')}</Text>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700 transition-colors">
+            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700">
                 <Row gutter={16}>
                     <Col xs={24} md={12}>
                         <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
@@ -360,14 +371,20 @@ function AttendanceModule() {
                 </Row>
             </Card>
 
-            <Table
-                columns={columns}
-                dataSource={studentsInGrade}
-                rowKey="id"
-                pagination={false}
-                className="shadow-sm rounded-lg overflow-hidden border border-slate-100"
-                locale={{ emptyText: <Empty description={selectedGrade ? t('teacher.noStudentsInGrade') : t('teacher.selectGrade')} /> }}
-            />
+            {isLoading ? (
+                <div className="bg-white dark:bg-[#1e293b] p-6 rounded-lg border border-slate-100 dark:border-slate-700 space-y-4 shadow-sm text-center">
+                    <Skeleton active paragraph={{ rows: 5 }} />
+                </div>
+            ) : (
+                <Table
+                    columns={columns}
+                    dataSource={studentsInGrade}
+                    rowKey="id"
+                    pagination={false}
+                    className="shadow-sm rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700"
+                    locale={{ emptyText: <Empty description={selectedGrade ? t('teacher.noStudentsInGrade') : t('teacher.selectGrade')} /> }}
+                />
+            )}
         </div>
     );
 }

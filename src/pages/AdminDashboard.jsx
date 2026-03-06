@@ -37,7 +37,8 @@ import {
     Layout,
     Menu,
     notification,
-    DatePicker
+    DatePicker,
+    Skeleton
 } from 'antd';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
@@ -114,7 +115,7 @@ export default function AdminDashboard() {
             <Sider
                 width={240}
                 style={{ flexShrink: 0 }}
-                className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block transition-colors"
+                className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mr-6 hidden md:block"
             >
                 <div style={{ padding: '16px' }}>
                     <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
@@ -130,7 +131,7 @@ export default function AdminDashboard() {
                 />
             </Sider>
 
-            <Content className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-6 min-h-[600px] transition-colors">
+            <Content className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-6 min-h-[600px]">
                 <Routes>
                     <Route path="/" element={<StudentRegistration />} />
                     <Route path="/certificates" element={<CertificateGenerator />} />
@@ -188,7 +189,7 @@ function SystemDataManagement() {
                 <Text type="secondary">Manage the underlying database system.</Text>
             </div>
 
-            <Card className="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900 transition-colors">
+            <Card className="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900">
                 <div className="flex flex-col gap-4 w-full">
                     <div>
                         <Text strong className="text-red-700 dark:text-red-500 text-lg flex items-center gap-2 mb-2">
@@ -233,7 +234,9 @@ function StudentRegistration() {
     const [filterGrade, setFilterGrade] = useState('');
     const [isFormValid, setIsFormValid] = useState(false);
 
-    const students = useLiveQuery(() => db.students.toArray()) || [];
+    const studentsData = useLiveQuery(() => db.students.toArray());
+    const students = studentsData || [];
+    const isLoadingStudents = studentsData === undefined;
 
     const handleValuesChange = (_, allValues) => {
         setIsFormValid(!!(allValues.name && allValues.grade));
@@ -642,7 +645,7 @@ function StudentRegistration() {
                 </div>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700 transition-colors">
+            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700">
                 <Form
                     form={form}
                     onFinish={handleRegister}
@@ -776,15 +779,22 @@ function StudentRegistration() {
 
             <div className="bg-white dark:bg-[#1e293b] rounded-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
                 <div className="overflow-hidden">
-                    <Table
-                        columns={columns}
-                        dataSource={filteredStudents}
-                        rowKey="id"
-                        pagination={false}
-                        scroll={{ y: 500 }}
-                        className="students-table"
-                        locale={{ emptyText: <Empty description={t('admin.noStudentsYet')} /> }}
-                    />
+                    {isLoadingStudents ? (
+                        <div className="p-6 space-y-4">
+                            <Skeleton active paragraph={{ rows: 1 }} title={false} />
+                            <Skeleton active paragraph={{ rows: 5 }} />
+                        </div>
+                    ) : (
+                        <Table
+                            columns={columns}
+                            dataSource={filteredStudents}
+                            rowKey="id"
+                            pagination={false}
+                            scroll={{ y: 500 }}
+                            className="students-table"
+                            locale={{ emptyText: <Empty description={t('admin.noStudentsYet')} /> }}
+                        />
+                    )}
                 </div>
             </div>
 
@@ -945,7 +955,7 @@ function CertificateGenerator() {
                 <Text type="secondary">{t('admin.generatorDesc')}</Text>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700 transition-colors">
+            <Card className="bg-slate-50 dark:bg-[#1e293b] border-slate-200 dark:border-slate-700">
                 <div className="flex flex-col gap-4 w-full">
                     <div>
                         <Text strong style={{ display: 'block', marginBottom: '8px' }}>
