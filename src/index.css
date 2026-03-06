@@ -163,6 +163,16 @@ button,
   background: #1e293b !important;
 }
 
+.dark .ant-picker-dropdown,
+.dark .ant-picker-panel-container {
+  background-color: #1e293b !important;
+}
+
+.dark .ant-picker-header,
+.dark .ant-picker-content th {
+  color: #e2e8f0 !important;
+}
+
 /* Table */
 .dark .ant-table {
   background: #1e293b !important;
@@ -245,6 +255,30 @@ button,
 
 .dark .ant-menu-item-selected {
   background-color: rgba(34, 197, 94, 0.10) !important;
+}
+
+/* Modals */
+.dark .ant-modal-content,
+.dark .ant-modal-header {
+  background-color: #1e293b !important;
+}
+
+.dark .ant-modal-header {
+  border-bottom-color: #334155 !important;
+}
+
+.dark .ant-modal-title {
+  color: #f8fafc !important;
+  background-color: #1e293b !important;
+}
+
+.dark .ant-modal-footer {
+  border-top-color: #334155 !important;
+}
+
+/* Form Item Extra (Ethiopian Preview) */
+.dark .ant-form-item-extra {
+  color: #94a3b8 !important;
 }
 
 /* Dividers */

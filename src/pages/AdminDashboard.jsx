@@ -36,7 +36,8 @@ import {
     Tooltip,
     Layout,
     Menu,
-    notification
+    notification,
+    DatePicker
 } from 'antd';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
@@ -46,6 +47,7 @@ import Papa from 'papaparse';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 const { Content, Sider } = Layout;
@@ -268,6 +270,25 @@ function StudentRegistration() {
 
     const currentEthiopianDateDisplay = formatEthiopianDate();
 
+    // Watch values for real-time preview
+    const regDateOfEntry = Form.useWatch('dateOfEntry', form);
+    const editDateOfEntry = Form.useWatch('dateOfEntry', editForm);
+
+    // Helper for real-time Ethiopian date preview in forms
+    const EthiopianDatePreview = ({ value }) => {
+        if (!value) return null;
+        try {
+            const dateString = value.toISOString();
+            return (
+                <div className="mt-1 text-xs text-slate-500 flex items-center gap-1">
+                    <span className="notranslate" translate="no">📅 {formatEthiopianDate(dateString)}</span>
+                </div>
+            );
+        } catch (e) {
+            return null;
+        }
+    };
+
     const handleRegister = async (values) => {
         // Duplicate name check — warn admin but allow override
         const existingWithSameName = students.filter(
@@ -289,13 +310,15 @@ function StudentRegistration() {
         }
 
         try {
+            const academicYear = values.dateOfEntry ? values.dateOfEntry.toISOString() : new Date().toISOString();
             await db.students.add({
                 id: crypto.randomUUID(),
                 ...values,
-                academicYear: new Date().toISOString(),
+                academicYear,
                 synced: 0,
             });
             form.resetFields();
+            form.setFieldsValue({ dateOfEntry: dayjs() });
             setIsFormValid(false);
             message.success('ተማሪ በተሳካ ሁኙ ተመዘግቷል!');
         } catch (err) {
@@ -316,14 +339,23 @@ function StudentRegistration() {
 
     const showEditModal = (student) => {
         setEditingStudent(student);
-        editForm.setFieldsValue(student);
+        editForm.setFieldsValue({
+            ...student,
+            dateOfEntry: student.academicYear ? dayjs(student.academicYear) : dayjs()
+        });
         setIsEditModalVisible(true);
     };
 
     const handleEditSave = async () => {
         try {
             const values = await editForm.validateFields();
-            await db.students.update(editingStudent.id, { ...values, synced: 0 });
+            const academicYear = values.dateOfEntry ? values.dateOfEntry.toISOString() : editingStudent.academicYear;
+
+            await db.students.update(editingStudent.id, {
+                ...values,
+                academicYear,
+                synced: 0
+            });
             setIsEditModalVisible(false);
             message.success('Student record updated.');
         } catch (err) {
@@ -637,8 +669,16 @@ function StudentRegistration() {
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Form.Item label={t('admin.dateOfEntry', 'Date of Entry')}>
-                                <Input disabled value={currentEthiopianDateDisplay} style={{ color: '#64748b', backgroundColor: 'transparent' }} />
+                            <Form.Item
+                                label={t('admin.dateOfEntry', 'Date of Entry')}
+                                name="dateOfEntry"
+                                initialValue={dayjs()}
+                                extra={<EthiopianDatePreview value={regDateOfEntry} />}
+                            >
+                                <DatePicker
+                                    className="w-full cursor-pointer"
+                                    format="DD/MM/YYYY"
+                                />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}>
@@ -794,11 +834,14 @@ function StudentRegistration() {
                         </Col>
                         <Col xs={24} md={12}>
                             <Form.Item
-                                label={t('admin.academicYear')}
-                                name="academicYear"
-                                tooltip="ለምሳሌ: 25 የካቲት 2018 ዓ.ም"
+                                label={t('admin.dateOfEntry', 'Date of Entry')}
+                                name="dateOfEntry"
+                                extra={<EthiopianDatePreview value={editDateOfEntry} />}
                             >
-                                <Input placeholder="e.g. 25 የካቲት 2018 ዓ.ም" />
+                                <DatePicker
+                                    className="w-full cursor-pointer"
+                                    format="DD/MM/YYYY"
+                                />
                             </Form.Item>
                         </Col>
                     </Row>

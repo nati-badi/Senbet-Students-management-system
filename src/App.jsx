@@ -77,6 +77,8 @@ export default function App() {
           fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif',
           colorBgContainer: isDarkMode ? '#1e293b' : '#ffffff',
           colorBgLayout: isDarkMode ? '#0f172a' : '#f8fafc',
+          colorBgElevated: isDarkMode ? '#1e293b' : '#ffffff',
+          colorTextHeading: isDarkMode ? '#f8fafc' : '#0f172a',
         },
         components: {
           Layout: {
