@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     EditOutlined,
@@ -9,7 +9,10 @@ import {
     BookOutlined,
     CheckOutlined,
     ClockCircleOutlined,
-    CloseOutlined
+    CloseOutlined,
+    ScanOutlined,
+    TeamOutlined,
+    HomeOutlined
 } from '@ant-design/icons';
 import {
     Layout,
@@ -19,6 +22,7 @@ import {
     Card,
     Select,
     Input,
+    Form,
     Table,
     Button,
     Row,
@@ -29,12 +33,14 @@ import {
     Skeleton,
     Empty,
     Radio,
+    notification,
     DatePicker
 } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
 import dayjs from 'dayjs';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
@@ -63,6 +69,11 @@ export default function TeacherDashboard() {
 
     const menuItems = [
         {
+            key: '/',
+            icon: <HomeOutlined />,
+            label: <Link to="/">{t('app.title')}</Link>
+        },
+        {
             key: '/teacher',
             icon: <EditOutlined />,
             label: <Link to="/teacher">{t('teacher.markEntry')}</Link>
@@ -75,7 +86,7 @@ export default function TeacherDashboard() {
     ];
 
     return (
-        <Layout className="bg-transparent" style={{ overflow: 'hidden' }}>
+        <Layout className="bg-transparent">
             <Sider
                 width={240}
                 style={{ flexShrink: 0 }}
@@ -88,10 +99,9 @@ export default function TeacherDashboard() {
                 </div>
                 <Menu
                     mode="inline"
-                    selectedKeys={[location.pathname]}
+                    selectedKeys={[location.pathname === '/teacher/' ? '/teacher' : location.pathname]}
                     items={menuItems}
                     className="border-none"
-                    onClick={({ key }) => navigate(key)}
                 />
             </Sider>
 
@@ -308,6 +318,59 @@ function AttendanceModule() {
         }
     };
 
+    const handleMarkAllPresent = async () => {
+        if (!selectedGrade || studentsInGrade.length === 0) return;
+
+        const newAttendance = { ...localAttendance };
+        try {
+            for (const student of studentsInGrade) {
+                newAttendance[student.id] = 'present';
+                const existingRecord = await db.attendance
+                    .filter(a => a.studentId === student.id && a.date === attendanceDate)
+                    .first();
+
+                if (existingRecord) {
+                    await db.attendance.update(existingRecord.id, { status: 'present', synced: 0 });
+                } else {
+                    await db.attendance.add({
+                        id: crypto.randomUUID(),
+                        studentId: student.id,
+                        date: attendanceDate,
+                        status: 'present',
+                        synced: 0
+                    });
+                }
+            }
+            setLocalAttendance(newAttendance);
+            message.success(t('teacher.markAllPresentSuccess', 'Successfully marked all as present'));
+        } catch (err) {
+            console.error("Bulk attendance failed:", err);
+            message.error("Failed to update all students.");
+        }
+    };
+
+    const handleScanSuccess = async (decodedText) => {
+        // decodedText is the studentId 
+        const student = allStudents.find(s => s.id === decodedText);
+        if (!student) {
+            message.error(t('teacher.studentNotFound'));
+            return;
+        }
+
+        // Only record if student is in the selected grade (or if no grade selected, just record it)
+        if (selectedGrade && student.grade !== selectedGrade) {
+            message.warning(`Student is from ${student.grade}, not ${selectedGrade}`);
+            // Still record it though, as they are present
+        }
+
+        await handleAttendanceChange(student.id, 'present');
+        notification.success({
+            message: t('teacher.scanSuccess', { name: student.name }),
+            placement: 'topRight',
+            duration: 2
+        });
+    };
+
     const columns = [
         { title: t('admin.name'), dataIndex: 'name', key: 'name' },
         {
@@ -346,8 +409,8 @@ function AttendanceModule() {
             </div>
 
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-                <Row gutter={16}>
-                    <Col xs={24} md={12}>
+                <Row gutter={16} align="bottom">
+                    <Col xs={24} md={8}>
                         <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
                             <Select
                                 placeholder={t('teacher.selectGrade')}
@@ -359,7 +422,7 @@ function AttendanceModule() {
                             />
                         </Form.Item>
                     </Col>
-                    <Col xs={24} md={12}>
+                    <Col xs={24} md={8}>
                         <Form.Item label={t('teacher.date')} style={{ marginBottom: 0 }}>
                             <DatePicker
                                 style={{ width: '100%' }}
@@ -368,8 +431,22 @@ function AttendanceModule() {
                             />
                         </Form.Item>
                     </Col>
+                    <Col xs={24} md={8}>
+                        <Space className="w-full">
+                            <Button
+                                icon={<TeamOutlined />}
+                                onClick={handleMarkAllPresent}
+                                disabled={!selectedGrade || studentsInGrade.length === 0}
+                                className="w-full"
+                            >
+                                {t('teacher.markAllPresent')}
+                            </Button>
+                        </Space>
+                    </Col>
                 </Row>
             </Card>
+
+            <QRScanner onScanSuccess={handleScanSuccess} />
 
             {isLoading ? (
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-lg border border-slate-100 dark:border-slate-800 space-y-4 shadow-sm text-center">
@@ -386,5 +463,63 @@ function AttendanceModule() {
                 />
             )}
         </div>
+    );
+}
+
+function QRScanner({ onScanSuccess }) {
+    const [isScanning, setIsScanning] = useState(false);
+    const { t } = useTranslation();
+    const scannerRef = useRef(null);
+
+    useEffect(() => {
+        if (isScanning) {
+            const scanner = new Html5QrcodeScanner(
+                "reader",
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                false
+            );
+            scanner.render(onScanSuccess, (err) => {
+                // Ignore silent errors
+            });
+            scannerRef.current = scanner;
+        } else {
+            if (scannerRef.current) {
+                scannerRef.current.clear().catch(err => console.error("Failed to clear scanner", err));
+                scannerRef.current = null;
+            }
+        }
+
+        return () => {
+            if (scannerRef.current) {
+                scannerRef.current.clear().catch(err => console.error("Failed to clear scanner on unmount", err));
+            }
+        };
+    }, [isScanning]);
+
+    return (
+        <Card className="bg-slate-900 border-slate-800 overflow-hidden relative min-h-[100px] flex flex-col items-center justify-center mb-6">
+            {!isScanning ? (
+                <Button
+                    type="primary"
+                    size="large"
+                    icon={<ScanOutlined />}
+                    onClick={() => setIsScanning(true)}
+                    className="h-16 px-12 text-lg rounded-full shadow-lg hover:scale-105 transition-transform"
+                >
+                    {t('teacher.scanID')}
+                </Button>
+            ) : (
+                <div className="w-full max-w-[500px] flex flex-col items-center">
+                    <div id="reader" className="w-full bg-black rounded-xl overflow-hidden mb-4"></div>
+                    <Button
+                        danger
+                        onClick={() => setIsScanning(false)}
+                        className="rounded-full"
+                    >
+                        {t('teacher.stopScanning')}
+                    </Button>
+                </div>
+            )}
+        </Card>
     );
 }

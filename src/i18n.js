@@ -55,7 +55,13 @@ const resources = {
                 "generatorDesc": "Automatically generate PDF mark sheets / certificates for all students.",
                 "downloadAllCertificates": "Download All Certificates (PDF)",
                 "noMarksYet": "No marks have been recorded yet. Cannot generate certificates.",
-                "selectGradeCerts": "Select Grade to Generate"
+                "selectGradeCerts": "Select Grade to Generate",
+                "idCards": "ID Cards",
+                "idCardGenerator": "Student ID Cards",
+                "idCardDesc": "Generate high-quality ID cards with QR codes for each student.",
+                "downloadIDCards": "Download all ID Cards",
+                "finalCertificates": "Final Certificates",
+                "certificateTemplateDesc": "Generate beautiful graduation certificates based on your custom template."
             },
             "teacher": {
                 "menu": "Teacher Menu",
@@ -74,7 +80,13 @@ const resources = {
                 "absent": "Absent",
                 "late": "Late",
                 "savedLocal": "Saved Locally",
-                "noStudentsInGrade": "No students found in this grade."
+                "noStudentsInGrade": "No students found in this grade.",
+                "scanID": "Scan ID Card",
+                "stopScanning": "Stop Camera",
+                "startScanning": "Start Camera",
+                "scanSuccess": "Attendance recorded for {{name}}!",
+                "studentNotFound": "Student not found in database.",
+                "markAllPresent": "Mark All Present"
             }
         }
     },
@@ -130,7 +142,13 @@ const resources = {
                 "generatorDesc": "ለሁሉም ተማሪዎች በራስ ሰር የPDF የምስክር ወረቀቶችን ይፍጠሩ።",
                 "downloadAllCertificates": "የምስክር ወረቀቶችን ያውርዱ (PDF)",
                 "noMarksYet": "ምንም አይነት ውጤት አልተመዘገበም። የምስክር ወረቀት ማመንጨት አይቻልም።",
-                "selectGradeCerts": "ለመፍጠር ክፍል ይምረጡ"
+                "selectGradeCerts": "ለመፍጠር ክፍል ይምረጡ",
+                "idCards": "መታወቂያ ካርዶች",
+                "idCardGenerator": "የተማሪ መታወቂያ ካርዶች",
+                "idCardDesc": "ለእያንዳንዱ ተማሪ የQR ኮድ ያላቸው ጥራት ያላቸው መታወቂያዎችን ይፍጠሩ።",
+                "downloadIDCards": "ሁሉንም መታወቂያዎች ያውርዱ",
+                "finalCertificates": "የምስክር ወረቀቶች",
+                "certificateTemplateDesc": "በእርስዎ ምርጫ መሰረት የተሰሩ የሚያማምሩ የምስክር ወረቀቶችን ይፍጠሩ።"
             },
             "teacher": {
                 "menu": "የመምህራን ምናሌ",
@@ -149,7 +167,13 @@ const resources = {
                 "absent": "ቀሪ",
                 "late": "አርፍዷል",
                 "savedLocal": "ተቀምጧል (Local)",
-                "noStudentsInGrade": "በዚህ ክፍል ተማሪዎች አልተገኙም።"
+                "noStudentsInGrade": "በዚህ ክፍል ተማሪዎች አልተገኙም።",
+                "scanID": "መታወቂያ ይቃኙ",
+                "stopScanning": "ካሜራ ያቁሙ",
+                "startScanning": "ካሜራ ይክፈቱ",
+                "scanSuccess": "ለ {{name}} ክትትል ተመዝግቧል!",
+                "studentNotFound": "ተማሪው በውሂብ ጎታ ውስጥ አልተገኘም።",
+                "markAllPresent": "ሁሉንም ተገኝተዋል በል"
             }
         }
     }

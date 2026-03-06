@@ -13,7 +13,9 @@ import {
     PlusOutlined,
     LockOutlined,
     DownloadOutlined,
-    WarningOutlined
+    WarningOutlined,
+    IdcardOutlined,
+    HomeOutlined
 } from '@ant-design/icons';
 import {
     Table,
@@ -49,6 +51,8 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
+import { QRCodeCanvas } from 'qrcode.react';
+import html2canvas from 'html2canvas';
 
 const { Title, Text } = Typography;
 const { Content, Sider } = Layout;
@@ -94,6 +98,11 @@ export default function AdminDashboard() {
 
     const menuItems = [
         {
+            key: '/',
+            icon: <HomeOutlined />,
+            label: <Link to="/">{t('app.title')}</Link>
+        },
+        {
             key: '/admin',
             icon: <UserAddOutlined />,
             label: <Link to="/admin">{t('admin.registerStudents')}</Link>
@@ -104,6 +113,11 @@ export default function AdminDashboard() {
             label: <Link to="/admin/certificates">{t('admin.certificates')}</Link>
         },
         {
+            key: '/admin/id-cards',
+            icon: <IdcardOutlined />,
+            label: <Link to="/admin/id-cards">{t('admin.idCards')}</Link>
+        },
+        {
             key: '/admin/data',
             icon: <DatabaseOutlined />,
             label: <Link to="/admin/data">{t('admin.systemData')}</Link>
@@ -111,7 +125,7 @@ export default function AdminDashboard() {
     ];
 
     return (
-        <Layout className="bg-transparent" style={{ overflow: 'hidden' }}>
+        <Layout className="bg-transparent">
             <Sider
                 width={240}
                 style={{ flexShrink: 0 }}
@@ -124,21 +138,31 @@ export default function AdminDashboard() {
                 </div>
                 <Menu
                     mode="inline"
-                    selectedKeys={[location.pathname]}
+                    selectedKeys={[location.pathname === '/admin/' ? '/admin' : location.pathname]}
                     items={menuItems}
                     className="border-none"
-                    onClick={({ key }) => navigate(key)}
                 />
             </Sider>
 
             <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 min-h-[600px]">
                 <Routes>
                     <Route path="/" element={<StudentRegistration />} />
-                    <Route path="/certificates" element={<CertificateGenerator />} />
+                    <Route path="/certificates" element={<DocumentGenerator type="certificate" />} />
+                    <Route path="/id-cards" element={<DocumentGenerator type="id-card" />} />
                     <Route path="/data" element={<SystemDataManagement />} />
+                    <Route path="/sync" element={<SyncCenter />} />
                 </Routes>
             </Content>
         </Layout>
+    );
+}
+
+function SyncCenter() {
+    const { t } = useTranslation();
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[400px]">
+            <Empty description={t('common.comingSoon')} />
+        </div>
     );
 }
 
@@ -881,112 +905,237 @@ function StudentRegistration() {
     );
 }
 
-function CertificateGenerator() {
+function DocumentGenerator({ type }) {
     const { t } = useTranslation();
+    const [selectedGrade, setSelectedGrade] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
     const students = useLiveQuery(() => db.students.toArray()) || [];
     const allMarks = useLiveQuery(() => db.marks.toArray()) || [];
-    const [selectedGrade, setSelectedGrade] = useState('');
+    const templateRef = useRef(null);
 
     const uniqueGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
+    const gradeStudents = students.filter(s => s.grade === selectedGrade);
 
-    const generateCertificates = () => {
-        if (!selectedGrade) return;
-        const gradeStudents = students.filter(s => s.grade === selectedGrade);
-        if (gradeStudents.length === 0) {
-            message.warning('No students in this grade.');
-            return;
-        }
+    const handleGenerate = async () => {
+        if (!selectedGrade || gradeStudents.length === 0) return;
+        setIsGenerating(true);
+        const doc = new jsPDF(type === 'id-card' ? 'p' : 'p', 'mm', 'a4');
 
-        const doc = new jsPDF();
-        gradeStudents.forEach((student, index) => {
-            if (index > 0) doc.addPage();
-            doc.setFillColor(248, 250, 252);
-            doc.rect(0, 0, 210, 297, 'F');
-            doc.setDrawColor(22, 101, 52);
-            doc.setLineWidth(1.5);
-            doc.rect(10, 10, 190, 277);
+        try {
+            for (let i = 0; i < gradeStudents.length; i++) {
+                const student = gradeStudents[i];
+                const element = document.getElementById(`temp-${type}-${student.id}`);
+                if (!element) continue;
 
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(26);
-            doc.setTextColor(15, 23, 42);
-            doc.text("Certificate of Achievement", 105, 40, { align: "center" });
+                // Simple batching: if not first page, add new page
+                if (i > 0) doc.addPage();
 
-            doc.setFontSize(16);
-            doc.text("በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት", 105, 50, { align: "center" });
-
-            doc.setFontSize(14);
-            doc.text(`This certifies that`, 105, 80, { align: "center" });
-
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(22);
-            doc.setTextColor(22, 101, 52);
-            doc.text(student.name, 105, 95, { align: "center" });
-
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(14);
-            doc.setTextColor(15, 23, 42);
-            doc.text(`has successfully completed Grade ${student.grade}.`, 105, 110, { align: "center" });
-
-            const studentMarks = allMarks.filter(m => m.studentId === student.id);
-            if (studentMarks.length > 0) {
-                doc.autoTable({
-                    startY: 130,
-                    head: [['Subject', 'Date', 'Score']],
-                    body: studentMarks.map(m => [m.subject, m.assessmentDate, m.score]),
-                    theme: 'striped',
-                    headStyles: { fillColor: [15, 23, 42], textColor: 255 },
-                    margin: { left: 20, right: 20 }
+                const canvas = await html2canvas(element, {
+                    scale: 3, // High quality
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: null
                 });
-            } else {
-                doc.setFontSize(12);
-                doc.setTextColor(100, 116, 139);
-                doc.text(t('admin.noMarksYet'), 105, 140, { align: "center" });
-            }
-        });
 
-        doc.save(`Senbet_Certificates_${selectedGrade}.pdf`);
-        message.success('Certificates generated!');
+                const imgData = canvas.toDataURL('image/png');
+                if (type === 'id-card') {
+                    // Place multiple cards per page or just one large one? 
+                    // User said "id card", usually 8 or 10 per page. 
+                    // For simplicity, let's do 1 focused card per page for now, or scaled to fit.
+                    const imgProps = doc.getImageProperties(imgData);
+                    const pdfWidth = doc.internal.pageSize.getWidth();
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                } else {
+                    const imgProps = doc.getImageProperties(imgData);
+                    const pdfWidth = doc.internal.pageSize.getWidth();
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                }
+            }
+            doc.save(`Senbet_${type === 'id-card' ? 'ID_Cards' : 'Certificates'}_${selectedGrade}.pdf`);
+            message.success(t('common.success', 'Generation complete!'));
+        } catch (err) {
+            console.error("PDF Gen Error:", err);
+            message.error("Failed to generate documents.");
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     return (
-        <div className="flex flex-col gap-6 w-full max-w-[600px]">
-            <div>
-                <Title level={2}>{t('admin.generateCertificates')}</Title>
-                <Text type="secondary">{t('admin.generatorDesc')}</Text>
+        <div className="flex flex-col gap-6 w-full">
+            <div className="max-w-[600px]">
+                <Title level={2}>{type === 'id-card' ? t('admin.idCardGenerator') : t('admin.finalCertificates')}</Title>
+                <Text type="secondary">{type === 'id-card' ? t('admin.idCardDesc') : t('admin.certificateTemplateDesc')}</Text>
+
+                <Card className="mt-6 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
+                    <Space direction="vertical" className="w-full" size="middle">
+                        <div>
+                            <Text strong style={{ display: 'block', marginBottom: '8px' }}>{t('admin.selectGradeCerts')}</Text>
+                            <Select
+                                placeholder={t('teacher.selectGrade')}
+                                value={selectedGrade}
+                                onChange={setSelectedGrade}
+                                style={{ width: '100%' }}
+                                size="large"
+                                options={uniqueGrades.map(g => ({ value: g, label: g }))}
+                            />
+                        </div>
+                        <Button
+                            type="primary"
+                            icon={<FilePdfOutlined />}
+                            size="large"
+                            block
+                            disabled={!selectedGrade || gradeStudents.length === 0}
+                            loading={isGenerating}
+                            onClick={handleGenerate}
+                        >
+                            {type === 'id-card' ? t('admin.downloadIDCards') : t('admin.downloadAllCertificates')}
+                        </Button>
+                    </Space>
+                </Card>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-                <div className="flex flex-col gap-4 w-full">
-                    <div>
-                        <Text strong style={{ display: 'block', marginBottom: '8px' }}>
-                            {t('admin.selectGradeCerts')}
-                        </Text>
-                        <Select
-                            placeholder={t('teacher.selectGrade')}
-                            value={selectedGrade}
-                            onChange={setSelectedGrade}
-                            style={{ width: '100%' }}
-                            size="large"
-                        >
-                            {uniqueGrades.map(g => (
-                                <Select.Option key={g} value={g}>{g}</Select.Option>
-                            ))}
-                        </Select>
+            {/* Hidden Templates for html2canvas */}
+            <div className="opacity-0 pointer-events-none fixed top-[5000px] left-0">
+                {gradeStudents.map(student => (
+                    <div key={student.id} id={`temp-${type}-${student.id}`} style={{ width: type === 'id-card' ? '86mm' : '210mm', padding: '10px' }}>
+                        {type === 'id-card' ? (
+                            <IDCardTemplate student={student} />
+                        ) : (
+                            <CertificateTemplate student={student} marks={allMarks.filter(m => m.studentId === student.id)} />
+                        )}
                     </div>
-
-                    <Button
-                        type="primary"
-                        icon={<FilePdfOutlined />}
-                        disabled={!selectedGrade}
-                        onClick={generateCertificates}
-                        size="large"
-                        block
-                        className="cursor-pointer"
-                    >
-                        {t('admin.downloadAllCertificates')}
-                    </Button>
-                </div>
-            </Card>
+                ))}
+            </div>
         </div>
     );
+}
+
+function IDCardTemplate({ student }) {
+    return (
+        <div className="w-[86mm] h-[54mm] bg-white border-[2px] border-slate-900 rounded-xl overflow-hidden flex flex-col relative text-slate-900 font-sans shadow-lg">
+            {/* Header */}
+            <div className="bg-slate-900 text-white p-2 flex items-center justify-between">
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-bold">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</span>
+                    <span className="text-[7px] uppercase tracking-tighter">Finote Birhan Senbet School</span>
+                </div>
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                    <IdcardOutlined className="text-white text-lg" />
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 flex p-2 gap-3 items-center">
+                {/* Photo Placeholder */}
+                <div className="w-[20mm] h-[24mm] border-2 border-slate-200 rounded-lg flex flex-col items-center justify-center bg-slate-50 overflow-hidden">
+                    <UserOutlined className="text-slate-300 text-3xl mb-1" />
+                    <span className="text-[6px] text-slate-400 uppercase">Student Photo</span>
+                </div>
+
+                {/* Details */}
+                <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
+                    <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">FullName / ሙሉ ስም</span>
+                    <span className="text-[11px] font-bold text-slate-900 leading-tight mb-1 truncate">{student.name}</span>
+
+                    <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Baptismal / የክርስትና ስም</span>
+                    <span className="text-[9px] font-semibold text-slate-700 leading-tight mb-1 truncate">{student.baptismalName || '-'}</span>
+
+                    <div className="flex gap-4">
+                        <div>
+                            <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Grade / ክፍል</span>
+                            <div className="text-[9px] font-bold">{student.grade}</div>
+                        </div>
+                        <div>
+                            <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Year / ዘመን</span>
+                            <div className="text-[9px] font-bold">{student.academicYear || dayjs().format('YYYY')}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* QR Code */}
+                <div className="p-1 bg-white border border-slate-100 rounded-lg">
+                    <QRCodeCanvas value={student.id} size={50} level="H" />
+                    <div className="text-[5px] text-center mt-0.5 text-slate-400 font-mono italic">SCAN FOR ATTENDANCE</div>
+                </div>
+            </div>
+
+            {/* Footer decoration */}
+            <div className="h-1 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 w-full" />
+        </div>
+    );
+}
+
+function CertificateTemplate({ student, marks }) {
+    const totalScore = marks.length > 0 ? marks.reduce((acc, m) => acc + (m.score || 0), 0) : 0;
+    const avgScore = marks.length > 0 ? (totalScore / marks.length).toFixed(1) : 0;
+
+    return (
+        <div className="w-[190mm] h-[277mm] bg-white border-[12px] border-double border-slate-900 p-12 flex flex-col items-center text-slate-900 relative font-serif">
+            {/* Corner Decorations */}
+            <div className="absolute top-4 left-4 border-t-4 border-l-4 border-slate-900 w-12 h-12" />
+            <div className="absolute top-4 right-4 border-t-4 border-r-4 border-slate-900 w-12 h-12" />
+            <div className="absolute bottom-4 left-4 border-b-4 border-l-4 border-slate-900 w-12 h-12" />
+            <div className="absolute bottom-4 right-4 border-b-4 border-r-4 border-slate-900 w-12 h-12" />
+
+            <div className="flex flex-col items-center mb-12 text-center">
+                <Title level={2} className="!mb-0 !text-slate-900 italic font-serif">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
+                <Text className="text-xl uppercase tracking-widest font-bold">Finote Birhan Senbet School</Text>
+                <div className="w-32 h-1 bg-slate-900 my-4" />
+                <Title level={1} className="!mb-8 !text-5xl uppercase tracking-tighter text-slate-800">Certificate of Completion</Title>
+            </div>
+
+            <Text className="text-2xl italic mb-6">This is to certify that</Text>
+
+            <div className="border-b-2 border-slate-900 w-full text-center pb-2 mb-8">
+                <Title level={1} className="!mb-0 !text-6xl text-slate-900">{student.name}</Title>
+            </div>
+
+            <Text className="text-xl text-center max-w-2xl leading-relaxed mb-12">
+                has successfully completed the studies and clinical requirements of <br />
+                <span className="font-bold text-2xl uppercase">{student.grade}</span> <br />
+                with distinction and academic excellence during the year of {student.academicYear || dayjs().format('YYYY')}.
+            </Text>
+
+            {/* Statistics Table */}
+            <div className="w-full mt-8 border-2 border-slate-200 p-8 rounded-2xl bg-slate-50/50">
+                <div className="grid grid-cols-2 gap-8">
+                    <div className="flex flex-col">
+                        <span className="text-slate-400 uppercase text-sm font-bold tracking-widest mb-2">Academic Performance</span>
+                        <div className="flex items-end gap-2">
+                            <Title level={2} className="!mb-0 !text-4xl text-slate-900">{avgScore}%</Title>
+                            <span className="text-slate-500 mb-1">Average Score</span>
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                        <span className="text-slate-400 uppercase text-sm font-bold tracking-widest mb-2">Baptismal Name</span>
+                        <Title level={3} className="!mb-0 !text-2xl text-slate-800">{student.baptismalName || 'N/A'}</Title>
+                    </div>
+                </div>
+
+                <div className="mt-8 pt-8 border-t border-slate-200 grid grid-cols-2 gap-12 text-center">
+                    <div className="flex flex-col items-center">
+                        <div className="w-48 border-b border-slate-900 mb-2 h-12" />
+                        <span className="text-sm font-bold uppercase tracking-tighter">School Administrator</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                        <div className="w-48 border-b border-slate-900 mb-2 h-12" />
+                        <span className="text-sm font-bold uppercase tracking-tighter">Grade Coordinator</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Seal Placeholder */}
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-40 h-40 border-4 border-double border-slate-200 rounded-full flex items-center justify-center opacity-50 rotate-12">
+                <div className="text-[10px] font-bold text-center text-slate-300 uppercase">Official School Seal</div>
+            </div>
+        </div>
+    );
+}
+
+// Keep older generator as fallback or delete if refactor is complete
+function CertificateGenerator() {
+    return <DocumentGenerator type="certificate" />;
 }
