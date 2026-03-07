@@ -16,7 +16,8 @@ const resources = {
                 "comingSoon": "Coming Soon",
                 "save": "Save",
                 "actions": "Actions",
-                "delete": "Delete"
+                "delete": "Delete",
+                "searchPlaceholder": "Search by name or ID..."
             },
             "admin": {
                 "menu": "Admin Menu",
@@ -40,7 +41,6 @@ const resources = {
                 "academicYear": "Academic Year",
                 "importData": "Import Excel/CSV",
                 "dateOfEntry": "Date of Entry",
-                "searchPlaceholder": "Search by name or phone...",
                 "allGrades": "All Grades",
                 "edit": "Edit",
                 "cancel": "Cancel",
@@ -105,7 +105,17 @@ const resources = {
                 "studentNotFound": "Student not found in database.",
                 "markAllPresent": "Mark All Present",
                 "selectAssessment": "Select Assessment",
-                "invalidScoreRange": "Score must be between 0 and {{max}}"
+                "invalidScoreRange": "Score must be between 0 and {{max}}",
+                "noClass": "No Class",
+                "clearAttendance": "Clear Attendance",
+                "viewProfile": "View Profile",
+                "studentProfile": "Student Profile",
+                "attendanceSummary": "Attendance Summary",
+                "marksHistory": "Marks History",
+                "totalPresent": "Total Present",
+                "totalLate": "Total Late",
+                "totalAbsent": "Total Absent",
+                "totalNoClass": "Total No Class"
             }
         }
     },
@@ -122,7 +132,8 @@ const resources = {
                 "comingSoon": "በቅርቡ የሚመጣ",
                 "save": "አስቀምጥ",
                 "actions": "እርምጃዎች",
-                "delete": "ሰርዝ"
+                "delete": "ሰርዝ",
+                "searchPlaceholder": "በስም ወይም በመታወቂያ ቁጥር ፈልግ..."
             },
             "admin": {
                 "menu": "የአስተዳዳሪ ምናሌ",
@@ -146,7 +157,6 @@ const resources = {
                 "academicYear": "የትምህርት ዘመን",
                 "importData": "ከ Excel/CSV አስገባ",
                 "dateOfEntry": "የምዝገባ ቀን",
-                "searchPlaceholder": "በስም ወይም በስልክ ቁጥር ፈልግ...",
                 "allGrades": "ሁሉም ክፍሎች",
                 "edit": "አስተካክል",
                 "cancel": "ሰርዝ",
@@ -211,7 +221,17 @@ const resources = {
                 "studentNotFound": "ተማሪው በውሂብ ጎታ ውስጥ አልተገኘም።",
                 "markAllPresent": "ሁሉንም ተገኝተዋል በል",
                 "selectAssessment": "ምዘና ይምረጡ",
-                "invalidScoreRange": "ውጤቱ ከ 0 እስከ {{max}} መሆን አለበት"
+                "invalidScoreRange": "ውጤቱ ከ 0 እስከ {{max}} መሆን አለበት",
+                "noClass": "ክፍል የለም",
+                "clearAttendance": "መገኘቱን አጽዳ",
+                "viewProfile": "መገለጫውን ይመልከቱ",
+                "studentProfile": "የተማሪ መገለጫ",
+                "attendanceSummary": "የመገኘት ማጠቃለያ",
+                "marksHistory": "የውጤት ታሪክ",
+                "totalPresent": "ጠቅላላ የተገኙ",
+                "totalLate": "ጠቅላላ የዘገዩ",
+                "totalAbsent": "ጠቅላላ የቀሩ",
+                "totalNoClass": "ጠቅላላ ክፍል የሌላቸው"
             }
         }
     }

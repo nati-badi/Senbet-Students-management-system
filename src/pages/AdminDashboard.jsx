@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     UserAddOutlined,
+    UserOutlined,
     FilePdfOutlined,
     DatabaseOutlined,
     DeleteOutlined,
@@ -54,6 +55,7 @@ import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
 import { QRCodeCanvas } from 'qrcode.react';
 import html2canvas from 'html2canvas';
+import StudentProfile from '../components/StudentProfile';
 
 const { Title, Text } = Typography;
 const { Content, Sider } = Layout;
@@ -293,6 +295,7 @@ function StudentRegistration() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterGrade, setFilterGrade] = useState('');
     const [isFormValid, setIsFormValid] = useState(false);
+    const [profileStudentId, setProfileStudentId] = useState(null);
 
     const studentsData = useLiveQuery(() => db.students.toArray());
     const students = studentsData || [];
@@ -680,6 +683,14 @@ function StudentRegistration() {
                             className="cursor-pointer"
                         />
                     </Popconfirm>
+                    <Tooltip title={t('teacher.viewProfile')}>
+                        <Button
+                            type="text"
+                            icon={<UserOutlined className="text-blue-500" />}
+                            onClick={() => setProfileStudentId(record.id)}
+                            className="cursor-pointer"
+                        />
+                    </Tooltip>
                 </Space>
             )
         },
@@ -926,6 +937,12 @@ function StudentRegistration() {
                     </Row>
                 </Form>
             </Modal>
+
+            <StudentProfile
+                studentId={profileStudentId}
+                visible={!!profileStudentId}
+                onClose={() => setProfileStudentId(null)}
+            />
         </div>
     );
 }

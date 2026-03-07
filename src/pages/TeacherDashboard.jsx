@@ -12,7 +12,10 @@ import {
     CloseOutlined,
     ScanOutlined,
     TeamOutlined,
-    HomeOutlined
+    HomeOutlined,
+    MinusCircleOutlined,
+    DeleteOutlined,
+    SearchOutlined
 } from '@ant-design/icons';
 import {
     Layout,
@@ -34,13 +37,15 @@ import {
     Empty,
     Radio,
     notification,
-    DatePicker
+    DatePicker,
+    Modal
 } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
 import dayjs from 'dayjs';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import StudentProfile from '../components/StudentProfile';
 
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
@@ -90,6 +95,7 @@ export default function TeacherDashboard() {
     const location = useLocation();
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const [profileStudentId, setProfileStudentId] = useState(null);
 
     const menuItems = [
         {
@@ -131,19 +137,30 @@ export default function TeacherDashboard() {
 
             <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 min-h-[600px]">
                 <Routes>
-                    <Route path="/" element={<SpeedEntryMarks />} />
-                    <Route path="/attendance" element={<AttendanceModule />} />
+                    <Route path="/" element={<SpeedEntryMarks setProfileStudentId={setProfileStudentId} />} />
+                    <Route path="/attendance" element={<AttendanceModule setProfileStudentId={setProfileStudentId} />} />
                 </Routes>
             </Content>
+
+            <Modal
+                title={t('admin.studentProfile')}
+                open={!!profileStudentId}
+                onCancel={() => setProfileStudentId(null)}
+                footer={null}
+                width={800}
+            >
+                {profileStudentId && <StudentProfile studentId={profileStudentId} />}
+            </Modal>
         </Layout>
     );
 }
 
-function SpeedEntryMarks() {
+function SpeedEntryMarks({ setProfileStudentId }) {
     const { t } = useTranslation();
     const [selectedGrade, setSelectedGrade] = useState('');
     const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
     const [localMarks, setLocalMarks] = useState({});
+    const [searchQuery, setSearchQuery] = useState('');
 
     const allStudentsData = useLiveQuery(() => db.students.toArray());
     const assessmentsData = useLiveQuery(() => db.assessments.toArray());
@@ -161,7 +178,13 @@ function SpeedEntryMarks() {
         .map(g => ({ value: String(g), label: formatGrade(g) }));
 
     const gradeOptions = [...GRADE_OPTIONS, ...extraGradeOptions];
-    const studentsInGrade = allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
+    const studentsInGrade = allStudents
+        .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
+        .filter(s => {
+            if (!searchQuery) return true;
+            const q = searchQuery.toLowerCase();
+            return s.name?.toLowerCase().includes(q) || s.id?.toLowerCase().includes(q);
+        });
 
     useEffect(() => {
         if (!selectedAssessmentId) return;
@@ -235,6 +258,20 @@ function SpeedEntryMarks() {
                 />
             )
         },
+        {
+            title: t('common.actions'),
+            key: 'actions',
+            width: 100,
+            render: (_, record) => (
+                <Button
+                    type="link"
+                    icon={<UserOutlined />}
+                    onClick={() => setProfileStudentId(record.id)}
+                >
+                    {t('teacher.viewProfile')}
+                </Button>
+            )
+        }
     ];
 
     return (
@@ -246,7 +283,7 @@ function SpeedEntryMarks() {
 
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Row gutter={16} align="bottom">
-                    <Col xs={24} md={8}>
+                    <Col xs={24} md={6}>
                         <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
                             <Select
                                 placeholder={t('teacher.selectGrade')}
@@ -261,7 +298,18 @@ function SpeedEntryMarks() {
                             />
                         </Form.Item>
                     </Col>
-                    <Col xs={24} md={8}>
+                    <Col xs={24} md={6}>
+                        <Form.Item label={t('common.searchPlaceholder')} style={{ marginBottom: 0 }}>
+                            <Input
+                                placeholder={t('common.searchPlaceholder')}
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                prefix={<SearchOutlined className="text-slate-400" />}
+                                allowClear
+                            />
+                        </Form.Item>
+                    </Col>
+                    <Col xs={24} md={6}>
                         <Form.Item label={t('teacher.selectAssessment')} style={{ marginBottom: 0 }}>
                             <Select
                                 placeholder={t('teacher.selectAssessment')}
@@ -278,7 +326,7 @@ function SpeedEntryMarks() {
                         </Form.Item>
                     </Col>
                     {selectedAssessment && (
-                        <Col xs={24} md={8}>
+                        <Col xs={24} md={6}>
                             <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded flex justify-between items-center h-[32px]">
                                 <Text strong className="text-blue-700 dark:text-blue-300">
                                     {t('admin.maxScore')}: {selectedAssessment.maxScore}
@@ -310,11 +358,12 @@ function SpeedEntryMarks() {
     );
 }
 
-function AttendanceModule() {
+function AttendanceModule({ setProfileStudentId }) {
     const { t } = useTranslation();
     const [selectedGrade, setSelectedGrade] = useState('');
     const [attendanceDate, setAttendanceDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [localAttendance, setLocalAttendance] = useState({});
+    const [searchQuery, setSearchQuery] = useState('');
 
     const allStudentsData = useLiveQuery(() => db.students.toArray());
     const allStudents = allStudentsData || [];
@@ -326,7 +375,13 @@ function AttendanceModule() {
         .map(g => ({ value: String(g), label: formatGrade(g) }));
 
     const gradeOptions2 = [...GRADE_OPTIONS, ...extraGradeOptions2];
-    const studentsInGrade = allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
+    const studentsInGrade = allStudents
+        .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
+        .filter(s => {
+            if (!searchQuery) return true;
+            const q = searchQuery.toLowerCase();
+            return s.name?.toLowerCase().includes(q) || s.id?.toLowerCase().includes(q);
+        });
 
     useEffect(() => {
         if (!selectedGrade || !attendanceDate) return;
@@ -401,8 +456,31 @@ function AttendanceModule() {
         }
     };
 
+    const handleClearAttendance = async () => {
+        if (!selectedGrade || studentsInGrade.length === 0) return;
+
+        const newAttendance = { ...localAttendance };
+        try {
+            for (const student of studentsInGrade) {
+                delete newAttendance[student.id];
+                const existingRecord = await db.attendance
+                    .filter(a => a.studentId === student.id && a.date === attendanceDate)
+                    .first();
+
+                if (existingRecord) {
+                    await db.attendance.delete(existingRecord.id);
+                }
+            }
+            setLocalAttendance(newAttendance);
+            message.success(t('teacher.clearAttendanceSuccess', 'Attendance cleared successfully'));
+        } catch (err) {
+            console.error("Clear attendance failed:", err);
+            message.error("Failed to clear attendance.");
+        }
+    };
+
     const handleScanSuccess = async (decodedText) => {
-        // decodedText is the studentId 
+        // decodedText is the studentId
         const student = allStudents.find(s => s.id === decodedText);
         if (!student) {
             message.error(t('teacher.studentNotFound'));
@@ -436,22 +514,54 @@ function AttendanceModule() {
                     <Radio.Group
                         value={currentStatus}
                         onChange={e => handleAttendanceChange(record.id, e.target.value)}
-                        buttonStyle="solid"
                         size="small"
+                        className="attendance-radio-group"
                     >
-                        <Radio.Button value="present" className="cursor-pointer">
+                        <Radio.Button
+                            value="present"
+                            className="cursor-pointer"
+                            style={currentStatus === 'present' ? { backgroundColor: '#22c55e', borderColor: '#22c55e', color: 'white' } : {}}
+                        >
                             <CheckOutlined /> {t('teacher.present')}
                         </Radio.Button>
-                        <Radio.Button value="late" className="cursor-pointer">
+                        <Radio.Button
+                            value="late"
+                            className="cursor-pointer"
+                            style={currentStatus === 'late' ? { backgroundColor: '#f59e0b', borderColor: '#f59e0b', color: 'white' } : {}}
+                        >
                             <ClockCircleOutlined /> {t('teacher.late')}
                         </Radio.Button>
-                        <Radio.Button value="absent" className="cursor-pointer">
+                        <Radio.Button
+                            value="absent"
+                            className="cursor-pointer"
+                            style={currentStatus === 'absent' ? { backgroundColor: '#ef4444', borderColor: '#ef4444', color: 'white' } : {}}
+                        >
                             <CloseOutlined /> {t('teacher.absent')}
+                        </Radio.Button>
+                        <Radio.Button
+                            value="no_class"
+                            className="cursor-pointer"
+                            style={currentStatus === 'no_class' ? { backgroundColor: '#64748b', borderColor: '#64748b', color: 'white' } : {}}
+                        >
+                            <MinusCircleOutlined /> {t('teacher.noClass')}
                         </Radio.Button>
                     </Radio.Group>
                 );
             }
         },
+        {
+            title: '',
+            key: 'profile',
+            width: 50,
+            render: (_, record) => (
+                <Button
+                    type="text"
+                    icon={<UserOutlined className="text-blue-500" />}
+                    onClick={() => setProfileStudentId(record.id)}
+                    title={t('teacher.viewProfile')}
+                />
+            )
+        }
     ];
 
     return (
@@ -463,7 +573,7 @@ function AttendanceModule() {
 
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Row gutter={16} align="bottom">
-                    <Col xs={24} md={8}>
+                    <Col xs={24} md={6}>
                         <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
                             <Select
                                 placeholder={t('teacher.selectGrade')}
@@ -475,7 +585,7 @@ function AttendanceModule() {
                             />
                         </Form.Item>
                     </Col>
-                    <Col xs={24} md={8}>
+                    <Col xs={24} md={6}>
                         <Form.Item label={t('teacher.date')} style={{ marginBottom: 0 }}>
                             <DatePicker
                                 style={{ width: '100%' }}
@@ -484,13 +594,32 @@ function AttendanceModule() {
                             />
                         </Form.Item>
                     </Col>
-                    <Col xs={24} md={8}>
-                        <Space className="w-full">
+                    <Col xs={24} md={6}>
+                        <Form.Item label={t('common.searchPlaceholder')} style={{ marginBottom: 0 }}>
+                            <Input
+                                placeholder={t('common.searchPlaceholder')}
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                prefix={<SearchOutlined className="text-slate-400" />}
+                                allowClear
+                            />
+                        </Form.Item>
+                    </Col>
+                    <Col xs={24} md={6}>
+                        <Space className="w-full justify-end" size="small">
                             <Button
+                                icon={<DeleteOutlined />}
+                                onClick={handleClearAttendance}
+                                disabled={!selectedGrade || studentsInGrade.length === 0}
+                                danger
+                            >
+                                {t('teacher.clearAttendance')}
+                            </Button>
+                            <Button
+                                type="primary"
                                 icon={<TeamOutlined />}
                                 onClick={handleMarkAllPresent}
                                 disabled={!selectedGrade || studentsInGrade.length === 0}
-                                className="w-full"
                             >
                                 {t('teacher.markAllPresent')}
                             </Button>

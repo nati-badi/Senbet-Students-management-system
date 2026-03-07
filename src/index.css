@@ -90,3 +90,14 @@ html.dark .ant-table-body::-webkit-scrollbar-thumb {
   background: #334155;
   border-radius: 4px;
 }
+
+/* Hide Number Input Spinners (Up/Down Arrows) */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+}
