@@ -61,7 +61,24 @@ const resources = {
                 "idCardDesc": "Generate high-quality ID cards with QR codes for each student.",
                 "downloadIDCards": "Download all ID Cards",
                 "finalCertificates": "Final Certificates",
-                "certificateTemplateDesc": "Generate beautiful graduation certificates based on your custom template."
+                "certificateTemplateDesc": "Generate beautiful graduation certificates based on your custom template.",
+                "subjects": "Subjects",
+                "manageSubjects": "Manage subjects that teachers can choose from.",
+                "addSubject": "Add Subject",
+                "subjectName": "Subject Name",
+                "subjectNamePlaceholder": "e.g. Math",
+                "deleteSubjectConfirm": "Are you sure you want to delete this subject?",
+                "subjectAdded": "Subject added successfully!",
+                "subjectDeleted": "Subject deleted successfully!",
+                "assessments": "Assessments",
+                "manageAssessments": "Define school tests, quizzes, and exams with maximum scores.",
+                "addAssessment": "Add Assessment",
+                "assessmentName": "Assessment Name",
+                "assessmentNamePlaceholder": "e.g. Midterm exam",
+                "maxScore": "Max Score",
+                "deleteAssessmentConfirm": "Are you sure you want to delete this assessment?",
+                "assessmentAdded": "Assessment added successfully!",
+                "assessmentDeleted": "Assessment deleted successfully!"
             },
             "teacher": {
                 "menu": "Teacher Menu",
@@ -72,7 +89,7 @@ const resources = {
                 "selectGrade": "Select Grade",
                 "subject": "Subject (e.g. Math)",
                 "assessmentLabel": "Assessment Name (e.g. Midterm)",
-                "enterMarksInfo": "Select a grade and subject to quickly enter marks for all students.",
+                "enterMarksInfo": "Select a grade and assessment to quickly enter marks for all students.",
                 "recordAttendanceInfo": "Select a grade and date to record daily attendance.",
                 "date": "Date",
                 "score": "Score / Out of 100",
@@ -86,7 +103,9 @@ const resources = {
                 "startScanning": "Start Camera",
                 "scanSuccess": "Attendance recorded for {{name}}!",
                 "studentNotFound": "Student not found in database.",
-                "markAllPresent": "Mark All Present"
+                "markAllPresent": "Mark All Present",
+                "selectAssessment": "Select Assessment",
+                "invalidScoreRange": "Score must be between 0 and {{max}}"
             }
         }
     },
@@ -148,7 +167,24 @@ const resources = {
                 "idCardDesc": "ለእያንዳንዱ ተማሪ የQR ኮድ ያላቸው ጥራት ያላቸው መታወቂያዎችን ይፍጠሩ።",
                 "downloadIDCards": "ሁሉንም መታወቂያዎች ያውርዱ",
                 "finalCertificates": "የምስክር ወረቀቶች",
-                "certificateTemplateDesc": "በእርስዎ ምርጫ መሰረት የተሰሩ የሚያማምሩ የምስክር ወረቀቶችን ይፍጠሩ።"
+                "certificateTemplateDesc": "በእርስዎ ምርጫ መሰረት የተሰሩ የሚያማምሩ የምስክር ወረቀቶችን ይፍጠሩ።",
+                "subjects": "የትምህርት ዓይነቶች",
+                "manageSubjects": "መምህራን የሚመርጧቸውን የትምህርት ዓይነቶች ያስተዳድሩ።",
+                "addSubject": "የትምህርት ዓይነት ጨምር",
+                "subjectName": "የትምህርት ዓይነት ስም",
+                "subjectNamePlaceholder": "ለምሳሌ ሂሳብ",
+                "deleteSubjectConfirm": "ይህን የትምህርት ዓይነት ለመሰረዝ እርግጠኛ ነዎት?",
+                "subjectAdded": "የትምህርት ዓይነት በተሳካ ሁኔታ ተጨምሯል!",
+                "subjectDeleted": "የትምህርት ዓይነት በተሳካ ሁኔታ ተሰርዟል!",
+                "assessments": "ምዘናዎች",
+                "manageAssessments": "የትምህርት ፈተናዎችን እና ኩይዞችን ከከፍተኛ ውጤታቸው ጋር ይግለጹ።",
+                "addAssessment": "ምዘና ጨምር",
+                "assessmentName": "የምዘና ስም",
+                "assessmentNamePlaceholder": "ለምሳሌ አጋማሽ ፈተና",
+                "maxScore": "ከፍተኛ ውጤት",
+                "deleteAssessmentConfirm": "ይህን ምዘና ለመሰረዝ እርግጠኛ ነዎት?",
+                "assessmentAdded": "ምዘና በተሳካ ሁኔታ ተጨምሯል!",
+                "assessmentDeleted": "ምዘና በተሳካ ሁኔታ ተሰርዟል!"
             },
             "teacher": {
                 "menu": "የመምህራን ምናሌ",
@@ -159,7 +195,7 @@ const resources = {
                 "selectGrade": "ክፍል ይምረጡ",
                 "subject": "የትምህርት ዓይነት (ለምሳሌ ሂሳብ)",
                 "assessmentLabel": "የምዘና ስም (ለምሳሌ አጋማሽ ፈተና)",
-                "enterMarksInfo": "ለሁሉም ተማሪዎች ውጤት በፍጥነት ለማስገባት ክፍል እና የትምህርት ዓይነት ይምረጡ።",
+                "enterMarksInfo": "ለሁሉም ተማሪዎች ውጤት በፍጥነት ለማስገባት ክፍል እና ምዘና ይምረጡ።",
                 "recordAttendanceInfo": "የዕለት ክትትል ለመመዝገብ ክፍል እና ቀን ይምረጡ።",
                 "date": "ቀን",
                 "score": "ውጤት (ከ 100)",
@@ -173,7 +209,9 @@ const resources = {
                 "startScanning": "ካሜራ ይክፈቱ",
                 "scanSuccess": "ለ {{name}} ክትትል ተመዝግቧል!",
                 "studentNotFound": "ተማሪው በውሂብ ጎታ ውስጥ አልተገኘም።",
-                "markAllPresent": "ሁሉንም ተገኝተዋል በል"
+                "markAllPresent": "ሁሉንም ተገኝተዋል በል",
+                "selectAssessment": "ምዘና ይምረጡ",
+                "invalidScoreRange": "ውጤቱ ከ 0 እስከ {{max}} መሆን አለበት"
             }
         }
     }

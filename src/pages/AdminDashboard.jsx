@@ -15,7 +15,8 @@ import {
     DownloadOutlined,
     WarningOutlined,
     IdcardOutlined,
-    HomeOutlined
+    HomeOutlined,
+    BookOutlined
 } from '@ant-design/icons';
 import {
     Table,
@@ -58,28 +59,51 @@ const { Title, Text } = Typography;
 const { Content, Sider } = Layout;
 
 // Fixed grade options for 1-12 + extra
+// Fixed grade options: store as number, label in Amharic
 const GRADE_OPTIONS = [
-    { value: '1ኛ ክፍል', label: '1ኛ ክፍል' },
-    { value: '2ኛ ክፍል', label: '2ኛ ክፍል' },
-    { value: '3ኛ ክፍል', label: '3ኛ ክፍል' },
-    { value: '4ኛ ክፍል', label: '4ኛ ክፍል' },
-    { value: '5ኛ ክፍል', label: '5ኛ ክፍል' },
-    { value: '6ኛ ክፍል', label: '6ኛ ክፍል' },
-    { value: '7ኛ ክፍል', label: '7ኛ ክፍል' },
-    { value: '8ኛ ክፍል', label: '8ኛ ክፍል' },
-    { value: '9ኛ ክፍል', label: '9ኛ ክፍል' },
-    { value: '10ኛ ክፍል', label: '10ኛ ክፍል' },
-    { value: '11ኛ ክፍል', label: '11ኛ ክፍል' },
-    { value: '12ኛ ክፍል', label: '12ኛ ክፍል' },
-    { value: '12+ (ሌላ)', label: '12+ (ሌላ)' },
+    { value: '1', label: '1ኛ ክፍል' },
+    { value: '2', label: '2ኛ ክፍል' },
+    { value: '3', label: '3ኛ ክፍል' },
+    { value: '4', label: '4ኛ ክፍል' },
+    { value: '5', label: '5ኛ ክፍል' },
+    { value: '6', label: '6ኛ ክፍል' },
+    { value: '7', label: '7ኛ ክፍል' },
+    { value: '8', label: '8ኛ ክፍል' },
+    { value: '9', label: '9ኛ ክፍል' },
+    { value: '10', label: '10ኛ ክፍል' },
+    { value: '11', label: '11ኛ ክፍል' },
+    { value: '12', label: '12ኛ ክፍል' },
+    { value: '13', label: '12+ (ሌላ)' },
 ];
+
+const formatGrade = (grade) => {
+    if (!grade) return '';
+    const s = String(grade);
+    const option = GRADE_OPTIONS.find(o => o.value === s);
+    if (option) return option.label;
+    if (s.includes('ኛ ክፍል')) return s;
+    return `${s}ኛ ክፍል`;
+};
+
+const normalizeGrade = (rawGrade) => {
+    if (!rawGrade) return '';
+    const s = String(rawGrade).toLowerCase().trim();
+    // Match "1", "Grade 1", "1ኛ ክፍል", etc.
+    const match = s.match(/(\d+)/);
+    if (match) {
+        const num = match[1];
+        if (parseInt(num) >= 1 && parseInt(num) <= 12) return num;
+        if (parseInt(num) > 12) return '13';
+    }
+    if (s.includes('ሌላ') || s.includes('other') || s.includes('12+')) return '13';
+    return rawGrade; // fallback
+};
 
 // Validators
 const validateAmharic = (_, value) => {
     if (!value) return Promise.resolve();
-    // Ethiopic Unicode block: U+1200–U+137F, spaces, and common punctuation allowed
-    const amharicOnly = /^[\u1200-\u137F\s\-/]+$/;
-    if (!amharicOnly.test(value)) return Promise.reject('ስም በአማርኛ ብቻ ይሁን');
+    // Allow both Ethiopic and standard Latin characters/spaces
+    // This makes the system more flexible while still supporting Amharic
     return Promise.resolve();
 };
 
@@ -122,6 +146,16 @@ export default function AdminDashboard() {
             icon: <DatabaseOutlined />,
             label: <Link to="/admin/data">{t('admin.systemData')}</Link>
         },
+        {
+            key: '/admin/subjects',
+            icon: <BookOutlined />,
+            label: <Link to="/admin/subjects">{t('admin.subjects')}</Link>
+        },
+        {
+            key: '/admin/assessments',
+            icon: <FilePdfOutlined />,
+            label: <Link to="/admin/assessments">{t('admin.assessments')}</Link>
+        },
     ];
 
     return (
@@ -150,6 +184,8 @@ export default function AdminDashboard() {
                     <Route path="/certificates" element={<DocumentGenerator type="certificate" />} />
                     <Route path="/id-cards" element={<DocumentGenerator type="id-card" />} />
                     <Route path="/data" element={<SystemDataManagement />} />
+                    <Route path="/subjects" element={<SubjectManagement />} />
+                    <Route path="/assessments" element={<AssessmentManagement />} />
                     <Route path="/sync" element={<SyncCenter />} />
                 </Routes>
             </Content>
@@ -456,7 +492,7 @@ function StudentRegistration() {
             }
 
             const name = String(row[nameKey] ?? '').trim();
-            const grade = String(row[gradeKey] ?? '').trim();
+            const grade = normalizeGrade(row[gradeKey]);
 
             if (!name || !grade) { errorCount++; continue; }
 
@@ -592,21 +628,10 @@ function StudentRegistration() {
             (student.baptismalName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
             (student.parentContact || "").includes(searchQuery);
 
-        const sGrade = String(student.grade).trim().toLowerCase();
-        const fGrade = String(filterGrade).trim().toLowerCase();
+        const sGrade = String(student.grade).trim();
+        const fGrade = String(filterGrade).trim();
 
-        let matchesGrade = !filterGrade || sGrade === fGrade;
-        if (!filterGrade) matchesGrade = true;
-        else if (!matchesGrade) {
-            // Fallback match: if both contain same number and same '+' status
-            const num1 = sGrade.match(/\d+/);
-            const num2 = fGrade.match(/\d+/);
-            if (num1 && num2 && num1[0] === num2[0]) {
-                const hasPlus1 = sGrade.includes('+');
-                const hasPlus2 = fGrade.includes('+');
-                if (hasPlus1 === hasPlus2) matchesGrade = true;
-            }
-        }
+        const matchesGrade = !filterGrade || sGrade === fGrade;
 
         return matchesSearch && matchesGrade;
     });
@@ -624,7 +649,7 @@ function StudentRegistration() {
             title: t('admin.grade'),
             dataIndex: 'grade',
             key: 'grade',
-            render: (text) => <Tag color="green">{text}</Tag>
+            render: (text) => <Tag color="green">{formatGrade(text)}</Tag>
         },
         { title: t('admin.contact'), dataIndex: 'parentContact', key: 'parentContact' },
         {
@@ -1138,4 +1163,284 @@ function CertificateTemplate({ student, marks }) {
 // Keep older generator as fallback or delete if refactor is complete
 function CertificateGenerator() {
     return <DocumentGenerator type="certificate" />;
+}
+
+function SubjectManagement() {
+    const { t } = useTranslation();
+    const [form] = Form.useForm();
+    const [editingId, setEditingId] = useState(null);
+
+    const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
+
+    const handleSave = async (values) => {
+        try {
+            if (editingId) {
+                await db.subjects.update(editingId, {
+                    name: values.name,
+                    synced: 0
+                });
+                message.success(t('common.save'));
+            } else {
+                await db.subjects.add({
+                    id: crypto.randomUUID(),
+                    name: values.name,
+                    synced: 0
+                });
+                message.success(t('admin.subjectAdded'));
+            }
+            form.resetFields();
+            setEditingId(null);
+        } catch (err) {
+            message.error("Error saving subject");
+        }
+    };
+
+    const handleEdit = (subject) => {
+        setEditingId(subject.id);
+        form.setFieldsValue({ name: subject.name });
+    };
+
+    const handleDelete = async (id) => {
+        await db.subjects.delete(id);
+        message.success(t('admin.subjectDeleted'));
+    };
+
+    const columns = [
+        { title: t('admin.subjectName'), dataIndex: 'name', key: 'name' },
+        {
+            title: t('common.actions'),
+            key: 'actions',
+            width: 150,
+            render: (_, record) => (
+                <Space>
+                    <Button
+                        icon={<EditOutlined />}
+                        onClick={() => handleEdit(record)}
+                        type="text"
+                    />
+                    <Popconfirm
+                        title={t('admin.deleteSubjectConfirm')}
+                        onConfirm={() => handleDelete(record.id)}
+                    >
+                        <Button
+                            icon={<DeleteOutlined />}
+                            danger
+                            type="text"
+                        />
+                    </Popconfirm>
+                </Space>
+            )
+        }
+    ];
+
+    return (
+        <div className="flex flex-col gap-6">
+            <div>
+                <Title level={2}>{t('admin.subjects')}</Title>
+                <Text type="secondary">{t('admin.manageSubjects')}</Text>
+            </div>
+
+            <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
+                <Form form={form} onFinish={handleSave} layout="inline">
+                    <Form.Item
+                        name="name"
+                        rules={[{ required: true, message: t('admin.subjectName') }]}
+                        style={{ minWidth: '300px' }}
+                    >
+                        <Input placeholder={t('admin.subjectNamePlaceholder')} />
+                    </Form.Item>
+                    <Form.Item>
+                        <Button type="primary" htmlType="submit">
+                            {editingId ? t('common.save') : t('admin.addSubject')}
+                        </Button>
+                        {editingId && (
+                            <Button className="ml-2" onClick={() => {
+                                setEditingId(null);
+                                form.resetFields();
+                            }}>
+                                {t('admin.cancel')}
+                            </Button>
+                        )}
+                    </Form.Item>
+                </Form>
+            </Card>
+
+            <Table
+                columns={columns}
+                dataSource={subjects}
+                rowKey="id"
+                pagination={false}
+                className="shadow-sm rounded-xl overflow-hidden"
+            />
+        </div>
+    );
+}
+
+function AssessmentManagement() {
+    const { t } = useTranslation();
+    const [form] = Form.useForm();
+    const [editingId, setEditingId] = useState(null);
+
+    const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
+    const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
+
+    const handleSave = async (values) => {
+        try {
+            const data = {
+                name: values.name,
+                subjectName: values.subjectName,
+                grade: values.grade,
+                maxScore: parseFloat(values.maxScore),
+                date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+                synced: 0
+            };
+
+            if (editingId) {
+                await db.assessments.update(editingId, data);
+                message.success(t('common.save'));
+            } else {
+                await db.assessments.add({
+                    id: crypto.randomUUID(),
+                    ...data
+                });
+                message.success(t('admin.assessmentAdded'));
+            }
+            form.resetFields();
+            setEditingId(null);
+        } catch (err) {
+            message.error("Error saving assessment");
+        }
+    };
+
+    const handleEdit = (assessment) => {
+        setEditingId(assessment.id);
+        form.setFieldsValue({
+            ...assessment,
+            date: assessment.date ? dayjs(assessment.date) : null
+        });
+    };
+
+    const handleDelete = async (id) => {
+        await db.assessments.delete(id);
+        message.success(t('admin.assessmentDeleted'));
+    };
+
+    const columns = [
+        { title: t('admin.name'), dataIndex: 'name', key: 'name' },
+        { title: t('admin.subjects'), dataIndex: 'subjectName', key: 'subjectName' },
+        { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
+        { title: t('admin.maxScore'), dataIndex: 'maxScore', key: 'maxScore' },
+        { title: t('teacher.date'), dataIndex: 'date', key: 'date' },
+        {
+            title: t('common.actions'),
+            key: 'actions',
+            width: 150,
+            render: (_, record) => (
+                <Space>
+                    <Button
+                        icon={<EditOutlined />}
+                        onClick={() => handleEdit(record)}
+                        type="text"
+                    />
+                    <Popconfirm
+                        title={t('admin.deleteAssessmentConfirm')}
+                        onConfirm={() => handleDelete(record.id)}
+                    >
+                        <Button
+                            icon={<DeleteOutlined />}
+                            danger
+                            type="text"
+                        />
+                    </Popconfirm>
+                </Space>
+            )
+        }
+    ];
+
+    return (
+        <div className="flex flex-col gap-6">
+            <div>
+                <Title level={2}>{t('admin.assessments')}</Title>
+                <Text type="secondary">{t('admin.manageAssessments')}</Text>
+            </div>
+
+            <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
+                <Form form={form} onFinish={handleSave} layout="vertical">
+                    <Row gutter={16}>
+                        <Col xs={24} md={8}>
+                            <Form.Item
+                                name="name"
+                                label={t('admin.assessmentName')}
+                                rules={[{ required: true }]}
+                            >
+                                <Input placeholder={t('admin.assessmentNamePlaceholder')} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item
+                                name="subjectName"
+                                label={t('admin.subjects')}
+                                rules={[{ required: true }]}
+                            >
+                                <Select showSearch>
+                                    {subjects.map(s => (
+                                        <Select.Option key={s.id} value={s.name}>{s.name}</Select.Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item
+                                name="grade"
+                                label={t('admin.grade')}
+                                rules={[{ required: true }]}
+                            >
+                                <Select options={GRADE_OPTIONS} showSearch />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item
+                                name="maxScore"
+                                label={t('admin.maxScore')}
+                                rules={[{ required: true }]}
+                            >
+                                <Input type="number" />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item
+                                name="date"
+                                label={t('teacher.date')}
+                            >
+                                <DatePicker style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={24} className="flex justify-end">
+                            <Space>
+                                {editingId && (
+                                    <Button onClick={() => {
+                                        setEditingId(null);
+                                        form.resetFields();
+                                    }}>
+                                        {t('admin.cancel')}
+                                    </Button>
+                                )}
+                                <Button type="primary" htmlType="submit">
+                                    {editingId ? t('common.save') : t('admin.addAssessment')}
+                                </Button>
+                            </Space>
+                        </Col>
+                    </Row>
+                </Form>
+            </Card>
+
+            <Table
+                columns={columns}
+                dataSource={assessments}
+                rowKey="id"
+                pagination={false}
+                className="shadow-sm rounded-xl overflow-hidden"
+            />
+        </div>
+    );
 }

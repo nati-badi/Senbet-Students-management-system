@@ -37,3 +37,26 @@ db.version(4).stores({
   trans.attendance.toCollection().modify(a => { a.synced = a.synced || 0; });
   trans.marks.toCollection().modify(m => { m.synced = m.synced || 0; });
 });
+
+db.version(5).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, parentContact, synced",
+  attendance: "++id, studentId, date, status, synced",
+  marks: "++id, studentId, assessmentDate, subject, score, synced",
+  subjects: "++id, name, synced"
+}).upgrade(trans => {
+  trans.subjects.toCollection().modify(s => { s.synced = s.synced || 0; });
+});
+
+db.version(6).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, parentContact, synced",
+  attendance: "++id, studentId, date, status, synced",
+  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, synced",
+  subjects: "++id, name, synced",
+  assessments: "++id, name, subjectName, grade, maxScore, date, synced"
+}).upgrade(trans => {
+  trans.assessments.toCollection().modify(a => { a.synced = a.synced || 0; });
+});
+
+db.version(7).stores({
+  marks: "++id, [studentId+assessmentId], studentId, assessmentDate, subject, score, assessmentId, synced",
+});

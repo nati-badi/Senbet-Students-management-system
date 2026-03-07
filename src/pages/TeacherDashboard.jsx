@@ -46,21 +46,45 @@ const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 
 // Fixed grade options (must match AdminDashboard)
+// Fixed grade options: store as number, label in Amharic
 const GRADE_OPTIONS = [
-    { value: '1ኛ ክፍል', label: '1ኛ ክፍል' },
-    { value: '2ኛ ክፍል', label: '2ኛ ክፍል' },
-    { value: '3ኛ ክፍል', label: '3ኛ ክፍል' },
-    { value: '4ኛ ክፍል', label: '4ኛ ክፍል' },
-    { value: '5ኛ ክፍል', label: '5ኛ ክፍል' },
-    { value: '6ኛ ክፍል', label: '6ኛ ክፍል' },
-    { value: '7ኛ ክፍል', label: '7ኛ ክፍል' },
-    { value: '8ኛ ክፍል', label: '8ኛ ክፍል' },
-    { value: '9ኛ ክፍል', label: '9ኛ ክፍል' },
-    { value: '10ኛ ክፍል', label: '10ኛ ክፍል' },
-    { value: '11ኛ ክፍል', label: '11ኛ ክፍል' },
-    { value: '12ኛ ክፍል', label: '12ኛ ክፍል' },
-    { value: '12+ (ሌላ)', label: '12+ (ሌላ)' },
+    { value: '1', label: '1ኛ ክፍል' },
+    { value: '2', label: '2ኛ ክፍል' },
+    { value: '3', label: '3ኛ ክፍል' },
+    { value: '4', label: '4ኛ ክፍል' },
+    { value: '5', label: '5ኛ ክፍል' },
+    { value: '6', label: '6ኛ ክፍል' },
+    { value: '7', label: '7ኛ ክፍል' },
+    { value: '8', label: '8ኛ ክፍል' },
+    { value: '9', label: '9ኛ ክፍል' },
+    { value: '10', label: '10ኛ ክፍል' },
+    { value: '11', label: '11ኛ ክፍል' },
+    { value: '12', label: '12ኛ ክፍል' },
+    { value: '13', label: '12+ (ሌላ)' },
 ];
+
+const formatGrade = (grade) => {
+    if (!grade) return '';
+    const s = String(grade);
+    const option = GRADE_OPTIONS.find(o => o.value === s);
+    if (option) return option.label;
+    if (s.includes('ኛ ክፍል')) return s;
+    return `${s}ኛ ክፍል`;
+};
+
+const normalizeGrade = (rawGrade) => {
+    if (!rawGrade) return '';
+    const s = String(rawGrade).toLowerCase().trim();
+    // Match "1", "Grade 1", "1ኛ ክፍል", etc.
+    const match = s.match(/(\d+)/);
+    if (match) {
+        const num = match[1];
+        if (parseInt(num) >= 1 && parseInt(num) <= 12) return num;
+        if (parseInt(num) > 12) return '13';
+    }
+    if (s.includes('ሌላ') || s.includes('other') || s.includes('12+')) return '13';
+    return rawGrade; // fallback
+};
 
 export default function TeacherDashboard() {
     const location = useLocation();
@@ -118,38 +142,43 @@ export default function TeacherDashboard() {
 function SpeedEntryMarks() {
     const { t } = useTranslation();
     const [selectedGrade, setSelectedGrade] = useState('');
-    const [subject, setSubject] = useState('');
-    const [assessmentDate, setAssessmentDate] = useState(dayjs().format('YYYY-MM-DD'));
+    const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
     const [localMarks, setLocalMarks] = useState({});
 
     const allStudentsData = useLiveQuery(() => db.students.toArray());
+    const assessmentsData = useLiveQuery(() => db.assessments.toArray());
     const allStudents = allStudentsData || [];
-    const isLoading = allStudentsData === undefined;
+    const allAssessments = assessmentsData || [];
+    const isLoading = allStudentsData === undefined || assessmentsData === undefined;
+
+    const filteredAssessments = allAssessments.filter(a => normalizeGrade(a.grade) === normalizeGrade(selectedGrade));
+    const selectedAssessment = allAssessments.find(a => a.id === selectedAssessmentId);
+
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
     const dbGrades = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
-    const gradeOptions = [
-        ...GRADE_OPTIONS,
-        ...dbGrades.filter(g => !GRADE_OPTIONS.some(o => o.value === g)).map(g => ({ value: g, label: g }))
-    ];
-    const studentsInGrade = allStudents.filter(s => s.grade === selectedGrade);
+    const extraGradeOptions = dbGrades
+        .filter(g => !GRADE_OPTIONS.some(o => o.value === String(g)))
+        .map(g => ({ value: String(g), label: formatGrade(g) }));
+
+    const gradeOptions = [...GRADE_OPTIONS, ...extraGradeOptions];
+    const studentsInGrade = allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
 
     useEffect(() => {
-        if (!selectedGrade || !subject || !assessmentDate) return;
+        if (!selectedAssessmentId) return;
 
         async function loadMarks() {
             const marks = await db.marks
-                .where('assessmentDate').equals(assessmentDate)
+                .where('assessmentId').equals(selectedAssessmentId)
                 .toArray();
 
-            const matchingMarks = marks.filter(m => m.subject === subject);
             const markMap = {};
-            matchingMarks.forEach(m => {
+            marks.forEach(m => {
                 markMap[m.studentId] = m.score;
             });
             setLocalMarks(markMap);
         }
         loadMarks();
-    }, [selectedGrade, subject, assessmentDate]);
+    }, [selectedAssessmentId]);
 
     const handleMarkChange = async (studentId, value) => {
         const score = parseFloat(value);
@@ -157,9 +186,14 @@ function SpeedEntryMarks() {
 
         if (isNaN(score)) return;
 
+        if (selectedAssessment && score > selectedAssessment.maxScore) {
+            message.warning(t('teacher.invalidScoreRange', { max: selectedAssessment.maxScore }));
+            return;
+        }
+
         try {
             const existingMark = await db.marks
-                .filter(m => m.studentId === studentId && m.subject === subject && m.assessmentDate === assessmentDate)
+                .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
                 .first();
 
             if (existingMark) {
@@ -168,8 +202,9 @@ function SpeedEntryMarks() {
                 await db.marks.add({
                     id: crypto.randomUUID(),
                     studentId,
-                    subject,
-                    assessmentDate,
+                    assessmentId: selectedAssessmentId,
+                    subject: selectedAssessment.subjectName,
+                    assessmentDate: selectedAssessment.date,
                     score,
                     synced: 0
                 });
@@ -182,6 +217,7 @@ function SpeedEntryMarks() {
 
     const columns = [
         { title: t('admin.name'), dataIndex: 'name', key: 'name' },
+        { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
         {
             title: t('teacher.score'),
             key: 'score',
@@ -190,10 +226,12 @@ function SpeedEntryMarks() {
             render: (_, record) => (
                 <Input
                     type="number"
-                    placeholder="0-100"
+                    placeholder={`0-${selectedAssessment?.maxScore || 100}`}
                     value={localMarks[record.id] || ''}
                     onChange={e => handleMarkChange(record.id, e.target.value)}
                     style={{ textAlign: 'right' }}
+                    max={selectedAssessment?.maxScore}
+                    min={0}
                 />
             )
         },
@@ -207,13 +245,16 @@ function SpeedEntryMarks() {
             </div>
 
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-                <Row gutter={16}>
+                <Row gutter={16} align="bottom">
                     <Col xs={24} md={8}>
                         <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
                             <Select
                                 placeholder={t('teacher.selectGrade')}
                                 value={selectedGrade}
-                                onChange={setSelectedGrade}
+                                onChange={(val) => {
+                                    setSelectedGrade(val);
+                                    setSelectedAssessmentId('');
+                                }}
                                 options={gradeOptions}
                                 allowClear
                                 showSearch
@@ -221,23 +262,33 @@ function SpeedEntryMarks() {
                         </Form.Item>
                     </Col>
                     <Col xs={24} md={8}>
-                        <Form.Item label={t('teacher.subject')} style={{ marginBottom: 0 }}>
-                            <Input
-                                placeholder="e.g. Math"
-                                value={subject}
-                                onChange={e => setSubject(e.target.value)}
+                        <Form.Item label={t('teacher.selectAssessment')} style={{ marginBottom: 0 }}>
+                            <Select
+                                placeholder={t('teacher.selectAssessment')}
+                                value={selectedAssessmentId}
+                                onChange={setSelectedAssessmentId}
+                                options={filteredAssessments.map(a => ({
+                                    value: a.id,
+                                    label: `${a.name} (${a.subjectName})`
+                                }))}
+                                allowClear
+                                showSearch
+                                disabled={!selectedGrade}
                             />
                         </Form.Item>
                     </Col>
-                    <Col xs={24} md={8}>
-                        <Form.Item label={t('teacher.date')} style={{ marginBottom: 0 }}>
-                            <DatePicker
-                                style={{ width: '100%' }}
-                                value={dayjs(assessmentDate)}
-                                onChange={(date) => setAssessmentDate(date ? date.format('YYYY-MM-DD') : '')}
-                            />
-                        </Form.Item>
-                    </Col>
+                    {selectedAssessment && (
+                        <Col xs={24} md={8}>
+                            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded flex justify-between items-center h-[32px]">
+                                <Text strong className="text-blue-700 dark:text-blue-300">
+                                    {t('admin.maxScore')}: {selectedAssessment.maxScore}
+                                </Text>
+                                <Text type="secondary" size="small">
+                                    {selectedAssessment.date}
+                                </Text>
+                            </div>
+                        </Col>
+                    )}
                 </Row>
             </Card>
 
@@ -270,11 +321,12 @@ function AttendanceModule() {
     const isLoading = allStudentsData === undefined;
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
     const dbGrades2 = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
-    const gradeOptions2 = [
-        ...GRADE_OPTIONS,
-        ...dbGrades2.filter(g => !GRADE_OPTIONS.some(o => o.value === g)).map(g => ({ value: g, label: g }))
-    ];
-    const studentsInGrade = allStudents.filter(s => s.grade === selectedGrade);
+    const extraGradeOptions2 = dbGrades2
+        .filter(g => !GRADE_OPTIONS.some(o => o.value === String(g)))
+        .map(g => ({ value: String(g), label: formatGrade(g) }));
+
+    const gradeOptions2 = [...GRADE_OPTIONS, ...extraGradeOptions2];
+    const studentsInGrade = allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
 
     useEffect(() => {
         if (!selectedGrade || !attendanceDate) return;
@@ -358,8 +410,8 @@ function AttendanceModule() {
         }
 
         // Only record if student is in the selected grade (or if no grade selected, just record it)
-        if (selectedGrade && student.grade !== selectedGrade) {
-            message.warning(`Student is from ${student.grade}, not ${selectedGrade}`);
+        if (selectedGrade && normalizeGrade(student.grade) !== normalizeGrade(selectedGrade)) {
+            message.warning(`Student is from ${formatGrade(student.grade)}, not ${formatGrade(selectedGrade)}`);
             // Still record it though, as they are present
         }
 
@@ -373,6 +425,7 @@ function AttendanceModule() {
 
     const columns = [
         { title: t('admin.name'), dataIndex: 'name', key: 'name' },
+        { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
         {
             title: t('teacher.attendance'),
             key: 'status',
