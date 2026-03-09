@@ -29,21 +29,15 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
     const attendanceRecords = useLiveQuery(() =>
         studentId ? db.attendance.where('studentId').equals(studentId).toArray() : []
-        , [studentId]);
+        , [studentId]) || [];
 
     const marks = useLiveQuery(() =>
         studentId ? db.marks.where('studentId').equals(studentId).toArray() : []
-        , [studentId]);
+        , [studentId]) || [];
 
-    const allAssessments = useLiveQuery(() => db.assessments.toArray());
+    const allAssessments = useLiveQuery(() => db.assessments.toArray()) || [];
+    const isLoading = student === undefined || allAssessments === undefined;
 
-    if (!student && visible) {
-        return (
-            <Modal title={t('teacher.studentProfile')} open={visible} onCancel={onClose} footer={null}>
-                <Empty description={t('teacher.studentNotFound')} />
-            </Modal>
-        );
-    }
 
     // --- Formatters ---
     const formatGrade = (grade) => {
@@ -84,32 +78,64 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
         return match ? match[1] : g;
     };
 
-    const studentGradeNorm = normalizeGrade(student?.grade);
-    const gradeAssessments = allAssessments?.filter(a => normalizeGrade(a.grade) === studentGradeNorm) || [];
+    const studentGradeNorm = useMemo(() => normalizeGrade(student?.grade), [student]);
+    const gradeAssessments = useMemo(() => {
+        if (!allAssessments || !studentGradeNorm) return [];
+        return allAssessments.filter(a => normalizeGrade(a.grade) === studentGradeNorm);
+    }, [allAssessments, studentGradeNorm]);
 
     // Map marks to assessments
-    const markHistory = gradeAssessments.map(assessment => {
-        const existingMark = marks?.find(m => m.assessmentId === assessment.id);
-        return {
-            key: assessment.id,
-            assessmentId: assessment.id,
-            assessmentName: assessment.name || 'Unknown',
-            subject: assessment.subjectName || 'Unknown',
-            score: existingMark ? existingMark.score : null,
-            maxScore: assessment.maxScore,
-            date: assessment.date || existingMark?.assessmentDate || '-',
-            percentage: existingMark ? ((existingMark.score / assessment.maxScore) * 100).toFixed(1) : null,
-            hasMark: !!existingMark
-        };
-    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+    const markHistory = useMemo(() => {
+        if (!gradeAssessments.length) return [];
+        return gradeAssessments.map(assessment => {
+            const existingMark = marks?.find(m => m.assessmentId === assessment.id);
+            return {
+                key: assessment.id,
+                assessmentId: assessment.id,
+                assessmentName: assessment.name || 'Unknown',
+                subject: assessment.subjectName || 'Unknown',
+                semester: assessment.semester || 'Semester I',
+                score: existingMark ? existingMark.score : null,
+                maxScore: assessment.maxScore,
+                date: assessment.date || existingMark?.assessmentDate || '-',
+                percentage: existingMark && assessment.maxScore > 0 ? ((existingMark.score / assessment.maxScore) * 100).toFixed(1) : null,
+                hasMark: !!existingMark
+            };
+        }).sort((a, b) => {
+            if (a.date === '-' || b.date === '-') return 0;
+            return new Date(b.date) - new Date(a.date);
+        });
+    }, [gradeAssessments, marks]);
 
     // Calculate Summary
-    const missingAssessments = markHistory.filter(m => !m.hasMark);
-    const completedAssessments = markHistory.filter(m => m.hasMark);
-    const totalEarnedScore = completedAssessments.reduce((acc, curr) => acc + curr.score, 0);
-    const totalMaxScore = completedAssessments.reduce((acc, curr) => acc + parseFloat(curr.maxScore || 0), 0);
-    const averagePercentage = totalMaxScore > 0 ? ((totalEarnedScore / totalMaxScore) * 100).toFixed(1) : 0;
+    const summary = useMemo(() => {
+        const missing = markHistory.filter(m => !m.hasMark);
+        const completed = markHistory.filter(m => m.hasMark);
+        const sem1 = markHistory.filter(m => m.semester === 'Semester I');
+        const sem2 = markHistory.filter(m => m.semester === 'Semester II');
+        const totalEarned = completed.reduce((acc, curr) => acc + (curr.score || 0), 0);
+        const totalMax = completed.reduce((acc, curr) => acc + (parseFloat(curr.maxScore) || 0), 0);
+        const avg = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(1) : '0';
+        return {
+            missingAssessments: missing,
+            completedAssessments: completed,
+            sem1Marks: sem1,
+            sem2Marks: sem2,
+            totalEarnedScore: totalEarned,
+            totalMaxScore: totalMax,
+            averagePercentage: avg
+        };
+    }, [markHistory]);
 
+    const { 
+        missingAssessments, 
+        completedAssessments, 
+        sem1Marks, 
+        sem2Marks, 
+        totalEarnedScore, 
+        totalMaxScore, 
+        averagePercentage 
+    } = summary;
     // --- Columns ---
     const markColumns = [
         { title: t('admin.name'), dataIndex: 'assessmentName', key: 'assessmentName', render: t => <Text strong>{t}</Text> },
@@ -142,7 +168,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             {formatGrade(student?.grade)}
                         </Tag>
                         <div>
-                            <Text type="secondary" className="text-xs uppercase tracking-widest">Entry Date: {student?.dateOfEntry ? dayjs(student.dateOfEntry).format('MMM YYYY') : '-'}</Text>
+                            <Text type="secondary" className="text-xs uppercase tracking-widest">Entry Date: {student?.academicYear ? dayjs(student.academicYear).format('MMM YYYY') : '-'}</Text>
                         </div>
                     </Col>
                 </Row>
@@ -228,95 +254,144 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                 <Tag color="purple" className="text-sm px-2 py-1">Overall Avg: {averagePercentage}%</Tag>
             </div>
 
-            <Table
-                dataSource={markHistory}
-                columns={markColumns}
-                size="small"
-                pagination={false}
-                bordered
-                className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden"
-            />
+            {sem1Marks.length > 0 && (
+                <>
+                    <Divider orientation="left" plain className="!mt-0">Semester I</Divider>
+                    <Table
+                        dataSource={sem1Marks}
+                        columns={markColumns}
+                        size="small"
+                        pagination={false}
+                        bordered
+                        className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden mb-6"
+                    />
+                </>
+            )}
+
+            {sem2Marks.length > 0 && (
+                <>
+                    <Divider orientation="left" plain className="!mt-2">Semester II</Divider>
+                    <Table
+                        dataSource={sem2Marks}
+                        columns={markColumns}
+                        size="small"
+                        pagination={false}
+                        bordered
+                        className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden"
+                    />
+                </>
+            )}
+
+            {sem1Marks.length === 0 && sem2Marks.length === 0 && (
+                <Empty description="No assessments found in this grade." className="my-8" />
+            )}
         </div>
     );
 
-    const renderLiveCertificate = () => (
-        <div className="mt-4 flex flex-col items-center bg-slate-100 dark:bg-slate-900 p-8 rounded-lg overflow-auto">
-            <div className="w-[190mm] min-h-[250mm] bg-white border-[12px] border-double border-slate-900 p-12 flex flex-col shadow-2xl relative font-serif text-slate-900 shrink-0 transform origin-top" style={{ transform: 'scale(0.8)', marginBottom: '-15%' }}>
-                {/* Corner Decorations */}
-                <div className="absolute top-4 left-4 border-t-4 border-l-4 border-slate-900 w-12 h-12" />
-                <div className="absolute top-4 right-4 border-t-4 border-r-4 border-slate-900 w-12 h-12" />
-                <div className="absolute bottom-4 left-4 border-b-4 border-l-4 border-slate-900 w-12 h-12" />
-                <div className="absolute bottom-4 right-4 border-b-4 border-r-4 border-slate-900 w-12 h-12" />
+    const renderLiveCertificate = () => {
+        const subjects = [...new Set(gradeAssessments.map(a => a.subjectName))].sort();
+        const subjectRows = subjects.map(subject => {
+            const semIEntry = markHistory.find(m => m.subject === subject && m.semester === 'Semester I');
+            const semIIEntry = markHistory.find(m => m.subject === subject && m.semester === 'Semester II');
+            
+            const semIEarned = semIEntry?.hasMark ? semIEntry.score : 0;
+            const semIMax = semIEntry ? semIEntry.maxScore : 0;
+            const semIHasData = semIEntry?.hasMark;
 
-                <div className="flex flex-col items-center mb-8 text-center">
-                    <Title level={3} className="!mb-0 !text-slate-900 italic font-serif">የተማሪ ውጤት መግለጫ (Preview)</Title>
-                    <Text className="text-lg uppercase tracking-widest font-bold">Academic Transcript</Text>
-                    <div className="w-32 h-1 bg-slate-900 my-4" />
-                </div>
+            const semIIEarned = semIIEntry?.hasMark ? semIIEntry.score : 0;
+            const semIIMax = semIIEntry ? semIIEntry.maxScore : 0;
+            const semIIHasData = semIIEntry?.hasMark;
 
-                <div className="border-b-2 border-slate-900 w-full text-center pb-2 mb-8">
-                    <Title level={2} className="!mb-0 text-slate-900">{student?.name}</Title>
-                    <Text className="text-md uppercase font-bold text-slate-500">{student?.baptismalName || 'N/A'} • {formatGrade(student?.grade)}</Text>
-                </div>
+            const totalMax = semIMax + semIIMax;
+            const totalEarned = semIEarned + semIIEarned;
+            const avgPct = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(0) : '-';
 
-                {/* Score Breakdown Table internally */}
-                <div className="w-full mb-8">
-                    <div className="grid grid-cols-4 border-b-2 border-slate-900 pb-2 mb-4 font-bold text-sm uppercase tracking-wider">
-                        <div className="col-span-2">Subject / Assessment</div>
-                        <div className="text-right">Max</div>
-                        <div className="text-right">Score</div>
+            return {
+                subject,
+                semI: semIHasData ? `${semIEarned} / ${semIMax}` : (semIEntry ? '—' : 'N/A'),
+                semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIEntry ? '—' : 'N/A'),
+                avg: avgPct !== '-' ? `${avgPct}%` : '—',
+            };
+        });
+
+        const overallAvg = totalMaxScore > 0 ? (totalEarnedScore / totalMaxScore * 100).toFixed(1) : 0;
+
+        return (
+            <div className="mt-4 flex flex-col items-center bg-slate-100 dark:bg-slate-900 p-8 rounded-lg overflow-auto">
+                <div className="w-[190mm] min-h-[250mm] bg-white border-[12px] border-double border-slate-900 p-12 flex flex-col shadow-2xl relative font-serif text-slate-900 shrink-0 transform origin-top" style={{ transform: 'scale(0.8)', marginBottom: '-10%' }}>
+                    {/* Corner Decorations */}
+                    <div className="absolute top-4 left-4 border-t-4 border-l-4 border-slate-900 w-12 h-12" />
+                    <div className="absolute top-4 right-4 border-t-4 border-r-4 border-slate-900 w-12 h-12" />
+                    <div className="absolute bottom-4 left-4 border-b-4 border-l-4 border-slate-900 w-12 h-12" />
+                    <div className="absolute bottom-4 right-4 border-b-4 border-r-4 border-slate-900 w-12 h-12" />
+
+                    <div className="flex flex-col items-center mb-8 text-center">
+                        <Title level={3} className="!mb-0 !text-slate-900 italic font-serif">የተማሪ ውጤት መግለጫ (Preview)</Title>
+                        <Text className="text-lg uppercase tracking-widest font-bold">Academic Transcript</Text>
+                        <div className="w-32 h-1 bg-slate-900 my-4" />
                     </div>
 
-                    {gradeAssessments.length === 0 ? (
-                        <div className="text-center italic text-slate-400 py-8 border border-dashed border-slate-300">
-                            No assessments defined for this grade.
+                    <div className="border-b-2 border-slate-900 w-full text-center pb-2 mb-8">
+                        <Title level={2} className="!mb-0 text-slate-900">{student?.name}</Title>
+                        <Text className="text-md uppercase font-bold text-slate-500">{student?.baptismalName || 'N/A'} • {formatGrade(student?.grade)}</Text>
+                    </div>
+
+                    {/* Score Breakdown Table internally */}
+                    <div className="w-full mb-8">
+                        <table className="w-full border-collapse text-sm">
+                            <thead>
+                                <tr className="bg-slate-900 text-white">
+                                    <th className="p-2 text-left border border-slate-900">Subject</th>
+                                    <th className="p-2 text-center border border-slate-900">Semester I</th>
+                                    <th className="p-2 text-center border border-slate-900">Semester II</th>
+                                    <th className="p-2 text-center border border-slate-900">Average</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {subjectRows.length === 0 ? (
+                                    <tr><td colSpan={4} className="text-center p-8 italic text-slate-400 border border-slate-200">No assessments defined</td></tr>
+                                ) : (
+                                    subjectRows.map((row, i) => (
+                                        <tr key={row.subject} className={i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}>
+                                            <td className="p-2 font-bold border border-slate-200">{row.subject}</td>
+                                            <td className="p-2 text-center border border-slate-200">{row.semI}</td>
+                                            <td className="p-2 text-center border border-slate-200">{row.semII}</td>
+                                            <td className="p-2 text-center font-bold border border-slate-200">{row.avg}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                            <tfoot>
+                                <tr className="bg-slate-900 text-white font-bold">
+                                    <td className="p-2 border border-slate-900">Overall Average</td>
+                                    <td colSpan={2} className="border border-slate-900"></td>
+                                    <td className="p-2 text-center border border-slate-900 text-lg">{averagePercentage}%</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    {missingAssessments.length > 0 && (
+                        <div className="mt-auto bg-red-50 border border-red-600 text-red-700 p-4 rounded text-center text-sm font-bold uppercase tracking-widest relative z-10">
+                            <WarningOutlined className="mr-2" />
+                            Incomplete Transcript - Missing {missingAssessments.length} Assessment(s)
                         </div>
-                    ) : (
-                        markHistory.map(m => (
-                            <div key={m.assessmentId} className="grid grid-cols-4 py-2 border-b border-slate-200 text-sm">
-                                <div className="col-span-2 flex flex-col">
-                                    <span className="font-bold">{m.subject}</span>
-                                    <span className="text-xs text-slate-500 leading-tight">{m.assessmentName}</span>
-                                </div>
-                                <div className="text-right font-mono self-center text-slate-500">{m.maxScore}</div>
-                                <div className="text-right self-center">
-                                    {m.hasMark ? (
-                                        <span className="font-bold font-mono text-lg">{m.score}</span>
-                                    ) : (
-                                        <span className="text-red-500 italic bg-red-50 px-2 py-0.5 rounded border border-red-200 text-xs">Pending Score</span>
-                                    )}
-                                </div>
-                            </div>
-                        ))
+                    )}
+                    {missingAssessments.length === 0 && gradeAssessments.length > 0 && (
+                        <div className="mt-auto bg-green-50 border border-green-600 text-green-700 p-4 rounded text-center text-sm font-bold uppercase tracking-widest relative z-10">
+                            <FileProtectOutlined className="mr-2" />
+                            Complete - Ready for Final Generation
+                        </div>
                     )}
 
-                    <div className="grid grid-cols-4 pt-4 mt-4 border-t-2 border-slate-900 font-bold">
-                        <div className="col-span-2 uppercase">Total / Average</div>
-                        <div className="text-right font-mono text-slate-500">{totalMaxScore}</div>
-                        <div className="text-right text-lg">{averagePercentage}%</div>
+                    {/* Seal Placeholder */}
+                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-32 h-32 border-4 border-double border-slate-200 rounded-full flex items-center justify-center opacity-30 rotate-12 pointer-events-none">
+                        <div className="text-[8px] font-bold text-center text-slate-300 uppercase leading-none">Official<br />Preview</div>
                     </div>
-                </div>
-
-                {missingAssessments.length > 0 && (
-                    <div className="mt-auto bg-red-50 border border-red-600 text-red-700 p-4 rounded text-center text-sm font-bold uppercase tracking-widest relative z-10">
-                        <WarningOutlined className="mr-2" />
-                        Incomplete Transcript - Missing {missingAssessments.length} Assessment(s)
-                    </div>
-                )}
-                {missingAssessments.length === 0 && gradeAssessments.length > 0 && (
-                    <div className="mt-auto bg-green-50 border border-green-600 text-green-700 p-4 rounded text-center text-sm font-bold uppercase tracking-widest relative z-10">
-                        <FileProtectOutlined className="mr-2" />
-                        Complete - Ready for Final Generation
-                    </div>
-                )}
-
-                {/* Seal Placeholder */}
-                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-32 h-32 border-4 border-double border-slate-200 rounded-full flex items-center justify-center opacity-30 rotate-12 pointer-events-none">
-                    <div className="text-[8px] font-bold text-center text-slate-300 uppercase leading-none">Official<br />Preview</div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const items = [
         { key: '1', label: <span><UserOutlined /> Overview</span>, children: renderOverview() },
@@ -327,15 +402,24 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
     return (
         <Modal
-            title={<Title level={4} style={{ margin: 0 }}>Student Profile</Title>}
+            title={<Title level={4} style={{ margin: 0 }}>{t('teacher.studentProfile', 'Student Profile')}</Title>}
             open={visible}
             onCancel={onClose}
             footer={null}
             width={850}
+            styles={{ body: { maxHeight: '80vh', overflowY: 'auto' } }}
             className="student-profile-modal"
-            destroyOnClose
+            destroyOnHidden
         >
-            <Tabs defaultActiveKey="1" items={items} />
+            {(isLoading) ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+                    <span>Loading...</span>
+                </div>
+            ) : !student ? (
+                <Empty description={t('teacher.studentNotFound', 'Student not found.')} />
+            ) : (
+                <Tabs defaultActiveKey="1" items={items} />
+            )}
         </Modal>
     );
 };

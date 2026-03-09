@@ -60,3 +60,7 @@ db.version(6).stores({
 db.version(7).stores({
   marks: "++id, [studentId+assessmentId], studentId, assessmentDate, subject, score, assessmentId, synced",
 });
+
+db.version(8).stores({
+  settings: "key, value" // stores key-value pairs like currentAcademicYear, currentSemester
+});

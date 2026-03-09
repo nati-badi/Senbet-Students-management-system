@@ -14,10 +14,9 @@ import {
     PlusOutlined,
     LockOutlined,
     DownloadOutlined,
-    WarningOutlined,
-    IdcardOutlined,
     HomeOutlined,
-    BookOutlined
+    BookOutlined,
+    SettingOutlined
 } from '@ant-design/icons';
 import {
     Table,
@@ -158,40 +157,58 @@ export default function AdminDashboard() {
             icon: <FilePdfOutlined />,
             label: <Link to="/admin/assessments">{t('admin.assessments')}</Link>
         },
+        {
+            key: '/admin/settings',
+            icon: <SettingOutlined />,
+            label: <Link to="/admin/settings">{t('app.settings', 'Settings')}</Link>
+        },
     ];
 
     return (
-        <Layout className="bg-transparent">
-            <Sider
-                width={240}
-                style={{ flexShrink: 0 }}
-                className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden md:block"
-            >
-                <div style={{ padding: '16px' }}>
-                    <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
-                        {t('admin.menu')}
-                    </Text>
-                </div>
+        <div className="flex flex-col w-full h-full">
+            {/* Mobile Navigation */}
+            <div className="md:hidden mb-4 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
                 <Menu
-                    mode="inline"
+                    mode="horizontal"
                     selectedKeys={[location.pathname === '/admin/' ? '/admin' : location.pathname]}
                     items={menuItems}
-                    className="border-none"
+                    className="border-none w-full overflow-x-auto flex-nowrap hide-scrollbar"
                 />
-            </Sider>
+            </div>
 
-            <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 min-h-[600px]">
-                <Routes>
-                    <Route path="/" element={<StudentRegistration />} />
-                    <Route path="/certificates" element={<DocumentGenerator type="certificate" />} />
-                    <Route path="/id-cards" element={<DocumentGenerator type="id-card" />} />
-                    <Route path="/data" element={<SystemDataManagement />} />
-                    <Route path="/subjects" element={<SubjectManagement />} />
-                    <Route path="/assessments" element={<AssessmentManagement />} />
-                    <Route path="/sync" element={<SyncCenter />} />
-                </Routes>
-            </Content>
-        </Layout>
+            <Layout className="bg-transparent">
+                <Sider
+                    width={240}
+                    style={{ flexShrink: 0 }}
+                    className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden md:block"
+                >
+                    <div style={{ padding: '16px' }}>
+                        <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
+                            {t('admin.menu')}
+                        </Text>
+                    </div>
+                    <Menu
+                        mode="inline"
+                        selectedKeys={[location.pathname === '/admin/' ? '/admin' : location.pathname]}
+                        items={menuItems}
+                        className="border-none"
+                    />
+                </Sider>
+
+                <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 md:p-6 min-h-[600px] w-full overflow-hidden">
+                    <Routes>
+                        <Route path="/" element={<StudentRegistration />} />
+                        <Route path="/certificates" element={<DocumentGenerator type="certificate" />} />
+                        <Route path="/id-cards" element={<DocumentGenerator type="id-card" />} />
+                        <Route path="/data" element={<SystemDataManagement />} />
+                        <Route path="/subjects" element={<SubjectManagement />} />
+                        <Route path="/assessments" element={<AssessmentManagement />} />
+                        <Route path="/settings" element={<SettingsManager />} />
+                        <Route path="/sync" element={<SyncCenter />} />
+                    </Routes>
+                </Content>
+            </Layout>
+        </div>
     );
 }
 
@@ -200,6 +217,84 @@ function SyncCenter() {
     return (
         <div className="flex flex-col items-center justify-center min-h-[400px]">
             <Empty description={t('common.comingSoon')} />
+        </div>
+    );
+}
+
+function SettingsManager() {
+    const { t } = useTranslation();
+    const [form] = Form.useForm();
+    
+    // Load current settings from DB
+    const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
+    
+    useEffect(() => {
+        if (settingsRows && settingsRows.length > 0) {
+            const settingsObj = {};
+            settingsRows.forEach(row => {
+                settingsObj[row.key] = row.value;
+            });
+            form.setFieldsValue({
+                currentAcademicYear: settingsObj.currentAcademicYear || dayjs().format('YYYY'),
+                currentSemester: settingsObj.currentSemester || 'Semester I'
+            });
+        } else {
+            form.setFieldsValue({
+                currentAcademicYear: dayjs().format('YYYY'),
+                currentSemester: 'Semester I'
+            });
+        }
+    }, [settingsRows, form]);
+
+    const handleSaveSettings = async (values) => {
+        try {
+            await db.settings.put({ key: 'currentAcademicYear', value: values.currentAcademicYear });
+            await db.settings.put({ key: 'currentSemester', value: values.currentSemester });
+            message.success(t('common.save', 'Settings saved successfully'));
+        } catch (error) {
+            message.error("Failed to save settings");
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-6">
+            <div>
+                <Title level={2}>{t('app.settings', 'System Settings')}</Title>
+                <Text type="secondary">Global configurations for Academic Year and Semester</Text>
+            </div>
+
+            <Card className="max-w-xl bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
+                    <Form.Item 
+                        label="Active Academic Year" 
+                        name="currentAcademicYear"
+                        rules={[{ required: true, message: 'Please enter current academic year' }]}
+                    >
+                        <Input placeholder="e.g. 2016" />
+                    </Form.Item>
+
+                    <Form.Item 
+                        label="Active Semester" 
+                        name="currentSemester"
+                        rules={[{ required: true }]}
+                    >
+                        <Select>
+                            <Select.Option value="Semester I">Semester I</Select.Option>
+                            <Select.Option value="Semester II">Semester II</Select.Option>
+                        </Select>
+                    </Form.Item>
+
+                    <Form.Item>
+                        <Button type="primary" htmlType="submit" size="large" icon={<SettingOutlined />}>
+                            {t('common.save', 'Save Global Settings')}
+                        </Button>
+                    </Form.Item>
+                </Form>
+                
+                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+                    <strong>Note:</strong> Editing the academic year controls the default year assigned to newly registered students. Editing the active semester will automatically guide teachers when they enter marks. Historic data is preserved based on the year it was entered.
+                </div>
+            </Card>
         </div>
     );
 }
@@ -296,10 +391,14 @@ function StudentRegistration() {
     const [filterGrade, setFilterGrade] = useState('');
     const [isFormValid, setIsFormValid] = useState(false);
     const [profileStudentId, setProfileStudentId] = useState(null);
+    const [generatingPdf, setGeneratingPdf] = useState(null); // studentId being generated
+    const [printStudent, setPrintStudent] = useState(null); // student for hidden template
 
     const studentsData = useLiveQuery(() => db.students.toArray());
     const students = studentsData || [];
     const isLoadingStudents = studentsData === undefined;
+    const allMarks = useLiveQuery(() => db.marks.toArray()) || [];
+    const allAssessments = useLiveQuery(() => db.assessments.toArray()) || [];
 
     const handleValuesChange = (_, allValues) => {
         setIsFormValid(!!(allValues.name && allValues.grade));
@@ -381,20 +480,21 @@ function StudentRegistration() {
         }
 
         try {
-            const academicYear = values.dateOfEntry ? values.dateOfEntry.toISOString() : new Date().toISOString();
-            await db.students.add({
-                id: crypto.randomUUID(),
-                ...values,
-                academicYear,
+            const { dateOfEntry, ...otherValues } = values;
+            const studentData = {
+                ...otherValues,
+                academicYear: dateOfEntry ? dateOfEntry.toISOString() : new Date().toISOString(),
+                createdAt: new Date().toISOString(),
                 synced: 0,
-            });
+            };
+
+            await db.students.add(studentData);
+            message.success(t('common.success', 'Student added successfully!'));
             form.resetFields();
-            form.setFieldsValue({ dateOfEntry: dayjs() });
             setIsFormValid(false);
-            message.success('ተማሪ በተሳካ ሁኙ ተመዘግቷል!');
         } catch (err) {
             console.error("Failed to add student:", err);
-            message.error('ተማሪ መዘግበት አልታቸለም።');
+            message.error(t('common.error', 'Failed to add student.'));
         }
     };
 
@@ -417,13 +517,60 @@ function StudentRegistration() {
         setIsEditModalVisible(true);
     };
 
+    const handleGenerateSinglePdf = async (student, type) => {
+        setGeneratingPdf(student.id + '-' + type);
+        setPrintStudent({ student, type });
+
+        // Wait for DOM to render the hidden template
+        await new Promise(r => setTimeout(r, 400));
+
+        try {
+            const elementId = `single-${type}-${student.id}`;
+            const element = document.getElementById(elementId);
+            if (!element) { message.error('Print template not found.'); return; }
+
+            const canvas = await html2canvas(element, {
+                scale: 3,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff',
+                onclone: (clonedDoc) => {
+                    const style = clonedDoc.createElement('style');
+                    style.innerHTML = `
+                        * { color-scheme: light !important; }
+                        [class*="bg-slate-"], [class*="text-slate-"], [class*="border-slate-"] {
+                            background-color: transparent !important;
+                            color: #0f172a !important;
+                            border-color: #e2e8f0 !important;
+                        }
+                    `;
+                    clonedDoc.head.appendChild(style);
+                }
+            });            const imgData = canvas.toDataURL('image/png');
+            const doc = new jsPDF('p', 'mm', type === 'id-card' ? [86, 54] : 'a4');
+            const imgProps = doc.getImageProperties(imgData);
+            const pdfWidth = doc.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, type === 'id-card' ? pdfHeight : Math.min(pdfHeight, doc.internal.pageSize.getHeight()));
+            doc.save(`${student.name}_${type === 'id-card' ? 'IDCard' : 'Certificate'}.pdf`);
+            message.success(`${type === 'id-card' ? 'ID Card' : 'Certificate'} downloaded!`);
+        } catch (err) {
+            console.error('Single PDF error:', err);
+            message.error('Failed to generate PDF.');
+        } finally {
+            setGeneratingPdf(null);
+            setPrintStudent(null);
+        }
+    };
+
     const handleEditSave = async () => {
         try {
             const values = await editForm.validateFields();
-            const academicYear = values.dateOfEntry ? values.dateOfEntry.toISOString() : editingStudent.academicYear;
+            const { dateOfEntry, ...otherValues } = values;
+            const academicYear = dateOfEntry ? dateOfEntry.toISOString() : editingStudent.academicYear;
 
             await db.students.update(editingStudent.id, {
-                ...values,
+                ...otherValues,
                 academicYear,
                 synced: 0
             });
@@ -666,10 +813,40 @@ function StudentRegistration() {
             key: 'actions',
             align: 'right',
             render: (_, record) => (
-                <Space>
+                <Space size="small" wrap>
+                    <Tooltip title={t('teacher.viewProfile')}>
+                        <Button
+                            type="text"
+                            icon={<UserOutlined className="text-blue-500" />}
+                            onClick={() => setProfileStudentId(record.id)}
+                            className="cursor-pointer"
+                            size="small"
+                        />
+                    </Tooltip>
+                    <Tooltip title="Print ID Card">
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<IdcardOutlined className="text-emerald-600" />}
+                            loading={generatingPdf === record.id + '-id-card'}
+                            onClick={() => handleGenerateSinglePdf(record, 'id-card')}
+                            className="cursor-pointer"
+                        />
+                    </Tooltip>
+                    <Tooltip title="Print Certificate">
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<FilePdfOutlined className="text-amber-600" />}
+                            loading={generatingPdf === record.id + '-certificate'}
+                            onClick={() => handleGenerateSinglePdf(record, 'certificate')}
+                            className="cursor-pointer"
+                        />
+                    </Tooltip>
                     <Tooltip title={t('admin.edit')}>
                         <Button
                             type="text"
+                            size="small"
                             icon={<EditOutlined />}
                             onClick={() => showEditModal(record)}
                             className="cursor-pointer"
@@ -679,18 +856,11 @@ function StudentRegistration() {
                         <Button
                             type="text"
                             danger
+                            size="small"
                             icon={<DeleteOutlined />}
                             className="cursor-pointer"
                         />
                     </Popconfirm>
-                    <Tooltip title={t('teacher.viewProfile')}>
-                        <Button
-                            type="text"
-                            icon={<UserOutlined className="text-blue-500" />}
-                            onClick={() => setProfileStudentId(record.id)}
-                            className="cursor-pointer"
-                        />
-                    </Tooltip>
                 </Space>
             )
         },
@@ -850,8 +1020,8 @@ function StudentRegistration() {
                             dataSource={filteredStudents}
                             rowKey="id"
                             pagination={false}
-                            scroll={{ y: 500 }}
-                            className="students-table"
+                            scroll={{ x: 'max-content', y: 500 }}
+                            className="students-table w-full"
                             locale={{ emptyText: <Empty description={t('admin.noStudentsYet')} /> }}
                         />
                     )}
@@ -943,6 +1113,24 @@ function StudentRegistration() {
                 visible={!!profileStudentId}
                 onClose={() => setProfileStudentId(null)}
             />
+
+            {/* Hidden single-student print template */}
+            {printStudent && (
+                <div className="opacity-0 pointer-events-none fixed top-[9999px] left-0" aria-hidden="true">
+                    <div id={`single-${printStudent.type}-${printStudent.student.id}`}
+                        style={{ width: printStudent.type === 'id-card' ? '86mm' : '210mm', background: 'white', padding: '10px' }}
+                    >
+                        {printStudent.type === 'id-card'
+                            ? <IDCardTemplate student={printStudent.student} />
+                            : <CertificateTemplate
+                                student={printStudent.student}
+                                marks={allMarks.filter(m => m.studentId === printStudent.student.id)}
+                                assessments={allAssessments}
+                              />
+                        }
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -951,8 +1139,10 @@ function DocumentGenerator({ type }) {
     const { t } = useTranslation();
     const [selectedGrade, setSelectedGrade] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [currentProcessingId, setCurrentProcessingId] = useState(null);
     const students = useLiveQuery(() => db.students.toArray()) || [];
     const allMarks = useLiveQuery(() => db.marks.toArray()) || [];
+    const allAssessments = useLiveQuery(() => db.assessments.toArray()) || [];
     const templateRef = useRef(null);
 
     const uniqueGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
@@ -966,8 +1156,20 @@ function DocumentGenerator({ type }) {
         try {
             for (let i = 0; i < gradeStudents.length; i++) {
                 const student = gradeStudents[i];
-                const element = document.getElementById(`temp-${type}-${student.id}`);
-                if (!element) continue;
+                setCurrentProcessingId(student.id);
+                
+                // Show progress message
+                const progressMsg = message.loading(`${t('common.processing', 'Processing')} ${i + 1}/${gradeStudents.length}: ${student.name}`, 0);
+
+                // Wait for React to render the specific student's template
+                await new Promise(r => setTimeout(r, 200));
+
+                const element = document.getElementById(`batch-temp-target`);
+                if (!element) {
+                    console.warn("Template target not found for", student.name);
+                    progressMsg(); // Close loading message
+                    continue;
+                }
 
                 // Simple batching: if not first page, add new page
                 if (i > 0) doc.addPage();
@@ -976,32 +1178,37 @@ function DocumentGenerator({ type }) {
                     scale: 3, // High quality
                     useCORS: true,
                     logging: false,
-                    backgroundColor: null
+                    backgroundColor: '#ffffff',
+                    onclone: (clonedDoc) => {
+                        const style = clonedDoc.createElement('style');
+                        style.innerHTML = `
+                            * { color-scheme: light !important; }
+                            [class*="bg-slate-"], [class*="text-slate-"], [class*="border-slate-"] {
+                                background-color: transparent !important;
+                                color: #0f172a !important;
+                                border-color: #e2e8f0 !important;
+                            }
+                        `;
+                        clonedDoc.head.appendChild(style);
+                    }
                 });
 
                 const imgData = canvas.toDataURL('image/png');
-                if (type === 'id-card') {
-                    // Place multiple cards per page or just one large one? 
-                    // User said "id card", usually 8 or 10 per page. 
-                    // For simplicity, let's do 1 focused card per page for now, or scaled to fit.
-                    const imgProps = doc.getImageProperties(imgData);
-                    const pdfWidth = doc.internal.pageSize.getWidth();
-                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-                } else {
-                    const imgProps = doc.getImageProperties(imgData);
-                    const pdfWidth = doc.internal.pageSize.getWidth();
-                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-                }
+                const imgProps = doc.getImageProperties(imgData);
+                const pdfWidth = doc.internal.pageSize.getWidth();
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                progressMsg(); // Close loading message
             }
             doc.save(`Senbet_${type === 'id-card' ? 'ID_Cards' : 'Certificates'}_${selectedGrade}.pdf`);
             message.success(t('common.success', 'Generation complete!'));
         } catch (err) {
             console.error("PDF Gen Error:", err);
+            message.destroy(); // Clear any hanging loading messages
             message.error("Failed to generate documents.");
         } finally {
             setIsGenerating(false);
+            setCurrentProcessingId(null);
         }
     };
 
@@ -1039,17 +1246,21 @@ function DocumentGenerator({ type }) {
                 </Card>
             </div>
 
-            {/* Hidden Templates for html2canvas */}
-            <div className="opacity-0 pointer-events-none fixed top-[5000px] left-0">
-                {gradeStudents.map(student => (
-                    <div key={student.id} id={`temp-${type}-${student.id}`} style={{ width: type === 'id-card' ? '86mm' : '210mm', padding: '10px' }}>
-                        {type === 'id-card' ? (
-                            <IDCardTemplate student={student} />
-                        ) : (
-                            <CertificateTemplate student={student} marks={allMarks.filter(m => m.studentId === student.id)} />
-                        )}
+            {/* Hidden Templates for html2canvas - Optimized to render only one at a time during batch */}
+            <div style={{ opacity: 0, pointerEvents: 'none', position: 'fixed', top: '5000px', left: 0, background: 'white' }}>
+                {isGenerating && currentProcessingId && (
+                    <div id="batch-temp-target" style={{ width: type === 'id-card' ? '325px' : '794px', padding: '10px' }}>
+                        {(() => {
+                            const student = gradeStudents.find(s => s.id === currentProcessingId);
+                            if (!student) return null;
+                            return type === 'id-card' ? (
+                                <IDCardTemplate student={student} />
+                            ) : (
+                                <CertificateTemplate student={student} marks={allMarks.filter(m => m.studentId === student.id)} assessments={allAssessments} />
+                            );
+                        })()}
                     </div>
-                ))}
+                )}
             </div>
         </div>
     );
@@ -1057,121 +1268,192 @@ function DocumentGenerator({ type }) {
 
 function IDCardTemplate({ student }) {
     return (
-        <div className="w-[86mm] h-[54mm] bg-white border-[2px] border-slate-900 rounded-xl overflow-hidden flex flex-col relative text-slate-900 font-sans shadow-lg">
+        <div style={{
+            width: '325px', height: '204px', background: '#ffffff', border: '2px solid #0f172a',
+            borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            fontFamily: 'Arial, sans-serif', boxSizing: 'border-box', position: 'relative'
+        }}>
             {/* Header */}
-            <div className="bg-slate-900 text-white p-2 flex items-center justify-between">
-                <div className="flex flex-col">
-                    <span className="text-[10px] font-bold">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</span>
-                    <span className="text-[7px] uppercase tracking-tighter">Finote Birhan Senbet School</span>
+            <div style={{ background: '#0f172a', color: '#ffffff', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 'bold' }}>በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</span>
+                    <span style={{ fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Finote Birhan Senbet School</span>
                 </div>
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                    <IdcardOutlined className="text-white text-lg" />
-                </div>
+                <div style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.15)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>🪪</div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 flex p-2 gap-3 items-center">
+            <div style={{ flex: 1, display: 'flex', padding: '8px 10px', gap: '8px', alignItems: 'center', boxSizing: 'border-box', width: '100%' }}>
                 {/* Photo Placeholder */}
-                <div className="w-[20mm] h-[24mm] border-2 border-slate-200 rounded-lg flex flex-col items-center justify-center bg-slate-50 overflow-hidden">
-                    <UserOutlined className="text-slate-300 text-3xl mb-1" />
-                    <span className="text-[6px] text-slate-400 uppercase">Student Photo</span>
+                <div style={{ width: '68px', minWidth: '68px', height: '80px', border: '2px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+                    <span style={{ fontSize: '28px' }}>👤</span>
+                    <span style={{ fontSize: '6px', color: '#94a3b8', textTransform: 'uppercase', marginTop: '2px' }}>Photo</span>
                 </div>
 
                 {/* Details */}
-                <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
-                    <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">FullName / ሙሉ ስም</span>
-                    <span className="text-[11px] font-bold text-slate-900 leading-tight mb-1 truncate">{student.name}</span>
-
-                    <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Baptismal / የክርስትና ስም</span>
-                    <span className="text-[9px] font-semibold text-slate-700 leading-tight mb-1 truncate">{student.baptismalName || '-'}</span>
-
-                    <div className="flex gap-4">
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', overflow: 'hidden' }}>
+                    <div>
+                        <div style={{ fontSize: '7px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Full Name / ሙሉ ስም</div>
+                        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{student.name}</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '7px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Baptismal / ከርስትና ስም</div>
+                        <div style={{ fontSize: '10px', fontWeight: '600', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{student.baptismalName || '-'}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '14px' }}>
                         <div>
-                            <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Grade / ክፍል</span>
-                            <div className="text-[9px] font-bold">{student.grade}</div>
+                            <div style={{ fontSize: '7px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Grade / ክፍል</div>
+                            <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#0f172a' }}>{student.grade}</div>
                         </div>
                         <div>
-                            <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Year / ዘመን</span>
-                            <div className="text-[9px] font-bold">{student.academicYear || dayjs().format('YYYY')}</div>
+                            <div style={{ fontSize: '7px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Year / ዘሜን</div>
+                            <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#0f172a' }}>{dayjs(student.academicYear).isValid() ? dayjs(student.academicYear).format('YYYY') : dayjs().format('YYYY')}</div>
                         </div>
                     </div>
                 </div>
 
                 {/* QR Code */}
-                <div className="p-1 bg-white border border-slate-100 rounded-lg">
-                    <QRCodeCanvas value={student.id} size={50} level="H" />
-                    <div className="text-[5px] text-center mt-0.5 text-slate-400 font-mono italic">SCAN FOR ATTENDANCE</div>
+                <div style={{ padding: '4px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                    <QRCodeCanvas value={student.id} size={50} level="H" bgColor="#ffffff" fgColor="#000000" />
+                    <div style={{ fontSize: '5px', color: '#94a3b8', fontFamily: 'monospace', fontStyle: 'italic', marginTop: '2px', textAlign: 'center' }}>SCAN</div>
                 </div>
             </div>
 
-            {/* Footer decoration */}
-            <div className="h-1 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 w-full" />
+            {/* Ethiopian-flag footer bar */}
+            <div style={{ height: '5px', background: 'linear-gradient(90deg, #22c55e 33%, #eab308 33% 66%, #ef4444 66%)', width: '100%' }} />
         </div>
     );
 }
 
-function CertificateTemplate({ student, marks }) {
-    const totalScore = marks.length > 0 ? marks.reduce((acc, m) => acc + (m.score || 0), 0) : 0;
-    const avgScore = marks.length > 0 ? (totalScore / marks.length).toFixed(1) : 0;
+function CertificateTemplate({ student, marks, assessments = [] }) {
+    // Group marks by subject, calculate Sem I and Sem II totals
+    const studentGrade = student.grade;
+    const gradeAssessments = assessments.filter(a => a.grade === studentGrade);
+
+    const subjects = [...new Set(gradeAssessments.map(a => a.subjectName))].sort();
+
+    const subjectRows = subjects.map(subject => {
+        const semIAssessments = gradeAssessments.filter(a => a.subjectName === subject && (a.semester || 'Semester I') === 'Semester I');
+        const semIIAssessments = gradeAssessments.filter(a => a.subjectName === subject && a.semester === 'Semester II');
+
+        const semIEarned = semIAssessments.reduce((acc, a) => {
+            const mark = marks.find(m => m.assessmentId === a.id);
+            return acc + (mark ? (mark.score || 0) : 0);
+        }, 0);
+        const semIMax = semIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+        const semIHasData = semIAssessments.some(a => marks.find(m => m.assessmentId === a.id));
+
+        const semIIEarned = semIIAssessments.reduce((acc, a) => {
+            const mark = marks.find(m => m.assessmentId === a.id);
+            return acc + (mark ? (mark.score || 0) : 0);
+        }, 0);
+        const semIIMax = semIIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+        const semIIHasData = semIIAssessments.some(a => marks.find(m => m.assessmentId === a.id));
+
+        const totalMax = semIMax + semIIMax;
+        const totalEarned = semIEarned + semIIEarned;
+        const avgPct = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(0) : '-';
+
+        return {
+            subject,
+            semI: semIHasData ? `${semIEarned} / ${semIMax}` : '—',
+            semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIAssessments.length === 0 ? 'N/A' : '—'),
+            avg: avgPct !== '-' ? `${avgPct}%` : '—',
+        };
+    });
+
+    const overallEarned = marks.reduce((acc, m) => acc + (m.score || 0), 0);
+    const overallMax = gradeAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+    const overallAvg = overallMax > 0 ? ((overallEarned / overallMax) * 100).toFixed(1) : 0;
 
     return (
-        <div className="w-[190mm] h-[277mm] bg-white border-[12px] border-double border-slate-900 p-12 flex flex-col items-center text-slate-900 relative font-serif">
+        <div style={{
+            width: '210mm', minHeight: '297mm', background: '#ffffff', border: '10px double #0f172a',
+            padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+            color: '#0f172a', position: 'relative', fontFamily: 'serif', boxSizing: 'border-box'
+        }}>
             {/* Corner Decorations */}
-            <div className="absolute top-4 left-4 border-t-4 border-l-4 border-slate-900 w-12 h-12" />
-            <div className="absolute top-4 right-4 border-t-4 border-r-4 border-slate-900 w-12 h-12" />
-            <div className="absolute bottom-4 left-4 border-b-4 border-l-4 border-slate-900 w-12 h-12" />
-            <div className="absolute bottom-4 right-4 border-b-4 border-r-4 border-slate-900 w-12 h-12" />
+            <div style={{ position: 'absolute', top: '12px', left: '12px', borderTop: '4px solid #0f172a', borderLeft: '4px solid #0f172a', width: '32px', height: '32px' }} />
+            <div style={{ position: 'absolute', top: '12px', right: '12px', borderTop: '4px solid #0f172a', borderRight: '4px solid #0f172a', width: '32px', height: '32px' }} />
+            <div style={{ position: 'absolute', bottom: '12px', left: '12px', borderBottom: '4px solid #0f172a', borderLeft: '4px solid #0f172a', width: '32px', height: '32px' }} />
+            <div style={{ position: 'absolute', bottom: '12px', right: '12px', borderBottom: '4px solid #0f172a', borderRight: '4px solid #0f172a', width: '32px', height: '32px' }} />
 
-            <div className="flex flex-col items-center mb-12 text-center">
-                <Title level={2} className="!mb-0 !text-slate-900 italic font-serif">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
-                <Text className="text-xl uppercase tracking-widest font-bold">Finote Birhan Senbet School</Text>
-                <div className="w-32 h-1 bg-slate-900 my-4" />
-                <Title level={1} className="!mb-8 !text-5xl uppercase tracking-tighter text-slate-800">Certificate of Completion</Title>
+            {/* Header */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px', textAlign: 'center' }}>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', letterSpacing: '0.1em' }}>በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</div>
+                <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b', marginTop: '4px' }}>Finote Birhan Senbet School</div>
+                <div style={{ width: '96px', height: '2px', background: '#0f172a', margin: '12px 0' }} />
+                <div style={{ fontSize: '28px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Academic Report Card</div>
             </div>
 
-            <Text className="text-2xl italic mb-6">This is to certify that</Text>
-
-            <div className="border-b-2 border-slate-900 w-full text-center pb-2 mb-8">
-                <Title level={1} className="!mb-0 !text-6xl text-slate-900">{student.name}</Title>
-            </div>
-
-            <Text className="text-xl text-center max-w-2xl leading-relaxed mb-12">
-                has successfully completed the studies and clinical requirements of <br />
-                <span className="font-bold text-2xl uppercase">{student.grade}</span> <br />
-                with distinction and academic excellence during the year of {student.academicYear || dayjs().format('YYYY')}.
-            </Text>
-
-            {/* Statistics Table */}
-            <div className="w-full mt-8 border-2 border-slate-200 p-8 rounded-2xl bg-slate-50/50">
-                <div className="grid grid-cols-2 gap-8">
-                    <div className="flex flex-col">
-                        <span className="text-slate-400 uppercase text-sm font-bold tracking-widest mb-2">Academic Performance</span>
-                        <div className="flex items-end gap-2">
-                            <Title level={2} className="!mb-0 !text-4xl text-slate-900">{avgScore}%</Title>
-                            <span className="text-slate-500 mb-1">Average Score</span>
-                        </div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                        <span className="text-slate-400 uppercase text-sm font-bold tracking-widest mb-2">Baptismal Name</span>
-                        <Title level={3} className="!mb-0 !text-2xl text-slate-800">{student.baptismalName || 'N/A'}</Title>
-                    </div>
+            {/* Student Info */}
+            <div style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', marginBottom: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '14px' }}>
+                <div>
+                    <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}>Student Name / ሙሉ ስም</div>
+                    <div style={{ fontWeight: 'bold', fontSize: '16px', marginTop: '2px' }}>{student.name}</div>
                 </div>
-
-                <div className="mt-8 pt-8 border-t border-slate-200 grid grid-cols-2 gap-12 text-center">
-                    <div className="flex flex-col items-center">
-                        <div className="w-48 border-b border-slate-900 mb-2 h-12" />
-                        <span className="text-sm font-bold uppercase tracking-tighter">School Administrator</span>
-                    </div>
-                    <div className="flex flex-col items-center">
-                        <div className="w-48 border-b border-slate-900 mb-2 h-12" />
-                        <span className="text-sm font-bold uppercase tracking-tighter">Grade Coordinator</span>
-                    </div>
+                <div>
+                    <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}>Baptismal / ክርስትና ስም</div>
+                    <div style={{ fontWeight: '600', marginTop: '2px' }}>{student.baptismalName || '—'}</div>
+                </div>
+                <div>
+                    <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}>Grade / ክፍል</div>
+                    <div style={{ fontWeight: 'bold', marginTop: '2px' }}>{student.grade}</div>
+                </div>
+                <div>
+                    <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}>Academic Year</div>
+                    <div style={{ fontWeight: '600', marginTop: '2px' }}>{dayjs(student.academicYear).format('YYYY')}</div>
                 </div>
             </div>
 
-            {/* Seal Placeholder */}
-            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-40 h-40 border-4 border-double border-slate-200 rounded-full flex items-center justify-center opacity-50 rotate-12">
-                <div className="text-[10px] font-bold text-center text-slate-300 uppercase">Official School Seal</div>
+            {/* Grades Table */}
+            <div style={{ width: '100%', marginBottom: '24px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                        <tr style={{ background: '#0f172a', color: 'white' }}>
+                            <th style={{ padding: '8px', textAlign: 'left', fontWeight: 'bold', border: '1px solid #0f172a' }}>Subject</th>
+                            <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', border: '1px solid #0f172a' }}>Semester I</th>
+                            <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', border: '1px solid #0f172a' }}>Semester II</th>
+                            <th style={{ padding: '8px', textAlign: 'center', fontWeight: 'bold', border: '1px solid #0f172a' }}>Average</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {subjectRows.length === 0 ? (
+                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '16px', color: '#94a3b8', border: '1px solid #e2e8f0' }}>No grade records</td></tr>
+                        ) : subjectRows.map((row, i) => (
+                            <tr key={row.subject} style={{ background: i % 2 === 0 ? '#f8fafc' : 'white', borderBottom: '1px solid #e2e8f0' }}>
+                                <td style={{ padding: '7px 8px', fontWeight: '600', borderX: '1px solid #e2e8f0', border: '1px solid #e2e8f0' }}>{row.subject}</td>
+                                <td style={{ padding: '7px', textAlign: 'center', border: '1px solid #e2e8f0' }}>{row.semI}</td>
+                                <td style={{ padding: '7px', textAlign: 'center', color: row.semII === '—' ? '#94a3b8' : 'inherit', border: '1px solid #e2e8f0' }}>{row.semII}</td>
+                                <td style={{ padding: '7px', textAlign: 'center', fontWeight: 'bold', border: '1px solid #e2e8f0' }}>{row.avg}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr style={{ background: '#0f172a', color: 'white', fontWeight: 'bold' }}>
+                            <td style={{ padding: '8px', border: '1px solid #0f172a' }}>Overall Average</td>
+                            <td colSpan={2} style={{ border: '1px solid #0f172a' }} />
+                            <td style={{ padding: '8px', textAlign: 'center', fontSize: '14px', border: '1px solid #0f172a' }}>{overallAvg}%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            {/* Signature lines */}
+            <div style={{ width: '100%', borderTop: '1px solid #e2e8f0', paddingTop: '24px', marginTop: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', textAlign: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: '160px', borderBottom: '1px solid #0f172a', marginBottom: '8px', height: '40px' }} />
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}>School Administrator</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ width: '160px', borderBottom: '1px solid #0f172a', marginBottom: '8px', height: '40px' }} />
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}>Grade Coordinator</span>
+                </div>
+            </div>
+
+            {/* Seal */}
+            <div style={{ position: 'absolute', bottom: '64px', left: '50%', transform: 'translateX(-50%) rotate(12deg)', width: '96px', height: '96px', border: '4px double #e2e8f0', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.4 }}>
+                <div style={{ fontSize: '10px', fontWeight: 'bold', textAlign: 'center', color: '#cbd5e1', textTransform: 'uppercase' }}>Official Seal</div>
             </div>
         </div>
     );
@@ -1282,13 +1564,16 @@ function SubjectManagement() {
                 </Form>
             </Card>
 
-            <Table
-                columns={columns}
-                dataSource={subjects}
-                rowKey="id"
-                pagination={false}
-                className="shadow-sm rounded-xl overflow-hidden"
-            />
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden w-full mt-4">
+                <Table
+                    columns={columns}
+                    dataSource={subjects}
+                    rowKey="id"
+                    pagination={false}
+                    scroll={{ x: 'max-content', y: 500 }}
+                    className="students-table w-full"
+                />
+            </div>
         </div>
     );
 }
@@ -1300,6 +1585,15 @@ function AssessmentManagement() {
 
     const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
     const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
+    const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
+    
+    const currentSemesterSetting = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
+
+    useEffect(() => {
+        if (!editingId && currentSemesterSetting) {
+            form.setFieldsValue({ semester: currentSemesterSetting });
+        }
+    }, [currentSemesterSetting, editingId, form]);
 
     const handleSave = async (values) => {
         try {
@@ -1308,6 +1602,7 @@ function AssessmentManagement() {
                 subjectName: values.subjectName,
                 grade: values.grade,
                 maxScore: parseFloat(values.maxScore),
+                semester: values.semester || 'Semester I',
                 date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
                 synced: 0
             };
@@ -1346,6 +1641,7 @@ function AssessmentManagement() {
         { title: t('admin.name'), dataIndex: 'name', key: 'name' },
         { title: t('admin.subjects'), dataIndex: 'subjectName', key: 'subjectName' },
         { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
+        { title: t('admin.semester', 'Semester'), dataIndex: 'semester', key: 'semester', render: (text) => t(`admin.${text === 'Semester I' ? 'semester1' : 'semester2'}`, text) },
         { title: t('admin.maxScore'), dataIndex: 'maxScore', key: 'maxScore' },
         { title: t('teacher.date'), dataIndex: 'date', key: 'date' },
         {
@@ -1417,6 +1713,18 @@ function AssessmentManagement() {
                         </Col>
                         <Col xs={24} md={8}>
                             <Form.Item
+                                name="semester"
+                                label={t('admin.semester', 'Semester')}
+                                rules={[{ required: true }]}
+                            >
+                                <Select options={[
+                                    { value: 'Semester I', label: t('admin.semester1', 'Semester I') },
+                                    { value: 'Semester II', label: t('admin.semester2', 'Semester II') }
+                                ]} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Form.Item
                                 name="maxScore"
                                 label={t('admin.maxScore')}
                                 rules={[{ required: true }]}
@@ -1451,13 +1759,16 @@ function AssessmentManagement() {
                 </Form>
             </Card>
 
-            <Table
-                columns={columns}
-                dataSource={assessments}
-                rowKey="id"
-                pagination={false}
-                className="shadow-sm rounded-xl overflow-hidden"
-            />
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden w-full mt-4">
+                <Table
+                    columns={columns}
+                    dataSource={assessments}
+                    rowKey="id"
+                    pagination={false}
+                    scroll={{ x: 'max-content', y: 500 }}
+                    className="students-table w-full"
+                />
+            </div>
         </div>
     );
 }
