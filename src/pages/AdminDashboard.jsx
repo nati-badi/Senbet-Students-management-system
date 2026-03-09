@@ -16,7 +16,8 @@ import {
     DownloadOutlined,
     HomeOutlined,
     BookOutlined,
-    SettingOutlined
+    SettingOutlined,
+    IdcardOutlined
 } from '@ant-design/icons';
 import {
     Table,

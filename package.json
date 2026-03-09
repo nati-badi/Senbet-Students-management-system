@@ -21,7 +21,7 @@
     "@capacitor/ios": "^8.2.0",
     "@capacitor/status-bar": "^8.0.1",
     "@capacitor/toast": "^8.0.1",
-    "@supabase/supabase-js": "^2.98.0",
+    "@supabase/supabase-js": "^2.99.0",
     "@tailwindcss/vite": "^4.2.1",
     "@yudiel/react-qr-scanner": "^2.5.1",
     "antd": "^6.3.1",
