@@ -120,6 +120,15 @@ const resources = {
                 "totalLate": "Total Late",
                 "totalAbsent": "Total Absent",
                 "totalNoClass": "Total No Class"
+            },
+            "parent": {
+                "title": "Parent & Student Portal",
+                "description": "View academic progress, attendance history, and missing assessments by entering the Student ID.",
+                "searchPlaceholder": "Enter Student ID (e.g. uuid-...)",
+                "studentNotFound": "No student found with this ID. Please contact the administrator.",
+                "viewFullProfile": "View Detailed Progress",
+                "portalNote": "Access Restricted",
+                "portalNoteDesc": "This is a read-only view for parents and students. To update records, please use the Teacher Portal."
             }
         }
     },
@@ -240,6 +249,15 @@ const resources = {
                 "totalLate": "ጠቅላላ የዘገዩ",
                 "totalAbsent": "ጠቅላላ የቀሩ",
                 "totalNoClass": "ጠቅላላ ክፍል የሌላቸው"
+            },
+            "parent": {
+                "title": "የወላጅ እና የተማሪ ፖርታል",
+                "description": "የተማሪውን መለያ ቁጥር በማስገባት ትምህርታዊ እድገትን፣ የቅርብ ጊዜ ክትትልን እና ያልተሞሉ ውጤቶችን ይመልከቱ።",
+                "searchPlaceholder": "የተማሪ መለያ ቁጥር ያስገቡ (ለምሳሌ uuid-...)",
+                "studentNotFound": "በዚህ መለያ ቁጥር የተመዘገበ ተማሪ አልተገኘም። እባክዎ አስተዳዳሪውን ያነጋግሩ።",
+                "viewFullProfile": "ዝርዝር እድገትን ይመልከቱ",
+                "portalNote": "መረጃን የማየት ገደብ",
+                "portalNoteDesc": "ይህ ለወላጆች እና ለተማሪዎች የማሳያ ገጽ ብቻ ነው። መረጃን ለማሻሻል እባክዎ የአስተማሪውን ፖርታል ይጠቀሙ።"
             }
         }
     }
