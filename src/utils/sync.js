@@ -1,75 +1,100 @@
 import { db } from '../db/database';
-
-export const API_BASE = 'http://localhost:5000/api';
+import { supabase } from './supabaseClient';
 
 export async function syncData() {
     console.log("Starting synchronization...");
+
+    if (!supabase) {
+        const msg = "Cloud Sync is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.";
+        console.warn(msg);
+        return { success: false, error: msg };
+    }
+
     try {
-        // 1. PUSH local changes to Server
-        const unsyncedStudents = await db.students.where('synced').equals(0).toArray();
-        const unsyncedAttendance = await db.attendance.where('synced').equals(0).toArray();
-        const unsyncedMarks = await db.marks.where('synced').equals(0).toArray();
+        const TABLES = ['students', 'attendance', 'marks', 'subjects', 'assessments'];
+        let pushedCount = 0;
+        let pulledCount = 0;
 
-        // Migration: Ensure all records have IDs (for data added before UUID switch)
-        for (const s of unsyncedStudents) if (!s.id) { s.id = crypto.randomUUID(); await db.students.put(s); }
-        for (const a of unsyncedAttendance) if (!a.id) { a.id = crypto.randomUUID(); await db.attendance.put(a); }
-        for (const m of unsyncedMarks) if (!m.id) { m.id = crypto.randomUUID(); await db.marks.put(m); }
+        // --- 1. PUSH LOCAL CHANGES TO SUPABASE ---
+        console.log("Pushing data to Supabase...");
+        for (const tableName of TABLES) {
+            const tableDb = db[tableName];
 
-        console.log(`Local unsynced data: ${unsyncedStudents.length} students, ${unsyncedAttendance.length} attendance, ${unsyncedMarks.length} marks`);
+            // Get records where synced === 0
+            let unsyncedRecords = await tableDb.where('synced').equals(0).toArray();
 
-        if (unsyncedStudents.length > 0 || unsyncedAttendance.length > 0 || unsyncedMarks.length > 0) {
-            console.log("Pushing data to server...");
-            const pushResponse = await fetch(`${API_BASE}/sync`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    students: unsyncedStudents,
-                    attendance: unsyncedAttendance,
-                    marks: unsyncedMarks
-                })
-            });
+            if (unsyncedRecords.length > 0) {
+                // 1a. Ensure all records have IDs (legacy data support) before pushing
+                let needsLocalUpdate = false;
+                for (const record of unsyncedRecords) {
+                    if (!record.id) {
+                        record.id = crypto.randomUUID();
+                        needsLocalUpdate = true;
+                    }
+                }
 
-            if (pushResponse.ok) {
-                const pushResult = await pushResponse.json();
-                console.log("Server accepted push:", pushResult);
+                if (needsLocalUpdate) {
+                    await tableDb.bulkPut(unsyncedRecords);
+                }
 
-                // Mark as synced locally
-                const studentIds = unsyncedStudents.map(s => s.id);
-                const attendanceIds = unsyncedAttendance.map(a => a.id);
-                const markIds = unsyncedMarks.map(m => m.id);
+                // 1b. Clean records for Supabase (remove local 'synced' flag)
+                const cleanRecords = unsyncedRecords.map(record => {
+                    const { synced, ...rest } = record;
+                    return rest;
+                });
 
-                await db.students.where('id').anyOf(studentIds).modify({ synced: 1 });
-                await db.attendance.where('id').anyOf(attendanceIds).modify({ synced: 1 });
-                await db.marks.where('id').anyOf(markIds).modify({ synced: 1 });
-                console.log("Locally marked records as synced.");
-            } else {
-                const errText = await pushResponse.text();
-                console.error("Server push failed:", pushResponse.status, errText);
-                throw new Error(`Server push failed with status ${pushResponse.status}`);
+                // 1c. Upsert to Supabase
+                const { error } = await supabase
+                    .from(tableName)
+                    .upsert(cleanRecords, { onConflict: 'id' });
+
+                if (error) {
+                    console.error(`Error pushing to ${tableName}:`, error);
+                    throw error;
+                }
+
+                // 1d. Mark local records as synced (synced === 1)
+                const localUpdates = unsyncedRecords.map(r => ({ ...r, synced: 1 }));
+                await tableDb.bulkPut(localUpdates);
+
+                pushedCount += cleanRecords.length;
+                console.log(`Pushed ${cleanRecords.length} records to ${tableName}`);
             }
         }
 
-        // 2. PULL master data from Server
-        console.log("Pulling data from server...");
-        const pullResponse = await fetch(`${API_BASE}/sync`);
-        if (pullResponse.ok) {
-            const data = await pullResponse.json();
-            console.log(`Received from server: ${data.students?.length || 0} students, ${data.attendance?.length || 0} attendance, ${data.marks?.length || 0} marks`);
+        // --- 2. PULL CLOUD CHANGES TO LOCAL DB ---
+        console.log("Pulling data from Supabase...");
+        for (const tableName of TABLES) {
+            const tableDb = db[tableName];
 
-            // bulkPut ensures we upsert (replace existing by ID)
-            if (data.students?.length) await db.students.bulkPut(data.students.map(s => ({ ...s, synced: 1 })));
-            if (data.attendance?.length) await db.attendance.bulkPut(data.attendance.map(a => ({ ...a, synced: 1 })));
-            if (data.marks?.length) await db.marks.bulkPut(data.marks.map(m => ({ ...m, synced: 1 })));
-            console.log("Local database updated with server data.");
-        } else {
-            console.error("Server pull failed:", pullResponse.status);
-            throw new Error(`Server pull failed with status ${pullResponse.status}`);
+            // In a production app, you would use a "last_sync_timestamp" to only pull new records.
+            // For simplicity and guaranteed consistency here, we will pull all cloud records 
+            // and upsert them locally. Since Dexie offline apps are generally light, this is fine.
+            const { data, error } = await supabase
+                .from(tableName)
+                .select('*');
+
+            if (error) {
+                console.error(`Error pulling from ${tableName}:`, error);
+                throw error;
+            }
+
+            if (data && data.length > 0) {
+                // Add synced: 1 back to cloud data before putting into Dexie
+                const localReadyData = data.map(record => ({ ...record, synced: 1 }));
+
+                // bulkPut will upsert (replace if ID exists, insert if new)
+                await tableDb.bulkPut(localReadyData);
+                pulledCount += data.length;
+                console.log(`Pulled ${data.length} records into ${tableName}`);
+            }
         }
 
-        console.log("Synchronization finished successfully.");
-        return { success: true };
+        console.log(`Synchronization finished successfully. Pushed: ${pushedCount}, Pulled: ${pulledCount}`);
+        return { success: true, pushed: pushedCount, pulled: pulledCount };
+
     } catch (error) {
         console.error("Sync process error:", error);
-        return { success: false, error: error.message };
+        return { success: false, error: error.message || "An unknown error occurred during sync." };
     }
 }

@@ -9,6 +9,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB - allow large AntD chunks
+      },
       manifest: {
         name: "Senbet School System",
         short_name: "SenbetSMS",
@@ -17,4 +20,8 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    chunkSizeWarningLimit: 4000, // suppress chunk size warnings for antd
+  },
 });
+

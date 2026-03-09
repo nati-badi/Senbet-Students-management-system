@@ -116,7 +116,7 @@ export default function TeacherDashboard() {
     ];
 
     return (
-        <Layout className="bg-transparent">
+        <Layout className="bg-transparent min-h-screen">
             <Sider
                 width={240}
                 style={{ flexShrink: 0 }}
@@ -135,12 +135,33 @@ export default function TeacherDashboard() {
                 />
             </Sider>
 
-            <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 min-h-[600px]">
+            <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 md:p-6 mb-20 md:mb-0">
                 <Routes>
                     <Route path="/" element={<SpeedEntryMarks setProfileStudentId={setProfileStudentId} />} />
                     <Route path="/attendance" element={<AttendanceModule setProfileStudentId={setProfileStudentId} />} />
                 </Routes>
             </Content>
+
+            {/* Mobile Bottom Navigation */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-6 py-2 flex justify-around items-center z-50 pb-safe">
+                {menuItems.map(item => {
+                    const isActive = location.pathname === item.key || (item.key === '/teacher' && location.pathname === '/teacher/');
+                    return (
+                        <Link
+                            key={item.key}
+                            to={item.key}
+                            className={`flex flex-col items-center gap-1 transition-colors ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
+                        >
+                            <span className="text-xl">{item.icon}</span>
+                            <span className="text-[10px] uppercase font-bold tracking-tighter">
+                                {item.key === '/' ? t('app.title') :
+                                    item.key === '/teacher' ? t('teacher.markEntry') :
+                                        t('teacher.attendance')}
+                            </span>
+                        </Link>
+                    );
+                })}
+            </div>
 
             <Modal
                 title={t('admin.studentProfile')}

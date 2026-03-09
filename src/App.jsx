@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
+import ParentPortal from './pages/ParentPortal';
 import { syncData } from './utils/sync';
 
 const { Header, Content, Footer } = Layout;
@@ -60,9 +61,9 @@ export default function App() {
     const result = await syncData();
     setIsSyncing(false);
     if (result.success) {
-      message.success('Synchronization completed successfully!');
+      message.success(`Sync successful! Pushed: ${result.pushed}, Pulled: ${result.pulled}`);
     } else {
-      message.error("Sync failed: " + (result.error || "Check server connection"));
+      message.error("Sync disabled: " + (result.error || "Check your internet connection and .env keys"));
     }
   };
 
@@ -150,6 +151,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/admin/*" element={<AdminDashboard />} />
             <Route path="/teacher/*" element={<TeacherDashboard />} />
+            <Route path="/parent" element={<ParentPortal />} />
           </Routes>
         </Content>
 
@@ -181,6 +183,12 @@ function Home() {
           <Button size="large" className="px-8 flex items-center gap-2">
             <TeamOutlined />
             {t('app.teacherPortal')}
+          </Button>
+        </Link>
+        <Link to="/parent">
+          <Button size="large" className="px-8 flex items-center gap-2">
+            <GlobalOutlined />
+            {t('parent.title', 'Parent Portal')}
           </Button>
         </Link>
       </Space>
