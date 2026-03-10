@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Senbet Teacher</string>
-    <string name="title_activity_main">Senbet Teacher</string>
-    <string name="package_name">et.finotebirhan.teacher</string>
-    <string name="custom_url_scheme">et.finotebirhan.teacher</string>
-</resources>

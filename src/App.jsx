@@ -14,9 +14,9 @@ import {
   MoonOutlined,
   SunOutlined
 } from '@ant-design/icons';
-import AdminDashboard from './pages/AdminDashboard';
-import TeacherDashboard from './pages/TeacherDashboard';
-import ParentPortal from './pages/ParentPortal';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import TeacherDashboard from './pages/teacher/TeacherDashboard';
+import ParentPortal from './pages/parent/ParentPortal';
 import { syncData } from './utils/sync';
 
 const { Header, Content, Footer } = Layout;

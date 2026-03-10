@@ -37,10 +37,15 @@ export async function syncData() {
                     await tableDb.bulkPut(unsyncedRecords);
                 }
 
-                // 1b. Clean records for Supabase (remove local 'synced' flag)
+                // 1b. Clean and Normalize records for Supabase (lowercase keys for Postgres)
                 const cleanRecords = unsyncedRecords.map(record => {
                     const { synced, ...rest } = record;
-                    return rest;
+                    // Convert keys to lowercase to match Supabase Postgres defaults
+                    const normalized = {};
+                    Object.keys(rest).forEach(key => {
+                        normalized[key.toLowerCase()] = rest[key];
+                    });
+                    return normalized;
                 });
 
                 // 1c. Upsert to Supabase
@@ -80,8 +85,30 @@ export async function syncData() {
             }
 
             if (data && data.length > 0) {
-                // Add synced: 1 back to cloud data before putting into Dexie
-                const localReadyData = data.map(record => ({ ...record, synced: 1 }));
+                // Map lowercase Postgres keys back to our local camelCase schema if necessary
+                // Tables where we know we use camelCase: students, assessments, marks, attendance
+                const localReadyData = data.map(record => {
+                    const mapped = { ...record, synced: 1 };
+
+                    // Specific mapping for known camelCase fields
+                    if (tableName === 'students') {
+                        if (record.baptismalname) mapped.baptismalName = record.baptismalname;
+                        if (record.parentcontact) mapped.parentContact = record.parentcontact;
+                        if (record.academicyear) mapped.academicYear = record.academicyear;
+                        if (record.dateofentry) mapped.dateOfEntry = record.dateofentry;
+                    } else if (tableName === 'assessments') {
+                        if (record.subjectname) mapped.subjectName = record.subjectname;
+                        if (record.maxscore) mapped.maxScore = record.maxscore;
+                    } else if (tableName === 'marks') {
+                        if (record.studentid) mapped.studentId = record.studentid;
+                        if (record.assessmentid) mapped.assessmentId = record.assessmentid;
+                        if (record.assessmentdate) mapped.assessmentDate = record.assessmentdate;
+                    } else if (tableName === 'attendance') {
+                        if (record.studentid) mapped.studentId = record.studentid;
+                    }
+
+                    return mapped;
+                });
 
                 // bulkPut will upsert (replace if ID exists, insert if new)
                 await tableDb.bulkPut(localReadyData);
