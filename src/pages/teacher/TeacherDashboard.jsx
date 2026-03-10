@@ -44,58 +44,13 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import dayjs from 'dayjs';
-<<<<<<< HEAD:src/pages/teacher/TeacherDashboard.jsx
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import StudentProfile from '../../components/StudentProfile';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
-=======
-import { Scanner } from '@yudiel/react-qr-scanner';
-import StudentProfile from '../components/StudentProfile';
 
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 
-// Fixed grade options (must match AdminDashboard)
-// Fixed grade options: store as number, label in Amharic
-const GRADE_OPTIONS = [
-    { value: '1', label: '1ኛ ክፍል' },
-    { value: '2', label: '2ኛ ክፍል' },
-    { value: '3', label: '3ኛ ክፍል' },
-    { value: '4', label: '4ኛ ክፍል' },
-    { value: '5', label: '5ኛ ክፍል' },
-    { value: '6', label: '6ኛ ክፍል' },
-    { value: '7', label: '7ኛ ክፍል' },
-    { value: '8', label: '8ኛ ክፍል' },
-    { value: '9', label: '9ኛ ክፍል' },
-    { value: '10', label: '10ኛ ክፍል' },
-    { value: '11', label: '11ኛ ክፍል' },
-    { value: '12', label: '12ኛ ክፍል' },
-    { value: '13', label: '12+ (ሌላ)' },
-];
-
-const formatGrade = (grade) => {
-    if (!grade) return '';
-    const s = String(grade);
-    const option = GRADE_OPTIONS.find(o => o.value === s);
-    if (option) return option.label;
-    if (s.includes('ኛ ክፍል')) return s;
-    return `${s}ኛ ክፍል`;
-};
-
-const normalizeGrade = (rawGrade) => {
-    if (!rawGrade) return '';
-    const s = String(rawGrade).toLowerCase().trim();
-    // Match "1", "Grade 1", "1ኛ ክፍል", etc.
-    const match = s.match(/(\d+)/);
-    if (match) {
-        const num = match[1];
-        if (parseInt(num) >= 1 && parseInt(num) <= 12) return num;
-        if (parseInt(num) > 12) return '13';
-    }
-    if (s.includes('ሌላ') || s.includes('other') || s.includes('12+')) return '13';
-    return rawGrade; // fallback
-};
->>>>>>> 688818807068736ad538ff38f16f81e18ef9714c:src/pages/TeacherDashboard.jsx
 
 export default function TeacherDashboard() {
     const location = useLocation();
