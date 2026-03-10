@@ -1,0 +1,30 @@
+
+> senbet-students-management-system@0.0.0 build
+> vite build
+
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m✓[39m 3382 modules transformed.
+[31m✗[39m Build failed in 20.08s
+[31merror during build:
+[31m[vite-plugin-pwa:build] There was an error during the build:
+  src/pages/AdminDashboard.jsx (49:9): "API_BASE" is not exported by "src/utils/sync.js", imported by "src/pages/AdminDashboard.jsx".
+Additionally, handling the error in the 'buildEnd' hook caused the following error:
+  src/pages/AdminDashboard.jsx (49:9): "API_BASE" is not exported by "src/utils/sync.js", imported by "src/pages/AdminDashboard.jsx".[31m
+file: [36mC:/Users/Administrator/Desktop/Senbet-Students-management-system/src/pages/AdminDashboard.jsx:49:9[31m
+[33m
+47: import { useTranslation } from 'react-i18next';
+48: import { db } from '../db/database';
+49: import { API_BASE } from '../utils/sync';
+             ^
+50: import Papa from 'papaparse';
+51: import jsPDF from 'jspdf';
+[31m
+    at getRollupError (file:///C:/Users/Administrator/Desktop/Senbet-Students-management-system/node_modules/rollup/dist/es/shared/parseAst.js:402:41)
+    at file:///C:/Users/Administrator/Desktop/Senbet-Students-management-system/node_modules/rollup/dist/es/shared/node-entry.js:23467:39
+    at async catchUnfinishedHookActions (file:///C:/Users/Administrator/Desktop/Senbet-Students-management-system/node_modules/rollup/dist/es/shared/node-entry.js:22925:16)
+    at async rollupInternal (file:///C:/Users/Administrator/Desktop/Senbet-Students-management-system/node_modules/rollup/dist/es/shared/node-entry.js:23450:5)
+    at async buildEnvironment (file:///C:/Users/Administrator/Desktop/Senbet-Students-management-system/node_modules/vite/dist/node/chunks/config.js:33541:12)
+    at async Object.build (file:///C:/Users/Administrator/Desktop/Senbet-Students-management-system/node_modules/vite/dist/node/chunks/config.js:33900:19)
+    at async Object.buildApp (file:///C:/Users/Administrator/Desktop/Senbet-Students-management-system/node_modules/vite/dist/node/chunks/config.js:33897:153)
+    at async CAC.<anonymous> (file:///C:/Users/Administrator/Desktop/Senbet-Students-management-system/node_modules/vite/dist/node/cli.js:629:3)[39m

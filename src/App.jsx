@@ -98,16 +98,16 @@ export default function App() {
           className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800"
           style={{ height: '64px' }}
         >
-          <Space align="center" size="middle">
+          <Space align="center" size="small">
             <Link to="/" className="flex items-center gap-2 notranslate" translate="no">
               <BookOutlined style={{ fontSize: '24px', color: isDarkMode ? '#22c55e' : '#166534' }} />
-              <Title level={4} style={{ margin: 0, fontSize: '1.25rem' }}>
+              <Title level={4} style={{ margin: 0, fontSize: '1rem', maxWidth: '220px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }} className="hidden sm:block">
                 በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት
               </Title>
             </Link>
           </Space>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1 sm:gap-4">
             <Space size="small">
               <Tooltip title={isOnline ? 'Network Online' : 'Network Offline'}>
                 <Badge
@@ -117,10 +117,10 @@ export default function App() {
                       type="text"
                       onClick={handleSync}
                       disabled={!isOnline || isSyncing}
-                      className="flex items-center gap-1.5 p-0 hover:text-forest-700 cursor-pointer"
+                      className="flex items-center gap-1 p-0 hover:text-forest-700 cursor-pointer"
                     >
                       {isSyncing ? <SyncOutlined spin /> : isOnline ? <CloudOutlined /> : <DatabaseOutlined />}
-                      <span className="text-xs font-medium">
+                      <span className="text-xs font-medium hidden sm:inline">
                         {isSyncing ? 'Syncing...' : isOnline ? 'Sync Ready' : t('teacher.savedLocal')}
                       </span>
                     </Button>
@@ -131,14 +131,16 @@ export default function App() {
               <Button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
-                className="ml-2 cursor-pointer"
+                className="cursor-pointer"
                 type="text"
+                size="small"
               />
 
               <Button
                 onClick={toggleLanguage}
                 icon={<GlobalOutlined />}
-                className="font-bold ml-2 cursor-pointer"
+                className="font-bold cursor-pointer"
+                size="small"
               >
                 {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
               </Button>

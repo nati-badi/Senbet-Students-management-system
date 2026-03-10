@@ -44,9 +44,58 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import dayjs from 'dayjs';
+<<<<<<< HEAD:src/pages/teacher/TeacherDashboard.jsx
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import StudentProfile from '../../components/StudentProfile';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
+=======
+import { Scanner } from '@yudiel/react-qr-scanner';
+import StudentProfile from '../components/StudentProfile';
+
+const { Title, Text } = Typography;
+const { Sider, Content } = Layout;
+
+// Fixed grade options (must match AdminDashboard)
+// Fixed grade options: store as number, label in Amharic
+const GRADE_OPTIONS = [
+    { value: '1', label: '1ኛ ክፍል' },
+    { value: '2', label: '2ኛ ክፍል' },
+    { value: '3', label: '3ኛ ክፍል' },
+    { value: '4', label: '4ኛ ክፍል' },
+    { value: '5', label: '5ኛ ክፍል' },
+    { value: '6', label: '6ኛ ክፍል' },
+    { value: '7', label: '7ኛ ክፍል' },
+    { value: '8', label: '8ኛ ክፍል' },
+    { value: '9', label: '9ኛ ክፍል' },
+    { value: '10', label: '10ኛ ክፍል' },
+    { value: '11', label: '11ኛ ክፍል' },
+    { value: '12', label: '12ኛ ክፍል' },
+    { value: '13', label: '12+ (ሌላ)' },
+];
+
+const formatGrade = (grade) => {
+    if (!grade) return '';
+    const s = String(grade);
+    const option = GRADE_OPTIONS.find(o => o.value === s);
+    if (option) return option.label;
+    if (s.includes('ኛ ክፍል')) return s;
+    return `${s}ኛ ክፍል`;
+};
+
+const normalizeGrade = (rawGrade) => {
+    if (!rawGrade) return '';
+    const s = String(rawGrade).toLowerCase().trim();
+    // Match "1", "Grade 1", "1ኛ ክፍል", etc.
+    const match = s.match(/(\d+)/);
+    if (match) {
+        const num = match[1];
+        if (parseInt(num) >= 1 && parseInt(num) <= 12) return num;
+        if (parseInt(num) > 12) return '13';
+    }
+    if (s.includes('ሌላ') || s.includes('other') || s.includes('12+')) return '13';
+    return rawGrade; // fallback
+};
+>>>>>>> 688818807068736ad538ff38f16f81e18ef9714c:src/pages/TeacherDashboard.jsx
 
 export default function TeacherDashboard() {
     const location = useLocation();
@@ -73,63 +122,51 @@ export default function TeacherDashboard() {
     ];
 
     return (
-        <Layout className="bg-transparent min-h-screen">
-            <Sider
-                width={240}
-                style={{ flexShrink: 0 }}
-                className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden md:block"
-            >
-                <div style={{ padding: '16px' }}>
-                    <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
-                        {t('teacher.menu')}
-                    </Text>
-                </div>
+        <div className="flex flex-col w-full h-full">
+            {/* Mobile Navigation */}
+            <div className="md:hidden mb-4 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
                 <Menu
-                    mode="inline"
+                    mode="horizontal"
                     selectedKeys={[location.pathname === '/teacher/' ? '/teacher' : location.pathname]}
                     items={menuItems}
-                    className="border-none"
+                    className="border-none w-full overflow-x-auto flex-nowrap hide-scrollbar"
                 />
-            </Sider>
-
-            <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 md:p-6 mb-20 md:mb-0">
-                <Routes>
-                    <Route path="/" element={<SpeedEntryMarks setProfileStudentId={setProfileStudentId} />} />
-                    <Route path="/attendance" element={<AttendanceModule setProfileStudentId={setProfileStudentId} />} />
-                </Routes>
-            </Content>
-
-            {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-6 py-2 flex justify-around items-center z-50 pb-safe">
-                {menuItems.map(item => {
-                    const isActive = location.pathname === item.key || (item.key === '/teacher' && location.pathname === '/teacher/');
-                    return (
-                        <Link
-                            key={item.key}
-                            to={item.key}
-                            className={`flex flex-col items-center gap-1 transition-colors ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
-                        >
-                            <span className="text-xl">{item.icon}</span>
-                            <span className="text-[10px] uppercase font-bold tracking-tighter">
-                                {item.key === '/' ? t('app.title') :
-                                    item.key === '/teacher' ? t('teacher.markEntry') :
-                                        t('teacher.attendance')}
-                            </span>
-                        </Link>
-                    );
-                })}
             </div>
 
-            <Modal
-                title={t('admin.studentProfile')}
-                open={!!profileStudentId}
-                onCancel={() => setProfileStudentId(null)}
-                footer={null}
-                width={800}
-            >
-                {profileStudentId && <StudentProfile studentId={profileStudentId} />}
-            </Modal>
-        </Layout>
+            <Layout className="bg-transparent">
+                <Sider
+                    width={240}
+                    style={{ flexShrink: 0 }}
+                    className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden md:block"
+                >
+                    <div style={{ padding: '16px' }}>
+                        <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
+                            {t('teacher.menu')}
+                        </Text>
+                    </div>
+                    <Menu
+                        mode="inline"
+                        selectedKeys={[location.pathname === '/teacher/' ? '/teacher' : location.pathname]}
+                        items={menuItems}
+                        className="border-none"
+                    />
+                </Sider>
+
+                <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 md:p-6 min-h-[600px] w-full overflow-hidden">
+                    <Routes>
+                        <Route path="/" element={<SpeedEntryMarks setProfileStudentId={setProfileStudentId} />} />
+                        <Route path="/attendance" element={<AttendanceModule setProfileStudentId={setProfileStudentId} />} />
+                    </Routes>
+                </Content>
+            </Layout>
+
+            <StudentProfile
+                studentId={profileStudentId}
+                visible={!!profileStudentId}
+                onClose={() => setProfileStudentId(null)}
+            />
+        </div>
+
     );
 }
 
@@ -142,11 +179,19 @@ function SpeedEntryMarks({ setProfileStudentId }) {
 
     const allStudentsData = useLiveQuery(() => db.students.toArray());
     const assessmentsData = useLiveQuery(() => db.assessments.toArray());
+    const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
+    
     const allStudents = allStudentsData || [];
     const allAssessments = assessmentsData || [];
     const isLoading = allStudentsData === undefined || assessmentsData === undefined;
 
-    const filteredAssessments = allAssessments.filter(a => normalizeGrade(a.grade) === normalizeGrade(selectedGrade));
+    const currentSemesterSetting = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
+
+    // Only allow teachers to grade assessments that match the current active semester
+    const filteredAssessments = allAssessments.filter(a => 
+        normalizeGrade(a.grade) === normalizeGrade(selectedGrade) && 
+        (a.semester || 'Semester I') === currentSemesterSetting
+    );
     const selectedAssessment = allAssessments.find(a => a.id === selectedAssessmentId);
 
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
@@ -220,14 +265,14 @@ function SpeedEntryMarks({ setProfileStudentId }) {
         { title: t('admin.name'), dataIndex: 'name', key: 'name' },
         { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
         {
-            title: t('teacher.score'),
+            title: selectedAssessment ? `${t('teacher.score')} (/${selectedAssessment.maxScore})` : t('teacher.score'),
             key: 'score',
             align: 'right',
             width: 150,
             render: (_, record) => (
                 <Input
                     type="number"
-                    placeholder={`0-${selectedAssessment?.maxScore || 100}`}
+                    placeholder={selectedAssessment ? `0-${selectedAssessment.maxScore}` : ''}
                     value={localMarks[record.id] || ''}
                     onChange={e => handleMarkChange(record.id, e.target.value)}
                     style={{ textAlign: 'right' }}
@@ -260,78 +305,91 @@ function SpeedEntryMarks({ setProfileStudentId }) {
             </div>
 
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-                <Row gutter={16} align="bottom">
-                    <Col xs={24} md={6}>
-                        <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
-                            <Select
-                                placeholder={t('teacher.selectGrade')}
-                                value={selectedGrade}
-                                onChange={(val) => {
-                                    setSelectedGrade(val);
-                                    setSelectedAssessmentId('');
-                                }}
-                                options={gradeOptions}
-                                allowClear
-                                showSearch
-                            />
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} md={6}>
-                        <Form.Item label={t('common.searchPlaceholder')} style={{ marginBottom: 0 }}>
-                            <Input
-                                placeholder={t('common.searchPlaceholder')}
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                prefix={<SearchOutlined className="text-slate-400" />}
-                                allowClear
-                            />
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} md={6}>
-                        <Form.Item label={t('teacher.selectAssessment')} style={{ marginBottom: 0 }}>
-                            <Select
-                                placeholder={t('teacher.selectAssessment')}
-                                value={selectedAssessmentId}
-                                onChange={setSelectedAssessmentId}
-                                options={filteredAssessments.map(a => ({
-                                    value: a.id,
-                                    label: `${a.name} (${a.subjectName})`
-                                }))}
-                                allowClear
-                                showSearch
-                                disabled={!selectedGrade}
-                            />
-                        </Form.Item>
-                    </Col>
-                    {selectedAssessment && (
-                        <Col xs={24} md={6}>
-                            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded flex justify-between items-center h-[32px]">
-                                <Text strong className="text-blue-700 dark:text-blue-300">
-                                    {t('admin.maxScore')}: {selectedAssessment.maxScore}
-                                </Text>
-                                <Text type="secondary" size="small">
-                                    {selectedAssessment.date}
-                                </Text>
-                            </div>
+                <Form layout="vertical">
+                    <Row gutter={16} align="bottom">
+                        <Col xs={24} md={8}>
+                            <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
+                                <Select
+                                    placeholder={t('teacher.selectGrade')}
+                                    value={selectedGrade}
+                                    onChange={(val) => {
+                                        setSelectedGrade(val);
+                                        setSelectedAssessmentId('');
+                                    }}
+                                    options={gradeOptions}
+                                    allowClear
+                                    showSearch
+                                />
+                            </Form.Item>
                         </Col>
-                    )}
-                </Row>
+                        <Col xs={24} md={8}>
+                            <Form.Item label={t('teacher.selectAssessment')} style={{ marginBottom: 0 }}>
+                                <Select
+                                    placeholder={t('teacher.selectAssessment')}
+                                    value={selectedAssessmentId}
+                                    onChange={setSelectedAssessmentId}
+                                    options={filteredAssessments.map(a => ({
+                                        value: a.id,
+                                        label: `${a.name} (${a.subjectName}) - ${t(`admin.${a.semester === 'Semester I' ? 'semester1' : 'semester2'}`, a.semester || 'Semester I')}`
+                                    }))}
+                                    allowClear
+                                    showSearch
+                                    disabled={!selectedGrade}
+                                />
+                            </Form.Item>
+                        </Col>
+                        {selectedAssessment && (
+                            <Col xs={24} md={8}>
+                                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded flex justify-between items-center h-[32px]">
+                                    <Text strong className="text-blue-700 dark:text-blue-300">
+                                        {t('admin.maxScore')}: {selectedAssessment.maxScore}
+                                    </Text>
+                                    <Text type="secondary" size="small">
+                                        {selectedAssessment.date}
+                                    </Text>
+                                </div>
+                            </Col>
+                        )}
+                    </Row>
+                </Form>
             </Card>
 
-            {isLoading ? (
-                <div className="bg-white dark:bg-[#1e293b] p-6 rounded-lg border border-slate-100 dark:border-slate-700 space-y-4 shadow-sm text-center">
-                    <Skeleton active paragraph={{ rows: 5 }} />
-                </div>
-            ) : (
-                <Table
-                    columns={columns}
-                    dataSource={studentsInGrade}
-                    rowKey="id"
-                    pagination={false}
-                    className="shadow-sm rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700"
-                    locale={{ emptyText: <Empty description={selectedGrade ? t('teacher.noStudentsInGrade') : t('teacher.selectGrade')} /> }}
+            <div className="flex flex-col sm:flex-row items-center gap-4 mt-6 mb-4 w-full">
+                <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
+                    {t('teacher.studentsList', 'Students List')}
+                    <Tag color="blue" style={{ marginLeft: '12px' }}>
+                        {searchQuery ? `${studentsInGrade.length} / ${allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade)).length}` : studentsInGrade.length}
+                    </Tag>
+                </Title>
+                <div className="hidden sm:block flex-grow border-t border-slate-200 dark:border-slate-700 mx-2"></div>
+                <Input
+                    placeholder={t('common.searchPlaceholder')}
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    prefix={<SearchOutlined className="text-slate-400" />}
+                    allowClear
+                    className="w-full sm:w-[300px]"
                 />
-            )}
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden w-full">
+                {isLoading ? (
+                    <div className="p-6 space-y-4">
+                        <Skeleton active paragraph={{ rows: 1 }} title={false} />
+                        <Skeleton active paragraph={{ rows: 5 }} />
+                    </div>
+                ) : (
+                    <Table
+                        columns={columns}
+                        dataSource={studentsInGrade}
+                        rowKey="id"
+                        pagination={false}
+                        scroll={{ x: 'max-content', y: 500 }}
+                        className="students-table w-full"
+                        locale={{ emptyText: <Empty description={selectedGrade ? t('teacher.noStudentsInGrade') : t('teacher.selectGrade')} /> }}
+                    />
+                )}
+            </div>
         </div>
     );
 }
@@ -550,78 +608,93 @@ function AttendanceModule({ setProfileStudentId }) {
             </div>
 
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-                <Row gutter={16} align="bottom">
-                    <Col xs={24} md={6}>
-                        <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
-                            <Select
-                                placeholder={t('teacher.selectGrade')}
-                                value={selectedGrade}
-                                onChange={setSelectedGrade}
-                                options={gradeOptions2}
-                                allowClear
-                                showSearch
-                            />
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} md={6}>
-                        <Form.Item label={t('teacher.date')} style={{ marginBottom: 0 }}>
-                            <DatePicker
-                                style={{ width: '100%' }}
-                                value={dayjs(attendanceDate)}
-                                onChange={(date) => setAttendanceDate(date ? date.format('YYYY-MM-DD') : '')}
-                            />
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} md={6}>
-                        <Form.Item label={t('common.searchPlaceholder')} style={{ marginBottom: 0 }}>
-                            <Input
-                                placeholder={t('common.searchPlaceholder')}
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                prefix={<SearchOutlined className="text-slate-400" />}
-                                allowClear
-                            />
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} md={6}>
-                        <Space className="w-full justify-end" size="small">
-                            <Button
-                                icon={<DeleteOutlined />}
-                                onClick={handleClearAttendance}
-                                disabled={!selectedGrade || studentsInGrade.length === 0}
-                                danger
-                            >
-                                {t('teacher.clearAttendance')}
-                            </Button>
-                            <Button
-                                type="primary"
-                                icon={<TeamOutlined />}
-                                onClick={handleMarkAllPresent}
-                                disabled={!selectedGrade || studentsInGrade.length === 0}
-                            >
-                                {t('teacher.markAllPresent')}
-                            </Button>
-                        </Space>
-                    </Col>
-                </Row>
+                <Form layout="vertical">
+                    <Row gutter={[16, 16]} align="bottom">
+                        <Col xs={24} sm={12} lg={6}>
+                            <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
+                                <Select
+                                    placeholder={t('teacher.selectGrade')}
+                                    value={selectedGrade}
+                                    onChange={setSelectedGrade}
+                                    options={gradeOptions2}
+                                    allowClear
+                                    showSearch
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                            <Form.Item label={t('teacher.date')} style={{ marginBottom: 0 }}>
+                                <DatePicker
+                                    style={{ width: '100%' }}
+                                    value={dayjs(attendanceDate)}
+                                    onChange={(date) => setAttendanceDate(date ? date.format('YYYY-MM-DD') : '')}
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={24} lg={12}>
+                            <Form.Item label=" " colon={false} style={{ marginBottom: 0 }}>
+                                <Space className="w-full justify-end" size="small" wrap>
+                                    <Button
+                                        icon={<DeleteOutlined />}
+                                        onClick={handleClearAttendance}
+                                        disabled={!selectedGrade || studentsInGrade.length === 0}
+                                        danger
+                                    >
+                                        {t('teacher.clearAttendance')}
+                                    </Button>
+                                    <Button
+                                        type="primary"
+                                        icon={<TeamOutlined />}
+                                        onClick={handleMarkAllPresent}
+                                        disabled={!selectedGrade || studentsInGrade.length === 0}
+                                    >
+                                        {t('teacher.markAllPresent')}
+                                    </Button>
+                                </Space>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                </Form>
             </Card>
 
             <QRScanner onScanSuccess={handleScanSuccess} />
 
-            {isLoading ? (
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-lg border border-slate-100 dark:border-slate-800 space-y-4 shadow-sm text-center">
-                    <Skeleton active paragraph={{ rows: 5 }} />
-                </div>
-            ) : (
-                <Table
-                    columns={columns}
-                    dataSource={studentsInGrade}
-                    rowKey="id"
-                    pagination={false}
-                    className="shadow-sm rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700"
-                    locale={{ emptyText: <Empty description={selectedGrade ? t('teacher.noStudentsInGrade') : t('teacher.selectGrade')} /> }}
+            <div className="flex flex-col sm:flex-row items-center gap-4 mt-6 mb-4 w-full">
+                <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
+                    {t('teacher.studentsList', 'Students List')}
+                    <Tag color="blue" style={{ marginLeft: '12px' }}>
+                        {searchQuery ? `${studentsInGrade.length} / ${allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade)).length}` : studentsInGrade.length}
+                    </Tag>
+                </Title>
+                <div className="hidden sm:block flex-grow border-t border-slate-200 dark:border-slate-700 mx-2"></div>
+                <Input
+                    placeholder={t('common.searchPlaceholder')}
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    prefix={<SearchOutlined className="text-slate-400" />}
+                    allowClear
+                    className="w-full sm:w-[300px]"
                 />
-            )}
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden w-full">
+                {isLoading ? (
+                    <div className="p-6 space-y-4">
+                        <Skeleton active paragraph={{ rows: 1 }} title={false} />
+                        <Skeleton active paragraph={{ rows: 5 }} />
+                    </div>
+                ) : (
+                    <Table
+                        columns={columns}
+                        dataSource={studentsInGrade}
+                        rowKey="id"
+                        pagination={false}
+                        scroll={{ x: 'max-content', y: 500 }}
+                        className="students-table w-full"
+                        locale={{ emptyText: <Empty description={selectedGrade ? t('teacher.noStudentsInGrade') : t('teacher.selectGrade')} /> }}
+                    />
+                )}
+            </div>
         </div>
     );
 }
@@ -629,54 +702,47 @@ function AttendanceModule({ setProfileStudentId }) {
 function QRScanner({ onScanSuccess }) {
     const [isScanning, setIsScanning] = useState(false);
     const { t } = useTranslation();
-    const scannerRef = useRef(null);
-
-    useEffect(() => {
-        if (isScanning) {
-            const scanner = new Html5QrcodeScanner(
-                "reader",
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                false
-            );
-            scanner.render(onScanSuccess, (err) => {
-                // Ignore silent errors
-            });
-            scannerRef.current = scanner;
-        } else {
-            if (scannerRef.current) {
-                scannerRef.current.clear().catch(err => console.error("Failed to clear scanner", err));
-                scannerRef.current = null;
-            }
-        }
-
-        return () => {
-            if (scannerRef.current) {
-                scannerRef.current.clear().catch(err => console.error("Failed to clear scanner on unmount", err));
-            }
-        };
-    }, [isScanning]);
 
     return (
-        <Card className="bg-slate-900 border-slate-800 overflow-hidden relative min-h-[100px] flex flex-col items-center justify-center mb-6">
+        <Card className="bg-slate-900 border-slate-800 overflow-hidden relative flex flex-col items-center justify-center mb-6">
             {!isScanning ? (
-                <Button
-                    type="primary"
-                    size="large"
-                    icon={<ScanOutlined />}
-                    onClick={() => setIsScanning(true)}
-                    className="h-16 px-12 text-lg rounded-full shadow-lg hover:scale-105 transition-transform"
-                >
-                    {t('teacher.scanID')}
-                </Button>
+                <div className="py-8 w-full flex justify-center">
+                    <Button
+                        type="primary"
+                        size="large"
+                        icon={<ScanOutlined />}
+                        onClick={() => setIsScanning(true)}
+                        className="h-16 px-12 text-lg rounded-full shadow-lg hover:scale-105 transition-transform"
+                    >
+                        {t('teacher.scanID')}
+                    </Button>
+                </div>
             ) : (
-                <div className="w-full max-w-[500px] flex flex-col items-center">
-                    <div id="reader" className="w-full bg-black rounded-xl overflow-hidden mb-4"></div>
+                <div className="w-full flex flex-col items-center p-4">
+                    <div className="w-full max-w-[400px] aspect-square rounded-2xl overflow-hidden mb-6 shadow-2xl relative border-4 border-slate-700">
+                        <Scanner
+                            onScan={(detectedCodes) => {
+                                if (detectedCodes && detectedCodes.length > 0) {
+                                    onScanSuccess(detectedCodes[0].rawValue);
+                                    // Make it feel responsive; could optional auto-close here
+                                }
+                            }}
+                            components={{
+                                audio: false,
+                                tracker: true,
+                            }}
+                        />
+                        {/* Overlay frame for aesthetics */}
+                        <div className="absolute inset-0 border-2 border-emerald-500 rounded-2xl pointer-events-none opacity-50 z-10" />
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border border-white/20 rounded-lg pointer-events-none z-10" />
+                    </div>
                     <Button
                         danger
+                        size="large"
                         onClick={() => setIsScanning(false)}
-                        className="rounded-full"
+                        className="rounded-full px-12 uppercase tracking-widest text-xs font-bold"
                     >
-                        {t('teacher.stopScanning')}
+                        {t('teacher.stopScanning', 'Stop Camera')}
                     </Button>
                 </div>
             )}

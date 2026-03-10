@@ -13,8 +13,21 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+<<<<<<< HEAD
     "@supabase/supabase-js": "^2.98.0",
+=======
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/camera": "^8.0.2",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/device": "^8.0.1",
+    "@capacitor/ios": "^8.2.0",
+    "@capacitor/status-bar": "^8.0.1",
+    "@capacitor/toast": "^8.0.1",
+    "@supabase/supabase-js": "^2.99.0",
+>>>>>>> 688818807068736ad538ff38f16f81e18ef9714c
     "@tailwindcss/vite": "^4.2.1",
+    "@yudiel/react-qr-scanner": "^2.5.1",
     "antd": "^6.3.1",
     "autoprefixer": "^10.4.27",
     "dayjs": "^1.11.19",
@@ -22,7 +35,6 @@
     "dexie-react-hooks": "^4.2.0",
     "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
-    "html5-qrcode": "^2.3.8",
     "i18next": "^25.8.14",
     "i18next-browser-languagedetector": "^8.2.1",
     "jspdf": "^4.2.0",
