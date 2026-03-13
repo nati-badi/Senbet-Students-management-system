@@ -171,7 +171,15 @@ export default function AssessmentManagement() {
                 columns={columns}
                 dataSource={assessments}
                 rowKey="id"
-                pagination={false}
+                scroll={{ x: 'max-content' }}
+                pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    showQuickJumper: true,
+                    position: ['bottomRight'],
+                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                }}
                 className="shadow-sm rounded-xl overflow-hidden"
             />
         </div>

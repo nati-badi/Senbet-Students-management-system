@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Layout, Menu, Button, Space, Typography, ConfigProvider, theme, Badge, Tooltip, message } from 'antd';
@@ -12,8 +12,11 @@ import {
   SyncOutlined,
   HomeOutlined,
   MoonOutlined,
-  SunOutlined
+  SunOutlined,
+  LockOutlined,
+  LogoutOutlined
 } from '@ant-design/icons';
+import { Form, Input, Card, Result } from 'antd';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import ParentPortal from './pages/parent/ParentPortal';
@@ -27,7 +30,20 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+  const [isAdminAuth, setIsAdminAuth] = useState(() => sessionStorage.getItem('admin_auth') === 'true');
+  const [activeRole, setActiveRole] = useState(() => sessionStorage.getItem('active_role') || null);
   const location = useLocation();
+  const themeTransitionTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    // Cleanup in case App unmounts while timer exists
+    return () => {
+      if (themeTransitionTimeoutRef.current) {
+        window.clearTimeout(themeTransitionTimeoutRef.current);
+        themeTransitionTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -38,6 +54,18 @@ export default function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+
+  const toggleTheme = () => {
+    // Add a short-lived class that enables CSS transitions during the toggle.
+    // This avoids "always-on" transitions that can make the UI feel sluggish.
+    document.documentElement.classList.add('theme-transition');
+    if (themeTransitionTimeoutRef.current) window.clearTimeout(themeTransitionTimeoutRef.current);
+    themeTransitionTimeoutRef.current = window.setTimeout(() => {
+      document.documentElement.classList.remove('theme-transition');
+      themeTransitionTimeoutRef.current = null;
+    }, 260);
+    setIsDarkMode(v => !v);
+  };
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -55,17 +83,49 @@ export default function App() {
     i18n.changeLanguage(newLang);
   };
 
-  const handleSync = async () => {
+  const handleAdminLogin = (password) => {
+    // Simple admin password for local access - can be improved later
+    if (password === 'senbet2026') {
+      setIsAdminAuth(true);
+      sessionStorage.setItem('admin_auth', 'true');
+      sessionStorage.setItem('active_role', 'admin');
+      setActiveRole('admin');
+      message.success('Logged in successfully!');
+    } else {
+      message.error('Invalid password!');
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdminAuth(false);
+    sessionStorage.removeItem('admin_auth');
+    sessionStorage.removeItem('active_role');
+    setActiveRole(null);
+    message.info('Logged out.');
+  };
+
+  const handleSync = useCallback(async ({ silent = false } = {}) => {
     if (!isOnline || isSyncing) return;
     setIsSyncing(true);
+    const hide = silent ? message.loading('Syncing...', 0) : null;
     const result = await syncData();
     setIsSyncing(false);
+    if (hide) hide();
     if (result.success) {
-      message.success(`Sync successful! Pushed: ${result.pushed}, Pulled: ${result.pulled}`);
+      if (!silent) message.success(`Sync successful! Pushed: ${result.pushed}, Pulled: ${result.pulled}`);
     } else {
       message.error("Sync disabled: " + (result.error || "Check your internet connection and .env keys"));
     }
-  };
+  }, [isOnline, isSyncing]);
+
+  // Sync once when the app first loads (not on every route change)
+  const hasSyncedOnLoad = useRef(false);
+  useEffect(() => {
+    if (!hasSyncedOnLoad.current && isOnline) {
+      hasSyncedOnLoad.current = true;
+      void handleSync({ silent: true });
+    }
+  }, [isOnline, handleSync]);
 
   return (
     <ConfigProvider
@@ -100,7 +160,7 @@ export default function App() {
         >
           <Space align="center" size="small">
             <Link to="/" className="flex items-center gap-2 notranslate" translate="no">
-              <BookOutlined style={{ fontSize: '24px', color: isDarkMode ? '#22c55e' : '#166534' }} />
+              <img src="/Logo.jpg" alt="Logo" className="w-9 h-9 object-cover rounded-full shadow-sm flex-shrink-0" />
               <Title level={4} style={{ margin: 0, fontSize: '1rem', maxWidth: '220px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }} className="hidden sm:block">
                 በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት
               </Title>
@@ -115,7 +175,7 @@ export default function App() {
                   text={
                     <Button
                       type="text"
-                      onClick={handleSync}
+                      onClick={() => handleSync()}
                       disabled={!isOnline || isSyncing}
                       className="flex items-center gap-1 p-0 hover:text-forest-700 cursor-pointer"
                     >
@@ -129,7 +189,7 @@ export default function App() {
               </Tooltip>
 
               <Button
-                onClick={() => setIsDarkMode(!isDarkMode)}
+                onClick={toggleTheme}
                 icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
                 className="cursor-pointer"
                 type="text"
@@ -144,15 +204,33 @@ export default function App() {
               >
                 {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
               </Button>
+
+              {isAdminAuth && (
+                 <Button
+                    onClick={handleAdminLogout}
+                    icon={<LogoutOutlined />}
+                    type="primary"
+                    danger
+                    className="font-bold shadow-md shadow-red-500/20"
+                >
+                    {t('common.logout')}
+                </Button>
+              )}
             </Space>
           </div>
         </Header>
 
         <Content className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
           <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/admin/*" element={<AdminDashboard />} />
-            <Route path="/teacher/*" element={<TeacherDashboard />} />
+            <Route path="/" element={<Home activeRole={activeRole} />} />
+            <Route 
+              path="/admin/*" 
+              element={isAdminAuth ? <AdminDashboard /> : <AdminLogin onLogin={handleAdminLogin} />} 
+            />
+            <Route 
+              path="/teacher/*" 
+              element={<TeacherDashboard />} 
+            />
             <Route path="/parent" element={<ParentPortal />} />
           </Routes>
         </Content>
@@ -165,7 +243,7 @@ export default function App() {
   );
 }
 
-function Home() {
+function Home({ activeRole }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
@@ -181,12 +259,14 @@ function Home() {
             {t('app.adminPortal')}
           </Button>
         </Link>
-        <Link to="/teacher">
-          <Button size="large" className="px-8 flex items-center gap-2">
-            <TeamOutlined />
-            {t('app.teacherPortal')}
-          </Button>
-        </Link>
+        {activeRole !== 'admin' && (
+          <Link to="/teacher">
+            <Button size="large" className="px-8 flex items-center gap-2">
+              <TeamOutlined />
+              {t('app.teacherPortal')}
+            </Button>
+          </Link>
+        )}
         <Link to="/parent">
           <Button size="large" className="px-8 flex items-center gap-2">
             <GlobalOutlined />
@@ -194,6 +274,42 @@ function Home() {
           </Button>
         </Link>
       </Space>
+    </div>
+  );
+}
+
+function AdminLogin({ onLogin }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <Card 
+        className="w-full max-w-md shadow-2xl rounded-3xl overflow-hidden border-slate-100 dark:border-slate-800"
+        title={
+          <div className="text-center pt-4">
+            <LockOutlined className="text-3xl text-forest-600 mb-2" />
+            <br/>
+            <Title level={4}>{t('admin.portalAccess', 'Staff Portal Access')}</Title>
+          </div>
+        }
+      >
+        <Form 
+          layout="vertical" 
+          onFinish={(v) => onLogin(v.password)}
+          requiredMark={false}
+        >
+          <Form.Item 
+            label={t('common.password', 'Master Password')} 
+            name="password" 
+            rules={[{ required: true, message: 'Password required' }]}
+            extra={t('parent.masterPwdExtra')}
+          >
+            <Input.Password prefix={<LockOutlined className="text-slate-300" />} placeholder="Enter password" size="large" className="rounded-xl" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" block size="large" className="h-12 font-bold rounded-xl shadow-lg mt-2">
+            Login
+          </Button>
+        </Form>
+      </Card>
     </div>
   );
 }

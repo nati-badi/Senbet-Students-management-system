@@ -101,3 +101,38 @@ input::-webkit-inner-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+/* ============================================================
+   SMOOTH THEME TRANSITION (Light <-> Dark)
+   Apply only during user-initiated toggles (see App.jsx).
+   Respects reduced-motion.
+   ============================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  /* Avoid transitioning every node (can be very laggy with Ant Design). */
+  html.theme-transition body,
+  html.theme-transition #root,
+  html.theme-transition .ant-layout,
+  html.theme-transition .ant-layout-header,
+  html.theme-transition .ant-layout-sider,
+  html.theme-transition .ant-layout-content,
+  html.theme-transition .ant-menu,
+  html.theme-transition .ant-card,
+  html.theme-transition .ant-table,
+  html.theme-transition .ant-table-container,
+  html.theme-transition .ant-table-thead > tr > th,
+  html.theme-transition .ant-table-tbody > tr > td,
+  html.theme-transition .ant-btn,
+  html.theme-transition .ant-input,
+  html.theme-transition .ant-input-affix-wrapper,
+  html.theme-transition .ant-select-selector,
+  html.theme-transition .ant-picker,
+  html.theme-transition .ant-modal-content,
+  html.theme-transition .ant-dropdown-menu,
+  html.theme-transition .ant-tag {
+    /* "Premium" feel: background leads, content follows slightly. */
+    transition-property: background-color, color, border-color, box-shadow;
+    transition-duration: 220ms;
+    transition-timing-function: ease;
+    transition-delay: 0ms, 40ms, 40ms, 0ms;
+  }
+}

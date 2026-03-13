@@ -168,7 +168,7 @@ export default function AdminDashboard() {
     return (
         <div className="flex flex-col w-full h-full">
             {/* Mobile Navigation */}
-            <div className="md:hidden mb-4 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+            <div className="lg:hidden mb-4 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
                 <Menu
                     mode="horizontal"
                     selectedKeys={[location.pathname === '/admin/' ? '/admin' : location.pathname]}
@@ -181,7 +181,7 @@ export default function AdminDashboard() {
                 <Sider
                     width={240}
                     style={{ flexShrink: 0 }}
-                    className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden md:block"
+                    className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden lg:block"
                 >
                     <div style={{ padding: '16px' }}>
                         <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
@@ -196,7 +196,7 @@ export default function AdminDashboard() {
                     />
                 </Sider>
 
-                <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 md:p-6 min-h-[600px] w-full overflow-hidden">
+                <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-3 sm:p-4 md:p-6 min-h-[600px] w-full overflow-hidden">
                     <Routes>
                         <Route path="/" element={<StudentRegistration />} />
                         <Route path="/certificates" element={<DocumentGenerator type="certificate" />} />
@@ -960,7 +960,7 @@ function StudentRegistration() {
                             className="cursor-pointer"
                             onClick={downloadTemplate}
                         >
-                            {t('admin.downloadTemplate', 'Download Template')}
+                            {t('admin.downloadTemplate', 'Download Import Template')}
                         </Button>
                         <Upload
                             accept=".csv,.xlsx,.xls"
@@ -1020,7 +1020,14 @@ function StudentRegistration() {
                             columns={columns}
                             dataSource={filteredStudents}
                             rowKey="id"
-                            pagination={false}
+                            pagination={{
+                                pageSize: 10,
+                                showSizeChanger: true,
+                                pageSizeOptions: ['10', '20', '50', '100'],
+                                showQuickJumper: true,
+                                position: ['bottomRight'],
+                                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                            }}
                             scroll={{ x: 'max-content', y: 500 }}
                             className="students-table w-full"
                             locale={{ emptyText: <Empty description={t('admin.noStudentsYet')} /> }}
@@ -1570,7 +1577,14 @@ function SubjectManagement() {
                     columns={columns}
                     dataSource={subjects}
                     rowKey="id"
-                    pagination={false}
+                    pagination={{
+                        pageSize: 10,
+                        showSizeChanger: true,
+                        pageSizeOptions: ['10', '20', '50', '100'],
+                        showQuickJumper: true,
+                        position: ['bottomRight'],
+                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                    }}
                     scroll={{ x: 'max-content', y: 500 }}
                     className="students-table w-full"
                 />
@@ -1765,7 +1779,14 @@ function AssessmentManagement() {
                     columns={columns}
                     dataSource={assessments}
                     rowKey="id"
-                    pagination={false}
+                    pagination={{
+                        pageSize: 10,
+                        showSizeChanger: true,
+                        pageSizeOptions: ['10', '20', '50', '100'],
+                        showQuickJumper: true,
+                        position: ['bottomRight'],
+                        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                    }}
                     scroll={{ x: 'max-content', y: 500 }}
                     className="students-table w-full"
                 />

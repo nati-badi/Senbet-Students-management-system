@@ -83,27 +83,32 @@ export default function SubjectManagement() {
             </div>
 
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-                <Form form={form} onFinish={handleSave} layout="inline">
-                    <Form.Item
-                        name="name"
-                        rules={[{ required: true, message: t('admin.subjectName') }]}
-                        style={{ minWidth: '300px' }}
-                    >
-                        <Input placeholder={t('admin.subjectNamePlaceholder')} />
-                    </Form.Item>
-                    <Form.Item>
-                        <Button type="primary" htmlType="submit">
-                            {editingId ? t('common.save') : t('admin.addSubject')}
-                        </Button>
-                        {editingId && (
-                            <Button className="ml-2" onClick={() => {
-                                setEditingId(null);
-                                form.resetFields();
-                            }}>
-                                {t('admin.cancel')}
-                            </Button>
-                        )}
-                    </Form.Item>
+                <Form form={form} onFinish={handleSave} layout="vertical">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <Form.Item
+                            name="name"
+                            label={t('admin.subjectName')}
+                            rules={[{ required: true, message: t('admin.subjectName') }]}
+                            className="md:col-span-2"
+                        >
+                            <Input placeholder={t('admin.subjectNamePlaceholder')} />
+                        </Form.Item>
+                        <Form.Item className="mb-0">
+                            <Space wrap>
+                                <Button type="primary" htmlType="submit">
+                                    {editingId ? t('common.save') : t('admin.addSubject')}
+                                </Button>
+                                {editingId && (
+                                    <Button onClick={() => {
+                                        setEditingId(null);
+                                        form.resetFields();
+                                    }}>
+                                        {t('admin.cancel')}
+                                    </Button>
+                                )}
+                            </Space>
+                        </Form.Item>
+                    </div>
                 </Form>
             </Card>
 
@@ -111,7 +116,15 @@ export default function SubjectManagement() {
                 columns={columns}
                 dataSource={subjects}
                 rowKey="id"
-                pagination={false}
+                scroll={{ x: 'max-content' }}
+                pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    showQuickJumper: true,
+                    position: ['bottomRight'],
+                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                }}
                 className="shadow-sm rounded-xl overflow-hidden"
             />
         </div>

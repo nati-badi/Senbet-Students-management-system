@@ -64,3 +64,28 @@ db.version(7).stores({
 db.version(8).stores({
   settings: "key, value" // stores key-value pairs like currentAcademicYear, currentSemester
 });
+
+db.version(9).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, parentContact, portalCode, synced",
+}).upgrade(trans => {
+  return trans.students.toCollection().modify(s => {
+    // Generate a simple 6-digit random code for existing students if they don't have one
+    if (!s.portalCode) {
+      s.portalCode = Math.floor(100000 + Math.random() * 900000).toString();
+    }
+  });
+});
+
+db.version(10).stores({
+  teachers: "++id, name, phone, assignedGrades, assignedSubjects, synced"
+});
+
+db.version(11).stores({
+  teachers: "++id, name, phone, accessCode, assignedGrades, assignedSubjects, synced"
+}).upgrade(trans => {
+  return trans.teachers.toCollection().modify(t => {
+    if (!t.accessCode) {
+      t.accessCode = Math.floor(100000 + Math.random() * 900000).toString();
+    }
+  });
+});

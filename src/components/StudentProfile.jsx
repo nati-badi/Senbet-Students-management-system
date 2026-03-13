@@ -143,7 +143,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
         {
             title: t('teacher.score'),
             key: 'score',
-            render: (_, r) => r.hasMark ? <Text strong>{r.score} / {r.maxScore}</Text> : <Tag icon={<WarningOutlined />} color="warning">Pending</Tag>
+            render: (_, r) => r.hasMark ? <Text strong>{r.score} / {r.maxScore}</Text> : <Tag icon={<WarningOutlined />} color="warning">{t('teacher.pending')}</Tag>
         },
         {
             title: '%',
@@ -168,7 +168,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             {formatGrade(student?.grade)}
                         </Tag>
                         <div>
-                            <Text type="secondary" className="text-xs uppercase tracking-widest">Entry Date: {student?.academicYear ? dayjs(student.academicYear).format('MMM YYYY') : '-'}</Text>
+                            <Text type="secondary" className="text-xs uppercase tracking-widest">{t('common.entryDate')}: {student?.academicYear ? dayjs(student.academicYear).format('MMM YYYY') : '-'}</Text>
                         </div>
                     </Col>
                 </Row>
@@ -179,9 +179,9 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                 <Descriptions.Item label={t('admin.parentContact')}>
                     <Space><PhoneOutlined /> {student?.parentContact}</Space>
                 </Descriptions.Item>
-                <Descriptions.Item label="Total Assessments">{gradeAssessments.length}</Descriptions.Item>
-                <Descriptions.Item label="Missing Marks">
-                    {missingAssessments.length > 0 ? <Text type="danger" strong>{missingAssessments.length}</Text> : <Text type="success">0 (Fully Graded)</Text>}
+                <Descriptions.Item label={t('teacher.totalAssessments')}>{gradeAssessments.length}</Descriptions.Item>
+                <Descriptions.Item label={t('teacher.missingMarks')}>
+                    {missingAssessments.length > 0 ? <Text type="danger" strong>{missingAssessments.length}</Text> : <Text type="success">0 ({t('teacher.fullyGraded')})</Text>}
                 </Descriptions.Item>
             </Descriptions>
         </div>
@@ -189,7 +189,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
     const renderAttendance = () => (
         <div className="space-y-6 mt-4">
-            <Title level={5} className="!mb-4"><Space><CalendarOutlined /> 90-Day Attendance Streak</Space></Title>
+            <Title level={5} className="!mb-4"><Space><CalendarOutlined /> {t('teacher.attendanceStreak')}</Space></Title>
 
             <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
                 <div className="flex flex-wrap gap-1.5 justify-start">
@@ -208,7 +208,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                     })}
                 </div>
                 <div className="flex gap-4 mt-4 text-xs text-slate-500 justify-end items-center">
-                    <span>Less</span>
+                    <span>{t('teacher.less')}</span>
                     <div className="flex gap-1.5">
                         <div className="w-3 h-3 rounded-sm bg-slate-200 dark:bg-slate-800"></div>
                         <div className="w-3 h-3 rounded-sm bg-slate-400"></div>
@@ -216,7 +216,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                         <div className="w-3 h-3 rounded-sm bg-amber-500"></div>
                         <div className="w-3 h-3 rounded-sm bg-green-500"></div>
                     </div>
-                    <span>More</span>
+                    <span>{t('teacher.more')}</span>
                 </div>
             </div>
 
@@ -241,17 +241,17 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
         <div className="space-y-6 mt-4">
             {missingAssessments.length > 0 && (
                 <Alert
-                    message="Missing Assessments Detected"
-                    description={`This student is missing marks for ${missingAssessments.length} assessment(s).`}
+                    message={t('teacher.missingAssessments')}
+                    description={t('teacher.missingAssessmentsDesc', { count: missingAssessments.length })}
                     type="warning"
                     showIcon
-                    action={<Tag color="red">{missingAssessments.length} Pending</Tag>}
+                    action={<Tag color="red">{missingAssessments.length} {t('teacher.pending')}</Tag>}
                 />
             )}
 
             <div className="flex justify-between items-end mb-2">
-                <Title level={5} className="!mb-0"><Space><PieChartOutlined /> Academic Record</Space></Title>
-                <Tag color="purple" className="text-sm px-2 py-1">Overall Avg: {averagePercentage}%</Tag>
+                <Title level={5} className="!mb-0"><Space><PieChartOutlined /> {t('teacher.academicRecord')}</Space></Title>
+                <Tag color="purple" className="text-sm px-2 py-1">{t('teacher.overallAvg')}: {averagePercentage}%</Tag>
             </div>
 
             {sem1Marks.length > 0 && (
@@ -326,8 +326,8 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                     <div className="absolute bottom-4 right-4 border-b-4 border-r-4 border-slate-900 w-12 h-12" />
 
                     <div className="flex flex-col items-center mb-8 text-center">
-                        <Title level={3} className="!mb-0 !text-slate-900 italic font-serif">የተማሪ ውጤት መግለጫ (Preview)</Title>
-                        <Text className="text-lg uppercase tracking-widest font-bold">Academic Transcript</Text>
+                        <Title level={3} className="!mb-0 !text-slate-900 italic font-serif">{t('teacher.academicTranscript')}</Title>
+                        <Text className="text-lg uppercase tracking-widest font-bold">{t('teacher.academicTranscript')}</Text>
                         <div className="w-32 h-1 bg-slate-900 my-4" />
                     </div>
 
@@ -341,9 +341,9 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                         <table className="w-full border-collapse text-sm">
                             <thead>
                                 <tr className="bg-slate-900 text-white">
-                                    <th className="p-2 text-left border border-slate-900">Subject</th>
-                                    <th className="p-2 text-center border border-slate-900">Semester I</th>
-                                    <th className="p-2 text-center border border-slate-900">Semester II</th>
+                                    <th className="p-2 text-left border border-slate-900">{t('admin.subjects')}</th>
+                                    <th className="p-2 text-center border border-slate-900">{t('common.semester')} I</th>
+                                    <th className="p-2 text-center border border-slate-900">{t('common.semester')} II</th>
                                     <th className="p-2 text-center border border-slate-900">Average</th>
                                 </tr>
                             </thead>
@@ -363,7 +363,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             </tbody>
                             <tfoot>
                                 <tr className="bg-slate-900 text-white font-bold">
-                                    <td className="p-2 border border-slate-900">Overall Average</td>
+                                    <td className="p-2 border border-slate-900">{t('teacher.overallAvg')}</td>
                                     <td colSpan={2} className="border border-slate-900"></td>
                                     <td className="p-2 text-center border border-slate-900 text-lg">{averagePercentage}%</td>
                                 </tr>
@@ -374,19 +374,19 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                     {missingAssessments.length > 0 && (
                         <div className="mt-auto bg-red-50 border border-red-600 text-red-700 p-4 rounded text-center text-sm font-bold uppercase tracking-widest relative z-10">
                             <WarningOutlined className="mr-2" />
-                            Incomplete Transcript - Missing {missingAssessments.length} Assessment(s)
+                            {t('teacher.incompleteTranscript', { count: missingAssessments.length })}
                         </div>
                     )}
                     {missingAssessments.length === 0 && gradeAssessments.length > 0 && (
                         <div className="mt-auto bg-green-50 border border-green-600 text-green-700 p-4 rounded text-center text-sm font-bold uppercase tracking-widest relative z-10">
                             <FileProtectOutlined className="mr-2" />
-                            Complete - Ready for Final Generation
+                            {t('teacher.readyForFinal')}
                         </div>
                     )}
 
                     {/* Seal Placeholder */}
                     <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-32 h-32 border-4 border-double border-slate-200 rounded-full flex items-center justify-center opacity-30 rotate-12 pointer-events-none">
-                        <div className="text-[8px] font-bold text-center text-slate-300 uppercase leading-none">Official<br />Preview</div>
+                        <div className="text-[8px] font-bold text-center text-slate-300 uppercase leading-none">{t('teacher.officialPreview')}</div>
                     </div>
                 </div>
             </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Typography, Row, Col, Card, Form, Input, Select, DatePicker, Button, Table, Tag, Space, Tooltip, Popconfirm, Modal, notification, Upload, message, Skeleton, Empty } from 'antd';
 import { SearchOutlined, FilterOutlined, DownloadOutlined, UploadOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -17,9 +17,16 @@ export default function StudentRegistration() {
     const { t, i18n } = useTranslation();
     const [form] = Form.useForm();
     const [editForm] = Form.useForm();
+    
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(() => {
+        try {
+            return sessionStorage.getItem('admin_students_search') || '';
+        } catch {
+            return '';
+        }
+    });
     const [filterGrade, setFilterGrade] = useState('');
     const [isFormValid, setIsFormValid] = useState(false);
     const [profileStudentId, setProfileStudentId] = useState(null);
@@ -98,6 +105,7 @@ export default function StudentRegistration() {
             await db.students.add({
                 id: crypto.randomUUID(),
                 ...values,
+                portalCode: values.portalCode || Math.floor(100000 + Math.random() * 900000).toString(),
                 academicYear,
                 synced: 0,
             });
@@ -226,18 +234,30 @@ export default function StudentRegistration() {
     ];
 
     const filteredStudents = students.filter(s => {
-        const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.baptismalName || "").toLowerCase().includes(searchQuery.toLowerCase());
+        const query = (searchQuery || "").toLowerCase();
+        const matchesSearch = (s.name || "").toLowerCase().includes(query) || 
+                              (s.baptismalName || "").toLowerCase().includes(query) ||
+                              (s.parentContact || "").includes(searchQuery);
         const matchesGrade = !filterGrade || String(s.grade) === String(filterGrade);
         return matchesSearch && matchesGrade;
     });
 
+    useEffect(() => {
+        try {
+            if (searchQuery) sessionStorage.removeItem('admin_students_search');
+        } catch {
+            // ignore
+        }
+    }, []);
+
     const columns = [
-        { title: t('admin.name'), dataIndex: 'name', key: 'name', sorter: (a, b) => a.name.localeCompare(b.name) },
-        { title: t('admin.baptismalName'), dataIndex: 'baptismalName', key: 'baptismalName' },
-        { title: t('admin.gender'), dataIndex: 'gender', render: (t) => <Tag color={t === 'Male' ? 'blue' : 'magenta'}>{t}</Tag> },
-        { title: t('admin.grade'), dataIndex: 'grade', render: (t) => <Tag color="green">{formatGrade(t)}</Tag> },
+        { title: t('admin.name'), dataIndex: 'name', key: 'name', sorter: (a, b) => (a.name || '').localeCompare(b.name || '') },
+        { title: t('admin.baptismalName'), dataIndex: 'baptismalName', key: 'baptismalName', sorter: (a, b) => (a.baptismalName || '').localeCompare(b.baptismalName || '') },
+        { title: t('admin.gender'), dataIndex: 'gender', render: (t) => <Tag color={t === 'Male' ? 'blue' : 'magenta'}>{t || '—'}</Tag>, sorter: (a, b) => (a.gender || '').localeCompare(b.gender || '') },
+        { title: t('admin.grade'), dataIndex: 'grade', render: (t) => <Tag color="green">{formatGrade(t)}</Tag>, sorter: (a, b) => normalizeGrade(a.grade) - normalizeGrade(b.grade) },
+        { title: t('admin.portalCode', 'Portal Code'), dataIndex: 'portalCode', render: (code) => <Text copyable font-family="monospace">{code}</Text> },
         { title: t('admin.contact'), dataIndex: 'parentContact' },
-        { title: t('admin.dateOfEntry'), dataIndex: 'academicYear', render: (t) => <span className="text-xs text-slate-500">{formatEthiopianDate(t)}</span> },
+        { title: t('admin.dateOfEntry'), dataIndex: 'academicYear', render: (t) => <span className="text-xs text-slate-500">{formatEthiopianDate(t)}</span>, sorter: (a, b) => new Date(a.academicYear || 0) - new Date(b.academicYear || 0) },
         {
             title: t('common.actions'), key: 'actions', align: 'right', render: (_, r) => (
                 <Space>
@@ -258,24 +278,58 @@ export default function StudentRegistration() {
                         <Col xs={24} md={12}><Form.Item label={t('admin.fullName')} name="name" rules={[{ required: true }, { validator: validateAmharic }]}><Input /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.baptismalNameField')} name="baptismalName" rules={[{ required: true }, { validator: validateAmharic }]}><Input /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.gender')} name="gender"><Select options={[{ value: 'Male', label: 'Male' }, { value: 'Female', label: 'Female' }]} /></Form.Item></Col>
-                        <Col xs={24} md={12}><Form.Item label={t('admin.dateOfEntry')} name="dateOfEntry" initialValue={dayjs()} extra={<EthiopianDatePreview value={regDateOfEntry} />}><DatePicker className="w-full" disabledDate={disabledDate} /></Form.Item></Col>
+                        <Col xs={24} md={12}>
+                            <Form.Item label={t('admin.dateOfEntry')} name="dateOfEntry" initialValue={dayjs()} extra={regDateOfEntry ? <EthiopianDatePreview value={regDateOfEntry} /> : null}>
+                                <DatePicker className="w-full" disabledDate={disabledDate} />
+                            </Form.Item>
+                        </Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.gradeClass')} name="grade" rules={[{ required: true }]}><Select options={GRADE_OPTIONS} showSearch /></Form.Item></Col>
+                        <Col xs={24} md={12}><Form.Item label={t('admin.portalCode', 'Portal Access Code')} name="portalCode" tooltip="6-digit access code for parent login. Leave empty to auto-generate."><Input placeholder="Auto-generates if empty" maxLength={6} /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.parentContact')} name="parentContact" rules={[{ required: true }, { validator: validateEthiopianPhone }]}><Input maxLength={10} /></Form.Item></Col>
                     </Row>
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
-                        <Button icon={<DownloadOutlined />} onClick={downloadTemplate}>{t('admin.downloadTemplate')}</Button>
+                        <Button icon={<DownloadOutlined />} onClick={downloadTemplate}>
+                            {t('admin.downloadTemplate', 'Download Import Template')}
+                        </Button>
                         <Upload showUploadList={false} beforeUpload={handleImportFile}><Button icon={<UploadOutlined />}>{t('admin.importData')}</Button></Upload>
                         <Button type="primary" htmlType="submit" disabled={!isFormValid}>{t('common.save')}</Button>
                     </div>
                 </Form>
             </Card>
 
-            <div className="flex flex-col sm:flex-row justify-between gap-4">
-                <Input prefix={<SearchOutlined />} placeholder={t('admin.searchPlaceholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} allowClear className="max-w-md" />
-                <Select placeholder={t('admin.allGrades')} value={filterGrade} onChange={setFilterGrade} allowClear className="w-48" options={allGradeOptions} />
+            <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                    <FilterOutlined className="text-slate-500" />
+                    <Text type="secondary" strong className="text-sm uppercase tracking-wide">Filter Students</Text>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <Input prefix={<SearchOutlined />} placeholder={t('admin.searchPlaceholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} allowClear className="max-w-md" />
+                    <Select 
+                        placeholder={`← ${t('admin.allGrades', 'All Grades')} (Filter by Grade)`}
+                        value={filterGrade} 
+                        onChange={setFilterGrade} 
+                        allowClear 
+                        className="w-64" 
+                        options={allGradeOptions}
+                        popupMatchSelectWidth={false}
+                    />
+                </div>
             </div>
 
-            <Table columns={columns} dataSource={filteredStudents} rowKey="id" pagination={false} loading={isLoadingStudents} />
+            <Table
+                columns={columns}
+                dataSource={filteredStudents}
+                rowKey="id"
+                loading={isLoadingStudents}
+                pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    showQuickJumper: true,
+                    position: ['bottomRight'],
+                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                }}
+            />
 
             <Modal title={t('admin.edit')} open={isEditModalVisible} onOk={handleEditSave} onCancel={() => setIsEditModalVisible(false)}>
                 <Form form={editForm} layout="vertical">
@@ -283,6 +337,7 @@ export default function StudentRegistration() {
                         <Col xs={24} md={12}><Form.Item label={t('admin.fullName')} name="name" rules={[{ required: true }]}><Input /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.baptismalNameField')} name="baptismalName" rules={[{ required: true }]}><Input /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.gradeClass')} name="grade" rules={[{ required: true }]}><Select options={GRADE_OPTIONS} /></Form.Item></Col>
+                        <Col xs={24} md={12}><Form.Item label={t('admin.portalCode', 'Portal Access Code')} name="portalCode" rules={[{ required: true }]}><Input maxLength={6} /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.parentContact')} name="parentContact" rules={[{ required: true }]}><Input /></Form.Item></Col>
                     </Row>
                 </Form>
