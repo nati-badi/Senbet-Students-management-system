@@ -6,18 +6,20 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import dayjs from 'dayjs';
-import { QRCodeCanvas } from 'qrcode.react';
-import { db } from '../../db/database';
+import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
+
 
 const { Title, Text } = Typography;
 
 export default function DocumentGenerator({ type }) {
     const { t } = useTranslation();
-    const [selectedGrade, setSelectedGrade] = useState('');
+    const [selectedGrade, setSelectedGrade] = useState(null);
     const [isGenerating, setIsGenerating] = useState(false);
+    
     const students = useLiveQuery(() => db.students.toArray()) || [];
     const allMarks = useLiveQuery(() => db.marks.toArray()) || [];
-
+    const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
+    const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
     const uniqueGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
     const gradeStudents = students.filter(s => s.grade === selectedGrade);
 
@@ -64,7 +66,7 @@ export default function DocumentGenerator({ type }) {
                 <Text type="secondary">{type === 'id-card' ? t('admin.idCardDesc') : t('admin.certificateTemplateDesc')}</Text>
 
                 <Card className="mt-6 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-                    <Space direction="vertical" className="w-full" size="middle">
+                    <Space orientation="vertical" className="w-full" size="middle">
                         <div>
                             <Text strong style={{ display: 'block', marginBottom: '8px' }}>{t('admin.selectGradeCerts')}</Text>
                             <Select
@@ -93,11 +95,20 @@ export default function DocumentGenerator({ type }) {
 
             <div className="opacity-0 pointer-events-none fixed top-[5000px] left-0">
                 {gradeStudents.map(student => (
-                    <div key={student.id} id={`temp-${type}-${student.id}`} style={{ width: type === 'id-card' ? '86mm' : '210mm', padding: '10px' }}>
+                    <div key={student.id} id={`temp-${type}-${student.id}`} style={{ 
+                        width: type === 'id-card' ? '86mm' : '210mm',
+                        height: 'auto',
+                        padding: '10px' 
+                    }}>
                         {type === 'id-card' ? (
                             <IDCardTemplate student={student} />
                         ) : (
-                            <CertificateTemplate student={student} marks={allMarks.filter(m => m.studentId === student.id)} />
+                            <CertificateTemplate 
+                                student={student} 
+                                marks={allMarks.filter(m => m.studentId === student.id)} 
+                                subjects={subjects}
+                                assessments={assessments}
+                            />
                         )}
                     </div>
                 ))}
@@ -149,62 +160,130 @@ function IDCardTemplate({ student }) {
     );
 }
 
-function CertificateTemplate({ student, marks }) {
-    const totalScore = marks.length > 0 ? marks.reduce((acc, m) => acc + (m.score || 0), 0) : 0;
-    const avgScore = marks.length > 0 ? (totalScore / marks.length).toFixed(1) : 0;
+function CertificateTemplate({ student, marks, subjects = [], assessments = [] }) {
+    const studentGrade = student.grade;
+    const gradeAssessments = assessments.filter(a => a.grade === studentGrade);
+    const uniqueSubjects = [...new Set(gradeAssessments.map(a => a.subjectName))].sort();
+
+    const subjectRows = uniqueSubjects.map(subjectName => {
+        const semIAssessments = gradeAssessments.filter(a => {
+            const subj = subjects.find(s => s.name === a.subjectName);
+            return a.subjectName === subjectName && (subj?.semester || 'Semester I') === 'Semester I';
+        });
+        const semIIAssessments = gradeAssessments.filter(a => {
+            const subj = subjects.find(s => s.name === a.subjectName);
+            return a.subjectName === subjectName && subj?.semester === 'Semester II';
+        });
+
+        const semIEarned = semIAssessments.reduce((acc, a) => {
+            const mark = marks.find(m => m.assessmentId === a.id);
+            return acc + (mark ? (mark.score || 0) : 0);
+        }, 0);
+        const semIMax = semIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+        const semIHasData = semIAssessments.some(a => marks.find(m => m.assessmentId === a.id));
+
+        const semIIEarned = semIIAssessments.reduce((acc, a) => {
+            const mark = marks.find(m => m.assessmentId === a.id);
+            return acc + (mark ? (mark.score || 0) : 0);
+        }, 0);
+        const semIIMax = semIIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+        const semIIHasData = semIIAssessments.some(a => marks.find(m => m.assessmentId === a.id));
+
+        const totalMax = semIMax + semIIMax;
+        const totalEarned = semIEarned + semIIEarned;
+        const avgPct = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(0) : '-';
+
+        return {
+            subject: subjectName,
+            semI: semIHasData ? `${semIEarned} / ${semIMax}` : '—',
+            semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIAssessments.length === 0 ? 'N/A' : '—'),
+            avg: avgPct !== '-' ? `${avgPct}%` : '—',
+        };
+    });
+
+    const overallEarned = marks.reduce((acc, m) => acc + (m.score || 0), 0);
+    const overallMax = gradeAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+    const overallAvg = overallMax > 0 ? ((overallEarned / overallMax) * 100).toFixed(1) : 0;
+
+    const { t } = useTranslation();
 
     return (
-        <div className="w-[190mm] h-[277mm] bg-white border-[12px] border-double border-slate-900 p-12 flex flex-col items-center text-slate-900 relative font-serif">
+        <div className="w-[190mm] h-[277mm] bg-white border-[12px] border-double border-slate-900 p-8 flex flex-col items-center text-slate-900 relative font-serif">
+            {/* Corner Decorations */}
             <div className="absolute top-4 left-4 border-t-4 border-l-4 border-slate-900 w-12 h-12" />
             <div className="absolute top-4 right-4 border-t-4 border-r-4 border-slate-900 w-12 h-12" />
             <div className="absolute bottom-4 left-4 border-b-4 border-l-4 border-slate-900 w-12 h-12" />
             <div className="absolute bottom-4 right-4 border-b-4 border-r-4 border-slate-900 w-12 h-12" />
 
-            <div className="flex flex-col items-center mb-12 text-center">
-                <Title level={2} className="!mb-0 !text-slate-900 italic font-serif">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
-                <Text className="text-xl uppercase tracking-widest font-bold">Finote Birhan Senbet School</Text>
-                <div className="w-32 h-1 bg-slate-900 my-4" />
-                <Title level={1} className="!mb-8 !text-5xl uppercase tracking-tighter text-slate-800">Certificate of Completion</Title>
+            <div className="flex flex-col items-center mb-6 text-center">
+                <Title level={3} className="!mb-0 !text-slate-900 font-serif">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
+                <Text className="text-sm uppercase tracking-widest font-bold">Finote Birhan Senbet School</Text>
+                <div className="w-24 h-0.5 bg-slate-900 my-2" />
+                <Title level={2} className="!mb-2 uppercase tracking-tighter text-slate-800">{t('admin.finalCertificates', 'Academic Report Card')}</Title>
             </div>
 
-            <Text className="text-2xl italic mb-6">This is to certify that</Text>
-            <div className="border-b-2 border-slate-900 w-full text-center pb-2 mb-8">
-                <Title level={1} className="!mb-0 !text-6xl text-slate-900">{student.name}</Title>
-            </div>
-
-            <Text className="text-xl text-center max-w-2xl leading-relaxed mb-12">
-                has successfully completed the studies and clinical requirements of <br />
-                <span className="font-bold text-2xl uppercase">{student.grade}</span> <br />
-                with distinction and academic excellence during the year of {student.academicYear || dayjs().format('YYYY')}.
-            </Text>
-
-            <div className="w-full mt-8 border-2 border-slate-200 p-8 rounded-2xl bg-slate-50/50">
-                <div className="grid grid-cols-2 gap-8">
-                    <div className="flex flex-col">
-                        <span className="text-slate-400 uppercase text-sm font-bold tracking-widest mb-2">Academic Performance</span>
-                        <div className="flex items-end gap-2">
-                            <Title level={2} className="!mb-0 !text-4xl text-slate-900">{avgScore}%</Title>
-                            <span className="text-slate-500 mb-1">Average Score</span>
-                        </div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                        <span className="text-slate-400 uppercase text-sm font-bold tracking-widest mb-2">Baptismal Name</span>
-                        <Title level={3} className="!mb-0 !text-2xl text-slate-800">{student.baptismalName || 'N/A'}</Title>
-                    </div>
+            <div className="w-full grid grid-cols-2 gap-4 mb-6 border border-slate-200 p-4 rounded-xl text-sm">
+                <div>
+                    <Text type="secondary" className="uppercase text-[10px] font-bold block">{t('admin.name')}</Text>
+                    <Text strong className="text-lg">{student.name}</Text>
                 </div>
-                <div className="mt-8 pt-8 border-t border-slate-200 grid grid-cols-2 gap-12 text-center">
-                    <div className="flex flex-col items-center">
-                        <div className="w-48 border-b border-slate-900 mb-2 h-12" />
-                        <span className="text-sm font-bold uppercase tracking-tighter">School Administrator</span>
-                    </div>
-                    <div className="flex flex-col items-center">
-                        <div className="w-48 border-b border-slate-900 mb-2 h-12" />
-                        <span className="text-sm font-bold uppercase tracking-tighter">Grade Coordinator</span>
-                    </div>
+                <div>
+                    <Text type="secondary" className="uppercase text-[10px] font-bold block">{t('admin.baptismalName', 'Baptismal Name')}</Text>
+                    <Text strong>{student.baptismalName || '-'}</Text>
+                </div>
+                <div>
+                    <Text type="secondary" className="uppercase text-[10px] font-bold block">{t('admin.grade')}</Text>
+                    <Text strong>{student.grade}</Text>
+                </div>
+                <div>
+                    <Text type="secondary" className="uppercase text-[10px] font-bold block">Year</Text>
+                    <Text strong>{student.academicYear || dayjs().format('YYYY')}</Text>
                 </div>
             </div>
-            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-40 h-40 border-4 border-double border-slate-200 rounded-full flex items-center justify-center opacity-50 rotate-12">
-                <div className="text-[10px] font-bold text-center text-slate-300 uppercase">Official School Seal</div>
+
+            <table className="w-full border-collapse border border-slate-900 text-sm mb-8">
+                <thead>
+                    <tr className="bg-slate-50">
+                        <th className="p-2 text-left border border-slate-900">{t('admin.subjects')}</th>
+                        <th className="p-2 text-center border border-slate-900">{t('admin.semester1', 'Semester I')}</th>
+                        <th className="p-2 text-center border border-slate-900">{t('admin.semester2', 'Semester II')}</th>
+                        <th className="p-2 text-center border border-slate-900">Average</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {subjectRows.map((row, idx) => (
+                        <tr key={idx}>
+                            <td className="p-2 border border-slate-900 font-bold">{row.subject}</td>
+                            <td className="p-2 text-center border border-slate-900">{row.semI}</td>
+                            <td className="p-2 text-center border border-slate-900">{row.semII}</td>
+                            <td className="p-2 text-center border border-slate-900 font-bold bg-slate-50/50">{row.avg}</td>
+                        </tr>
+                    ))}
+                </tbody>
+                <tfoot>
+                    <tr className="bg-slate-900 text-white font-bold">
+                        <td className="p-3 border border-slate-900 uppercase tracking-wider">{t('admin.totalScore', 'Grand Total')}</td>
+                        <td colSpan={2} className="p-3 text-center border border-slate-900">{overallEarned} / {overallMax}</td>
+                        <td className="p-3 text-center border border-slate-900 text-xl">{overallAvg}%</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div className="w-full grid grid-cols-2 gap-12 text-center mt-auto pb-8">
+                <div className="flex flex-col items-center">
+                    <div className="w-48 border-b border-slate-900 mb-2 h-12" />
+                    <span className="text-xs font-bold uppercase tracking-tighter">School Administrator</span>
+                </div>
+                <div className="flex flex-col items-center">
+                    <div className="w-48 border-b border-slate-900 mb-2 h-12" />
+                    <span className="text-xs font-bold uppercase tracking-tighter">Grade Coordinator</span>
+                </div>
+            </div>
+
+            <div className="absolute bottom-20 left-10 opacity-30 transform -rotate-12 pointer-events-none">
+                <div className="w-32 h-32 border-4 border-double border-slate-400 rounded-full flex items-center justify-center">
+                    <Text className="text-[10px] font-bold text-center uppercase text-slate-400">Official Seal</Text>
+                </div>
             </div>
         </div>
     );

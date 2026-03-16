@@ -89,3 +89,20 @@ db.version(11).stores({
     }
   });
 });
+
+db.version(12).stores({
+  templates: "++id, type, name, config, isDefault, synced"
+});
+
+db.version(13).stores({
+  assessments: "++id, name, subjectName, grade, maxScore, date, semester, synced",
+  attendance: "++id, studentId, date, status, semester, synced",
+});
+
+db.version(14).stores({
+  subjects: "++id, name, semester, synced",
+});
+
+db.version(15).stores({
+  assessments: "++id, name, subjectName, grade, maxScore, date, synced",
+});

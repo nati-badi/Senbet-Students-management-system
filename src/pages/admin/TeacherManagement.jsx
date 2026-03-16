@@ -13,6 +13,8 @@ export default function TeacherManagement() {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingTeacher, setEditingTeacher] = useState(null);
     const [form] = Form.useForm();
+    const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
+    const currentSemester = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
 
     const teachers = useLiveQuery(() => db.teachers?.toArray()) || [];
     const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
@@ -26,10 +28,12 @@ export default function TeacherManagement() {
             .map(g => ({ value: String(g), label: formatGrade(g) }))
     ];
 
-    const subjectOptions = [...new Set(subjects.map(s => s.name))].map(name => ({
-        label: name,
-        value: name
-    }));
+    const subjectOptions = subjects
+        .filter(s => (s.semester || 'Semester I') === currentSemester)
+        .map(s => ({
+            label: s.name,
+            value: s.name
+        }));
 
     const showModal = (teacher = null) => {
         setEditingTeacher(teacher);

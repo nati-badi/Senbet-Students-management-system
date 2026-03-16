@@ -36,7 +36,8 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
         , [studentId]) || [];
 
     const allAssessments = useLiveQuery(() => db.assessments.toArray()) || [];
-    const isLoading = student === undefined || allAssessments === undefined;
+    const allSubjects = useLiveQuery(() => db.subjects.toArray()) || [];
+    const isLoading = student === undefined || allAssessments === undefined || allSubjects === undefined;
 
 
     // --- Formatters ---
@@ -89,12 +90,13 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
         if (!gradeAssessments.length) return [];
         return gradeAssessments.map(assessment => {
             const existingMark = marks?.find(m => m.assessmentId === assessment.id);
+            const subject = allSubjects.find(s => s.name === assessment.subjectName);
             return {
                 key: assessment.id,
                 assessmentId: assessment.id,
                 assessmentName: assessment.name || 'Unknown',
                 subject: assessment.subjectName || 'Unknown',
-                semester: assessment.semester || 'Semester I',
+                semester: subject?.semester || 'Semester I',
                 score: existingMark ? existingMark.score : null,
                 maxScore: assessment.maxScore,
                 date: assessment.date || existingMark?.assessmentDate || '-',
@@ -105,7 +107,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             if (a.date === '-' || b.date === '-') return 0;
             return new Date(b.date) - new Date(a.date);
         });
-    }, [gradeAssessments, marks]);
+    }, [gradeAssessments, marks, allSubjects]);
 
     // Calculate Summary
     const summary = useMemo(() => {

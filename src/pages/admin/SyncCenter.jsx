@@ -105,7 +105,7 @@ export default function SyncCenter() {
             </Row>
 
             <Card title="Database Status" className="mt-4">
-                <Space direction="vertical" className="w-full">
+                <Space orientation="vertical" className="w-full">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <Space>
                             <Badge status="processing" />

@@ -279,11 +279,13 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
     const allStudentsData = useLiveQuery(() => db.students.toArray());
     const assessmentsData = useLiveQuery(() => db.assessments.toArray());
+    const subjectsData = useLiveQuery(() => db.subjects.toArray());
     const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
 
     const allStudents = allStudentsData || [];
     const allAssessments = assessmentsData || [];
-    const isLoading = allStudentsData === undefined || assessmentsData === undefined;
+    const allSubjects = subjectsData || [];
+    const isLoading = allStudentsData === undefined || assessmentsData === undefined || subjectsData === undefined;
 
     const currentSemesterSetting = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
 
@@ -291,12 +293,14 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const allowedSubjects = Array.isArray(teacher?.assignedSubjects) ? teacher.assignedSubjects : [];
 
     // Only allow teachers to grade assessments that match their assigned subjects/grades + current semester
-    const filteredAssessments = allAssessments.filter(a =>
-        normalizeGrade(a.grade) === normalizeGrade(selectedGrade) &&
-        (a.semester || 'Semester I') === currentSemesterSetting &&
-        (allowedGrades.length === 0 || allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(a.grade))) &&
-        (allowedSubjects.length === 0 || allowedSubjects.includes(a.subjectName))
-    );
+    const filteredAssessments = allAssessments.filter(a => {
+        const subject = allSubjects.find(s => s.name === a.subjectName);
+        const assessmentSemester = subject?.semester || 'Semester I';
+        return normalizeGrade(a.grade) === normalizeGrade(selectedGrade) &&
+            assessmentSemester === currentSemesterSetting &&
+            (allowedGrades.length === 0 || allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(a.grade))) &&
+            (allowedSubjects.length === 0 || allowedSubjects.includes(a.subjectName));
+    });
     const selectedAssessment = allAssessments.find(a => a.id === selectedAssessmentId);
 
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
@@ -554,10 +558,14 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                     placeholder={t('teacher.selectAssessment')}
                                     value={selectedAssessmentId}
                                     onChange={setSelectedAssessmentId}
-                                    options={filteredAssessments.map(a => ({
-                                        value: a.id,
-                                        label: `${a.name} (${a.subjectName}) - ${t(`admin.${a.semester === 'Semester I' ? 'semester1' : 'semester2'}`, a.semester || 'Semester I')}`
-                                    }))}
+                                    options={filteredAssessments.map(a => {
+                                        const subject = allSubjects.find(s => s.name === a.subjectName);
+                                        const sem = subject?.semester || 'Semester I';
+                                        return {
+                                            value: a.id,
+                                            label: `${a.name} (${a.subjectName}) - ${t(`admin.${sem === 'Semester I' ? 'semester1' : 'semester2'}`, sem)}`
+                                        };
+                                    })}
                                     allowClear
                                     showSearch
                                     disabled={!selectedGrade}
@@ -717,13 +725,14 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                 .first();
 
             if (existingRecord) {
-                await db.attendance.update(existingRecord.id, { status, synced: 0 });
+                await db.attendance.update(existingRecord.id, { status, semester: currentSemesterSetting, synced: 0 });
             } else {
                 await db.attendance.add({
                     id: crypto.randomUUID(),
                     studentId,
                     date: attendanceDate,
                     status,
+                    semester: currentSemesterSetting,
                     synced: 0
                 });
             }
@@ -745,13 +754,14 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                     .first();
 
                 if (existingRecord) {
-                    await db.attendance.update(existingRecord.id, { status: 'present', synced: 0 });
+                    await db.attendance.update(existingRecord.id, { status: 'present', semester: currentSemesterSetting, synced: 0 });
                 } else {
                     await db.attendance.add({
                         id: crypto.randomUUID(),
                         studentId: student.id,
                         date: attendanceDate,
                         status: 'present',
+                        semester: currentSemesterSetting,
                         synced: 0
                     });
                 }
@@ -884,7 +894,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                     <Row gutter={[16, 16]}>
                         <Col xs={24} sm={12}>
                             <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm h-full">
-                                <Space direction="vertical" className="w-full">
+                                <Space orientation="vertical" className="w-full">
                                     <Text strong type="secondary">{t('teacher.selectGrade')}</Text>
                                     <Select
                                         value={selectedGrade}
@@ -904,7 +914,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                         <Col xs={24} sm={12}>
                             <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm h-full flex flex-col justify-center">
                                 {selectedGrade && currentSemesterSetting && allowedSubjects.length > 0 && allowedGrades.length > 0 ? (
-                                    <Space direction="vertical" className="w-full">
+                                    <Space orientation="vertical" className="w-full">
                                         <Text strong type="secondary">{t('teacher.selectAssessment')}</Text>
                                         <Select
                                             value={selectedAssessmentId}

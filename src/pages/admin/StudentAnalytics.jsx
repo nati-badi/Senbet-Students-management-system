@@ -15,6 +15,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
     const marks = useLiveQuery(() => db.marks.toArray()) || [];
     const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
     const attendance = useLiveQuery(() => db.attendance.toArray()) || [];
+    const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
 
     const dbGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
     const allGradeOptions = [
@@ -41,7 +42,10 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
     const studentRankings = useMemo(() => {
         if (!students.length || !marks.length || !assessments.length) return [];
 
-        const semesterAssessments = assessments.filter(a => (a.semester || 'Semester I') === selectedSemester);
+        const semesterAssessments = assessments.filter(a => {
+            const subject = subjects.find(s => s.name === a.subjectName);
+            return (subject?.semester || 'Semester I') === selectedSemester;
+        });
         if (semesterAssessments.length === 0) return [];
 
         const assessmentIds = semesterAssessments.map(a => a.id);
@@ -62,7 +66,10 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
             const percentage = totalMax > 0 ? (totalScore / totalMax) * 100 : 0;
 
             // Calculate attendance stats
-            const studentAttendance = attendance.filter(a => a.studentId === student.id);
+            const studentAttendance = attendance.filter(a => 
+                a.studentId === student.id && 
+                (a.semester || 'Semester I') === selectedSemester
+            );
             const presentCount = studentAttendance.filter(a => a.status === 'present').length;
             const totalDays = studentAttendance.length;
             const attendanceRate = totalDays > 0 ? (presentCount / totalDays) * 100 : 0;

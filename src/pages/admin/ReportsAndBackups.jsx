@@ -13,6 +13,7 @@ export default function ReportsAndBackups() {
     const students = useLiveQuery(() => db.students.toArray()) || [];
     const marks = useLiveQuery(() => db.marks.toArray()) || [];
     const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
+    const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
     const attendance = useLiveQuery(() => db.attendance.toArray()) || [];
 
     const handleDownloadStudents = () => {
@@ -44,8 +45,11 @@ export default function ReportsAndBackups() {
             return;
         }
 
-        // Filter assessments by semester
-        const semesterAssessments = assessments.filter(a => (a.semester || 'Semester I') === semester);
+        // Filter assessments by semester (derived from subject)
+        const semesterAssessments = assessments.filter(a => {
+            const subject = subjects.find(s => s.name === a.subjectName);
+            return (subject?.semester || 'Semester I') === semester;
+        });
         if (semesterAssessments.length === 0) {
             message.warning(`No assessments found for ${semester}.`);
             return;

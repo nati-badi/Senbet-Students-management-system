@@ -16,17 +16,31 @@ export default function UrgentMatters() {
     const students = useLiveQuery(() => db.students.toArray(), []) || [];
     const marks = useLiveQuery(() => db.marks.toArray(), []) || [];
     const assessments = useLiveQuery(() => db.assessments.toArray(), []) || [];
+    const subjects = useLiveQuery(() => db.subjects.toArray(), []) || [];
+
+    const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
+    const currentSemester = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
 
     // Students missing critical info
     const missingInfoStudents = useMemo(() => students.filter(s =>
         !s.name || !s.baptismalName || !s.grade || !s.parentContact || !s.portalCode
     ), [students]);
 
-    // Students with no marks recorded at all
+    // Students with no marks recorded in ACTIVE SEMESTER assessments
     const noMarksStudents = useMemo(() => {
-        const studentsWithMarks = new Set(marks.map(m => m.studentId));
-        return students.filter(s => !studentsWithMarks.has(s.id));
-    }, [students, marks]);
+        const activeAssessments = assessments.filter(a => {
+            const subject = subjects.find(s => s.name === a.subjectName);
+            return (subject?.semester || 'Semester I') === currentSemester;
+        });
+        if (activeAssessments.length === 0) return [];
+
+        const activeAssessmentIds = new Set(activeAssessments.map(a => a.id));
+        const studentsWithMarksInActiveSem = new Set(
+            marks.filter(m => activeAssessmentIds.has(m.assessmentId)).map(m => m.studentId)
+        );
+        
+        return students.filter(s => !studentsWithMarksInActiveSem.has(s.id));
+    }, [students, marks, assessments, subjects, currentSemester]);
 
     // Students missing portal codes
     const missingPortalCode = useMemo(() => students.filter(s => !s.portalCode || s.portalCode.trim() === ''), [students]);
@@ -391,7 +405,7 @@ export default function UrgentMatters() {
                     className="rounded-2xl border-l-4 border-l-yellow-500 shadow-sm"
                 >
                     <Paragraph type="secondary" className="mb-4">
-                        These students have no assessment marks recorded yet. Use the Teacher Portal or Mark Entry to record their scores.
+                        These students have no assessment marks recorded for <Text strong>{currentSemester}</Text>. Use the Teacher Portal or Mark Entry to record their scores.
                     </Paragraph>
                     <List
                         dataSource={noMarksStudents}

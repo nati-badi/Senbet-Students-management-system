@@ -222,7 +222,7 @@ export default function ParentDashboard() {
 function HomeSection({ onNavigate }) {
     const { t } = useTranslation();
     return (
-        <div className="space-y-8">
+        <div className="flex flex-col gap-8">
             <div className="group relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-forest-700 via-forest-600 to-green-500 p-1 shadow-2xl transition-all duration-500 hover:shadow-forest-200/50">
                 <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 bg-forest-900/10 p-8 md:p-12 rounded-[2.4rem] backdrop-blur-sm">
                     <div className="flex-1 space-y-6">
@@ -274,7 +274,7 @@ function HomeSection({ onNavigate }) {
                                     <List.Item.Meta
                                         avatar={<Avatar style={{ backgroundColor: item.color === 'blue' ? '#3b82f6' : item.color === 'green' ? '#22c55e' : '#f97316' }} icon={<InfoCircleOutlined />} />}
                                         title={<span className="font-bold">{t(`parent.announcementTitle${item.title.replace(/\s/g, '')}`, item.title)}</span>}
-                                        description={<div className="mt-1 space-y-1"><Tag color={item.color} className="rounded-full">{t(`parent.announcementDate${item.title.replace(/\s/g, '')}`, item.date)}</Tag><p className="text-slate-500 text-sm m-0">{t(`parent.announcementDesc${item.title.replace(/\s/g, '')}`, item.desc)}</p></div>}
+                                        description={<div className="mt-1 flex flex-col gap-1"><Tag color={item.color} className="rounded-full w-fit">{t(`parent.announcementDate${item.title.replace(/\s/g, '')}`, item.date)}</Tag><p className="text-slate-500 text-sm m-0">{t(`parent.announcementDesc${item.title.replace(/\s/g, '')}`, item.desc)}</p></div>}
                                     />
                                 </List.Item>
                             )}
@@ -325,7 +325,7 @@ function AboutSection() {
             <div className="absolute top-0 right-0 w-1/2 h-full bg-forest-50/50 dark:bg-forest-900/10 skew-x-[-12deg] translate-x-32 z-0"></div>
             <Row gutter={[64, 64]} align="middle" className="relative z-10">
                 <Col xs={24} lg={12}>
-                    <Space direction="vertical" size="large">
+                    <Space orientation="vertical" size="large">
                         <Tag color="green" className="rounded-full px-4 py-1 text-sm font-bold uppercase tracking-widest">{t('parent.aboutSchool', 'About Us')}</Tag>
                         <Title level={1} className="!text-5xl font-black">{t('parent.aboutSchoolLong', 'About Our School')}</Title>
                         <Paragraph className="text-xl leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
@@ -475,7 +475,7 @@ function ProgressSection({ student, onLogout, onViewProfile }) {
                 <div className="p-8">
                     <Row gutter={[24, 24]} align="middle">
                         <Col xs={24} md={16}>
-                            <Space direction="vertical" size="middle">
+                            <Space orientation="vertical" size="middle">
                                 <div className="flex items-center gap-3">
                                     <Avatar size={80} src={`https://api.dicebear.com/7.x/initials/svg?seed=${student.name}`} className="shadow-lg border-4 border-slate-50 dark:border-slate-800" />
                                     <div>

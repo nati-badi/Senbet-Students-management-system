@@ -96,7 +96,16 @@ const resources = {
                 "teacherManagement": "Teacher Management",
                 "reportsBackups": "Reports & Backups",
                 "analyticsDashboard": "Analytics Dashboard",
-                "topStudents": "Top Students"
+                "topStudents": "Top Students",
+                "templateDesigner": "Template Designer",
+                "selectTemplate": "Select Design Template",
+                "templateList": "Template List",
+                "generalSettings": "General Settings",
+                "fieldCustomization": "Field Customization",
+                "saveTemplate": "Save Template",
+                "preview": "Preview",
+                "idCard": "ID Card",
+                "certificate": "Certificate"
             },
             "teacher": {
                 "menu": "Teacher Menu",
@@ -308,7 +317,16 @@ const resources = {
                 "teacherManagement": "የመምህራን አስተዳደር",
                 "reportsBackups": "ሪፖርቶች እና ምትኬ",
                 "analyticsDashboard": "ትንታኔ ዳሽቦርድ",
-                "topStudents": "ከፍተኛ ተማሪዎች"
+                "topStudents": "ከፍተኛ ተማሪዎች",
+                "templateDesigner": "የንድፍ ማስተካከያ",
+                "selectTemplate": "የንድፍ ምርጫ",
+                "templateList": "የንድፍ ዝርዝር",
+                "generalSettings": "አጠቃላይ ቅንብሮች",
+                "fieldCustomization": "የመስኮች ማስተካከያ",
+                "saveTemplate": "ንድፉን አስቀምጥ",
+                "preview": "ቅድመ እይታ",
+                "idCard": "መታወቂያ ካርድ",
+                "certificate": "የምስክር ወረቀት"
             },
             "teacher": {
                 "menu": "የመምህራን ምናሌ",

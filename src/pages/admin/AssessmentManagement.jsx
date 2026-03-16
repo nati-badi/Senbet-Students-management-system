@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, message, Row, Col, Select, DatePicker } from 'antd';
+import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, message, Row, Col, Select, DatePicker, Tag } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -63,6 +63,15 @@ export default function AssessmentManagement() {
         { title: t('admin.subjects'), dataIndex: 'subjectName', key: 'subjectName' },
         { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
         { title: t('admin.maxScore'), dataIndex: 'maxScore', key: 'maxScore' },
+        { 
+            title: t('admin.semester', 'Semester'), 
+            key: 'semester', 
+            render: (_, record) => {
+                const subject = subjects.find(s => s.name === record.subjectName);
+                const sem = subject?.semester || 'Semester I';
+                return <Tag color="gold">{t(`admin.${sem === 'Semester II' ? 'semester2' : 'semester1'}`, sem)}</Tag>;
+            }
+        },
         { title: t('teacher.date'), dataIndex: 'date', key: 'date' },
         {
             title: t('common.actions'),
@@ -115,7 +124,9 @@ export default function AssessmentManagement() {
                                 label={t('admin.subjects')}
                                 rules={[{ required: true }]}
                             >
-                                <Select showSearch>
+                                <Select 
+                                    showSearch
+                                >
                                     {subjects.map(s => (
                                         <Select.Option key={s.id} value={s.name}>{s.name}</Select.Option>
                                     ))}
@@ -148,8 +159,8 @@ export default function AssessmentManagement() {
                                 <DatePicker style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
-                        <Col xs={24} md={24} className="flex justify-end">
-                            <Space>
+                        <Col xs={24} md={16} className="flex justify-end items-end">
+                            <Space className="mb-6">
                                 {editingId && (
                                     <Button onClick={() => {
                                         setEditingId(null);

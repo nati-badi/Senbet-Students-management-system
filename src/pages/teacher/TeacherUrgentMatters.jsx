@@ -19,6 +19,7 @@ export default function TeacherUrgentMatters({ teacher }) {
     const allStudents = useLiveQuery(() => db.students.toArray(), []) || [];
     const marks = useLiveQuery(() => db.marks.toArray(), []) || [];
     const allAssessments = useLiveQuery(() => db.assessments.toArray(), []) || [];
+    const allSubjects = useLiveQuery(() => db.subjects.toArray(), []) || [];
     const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
 
     const currentSemester = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
@@ -32,11 +33,13 @@ export default function TeacherUrgentMatters({ teacher }) {
     }, [allStudents, allowedGrades]);
 
     // Assessments this teacher is responsible for
-    const myAssessments = useMemo(() => allAssessments.filter(a =>
-        (a.semester || 'Semester I') === currentSemester &&
-        (allowedGrades.length === 0 || allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(a.grade))) &&
-        (allowedSubjects.length === 0 || allowedSubjects.includes(a.subjectName))
-    ), [allAssessments, allowedGrades, allowedSubjects, currentSemester]);
+    const myAssessments = useMemo(() => allAssessments.filter(a => {
+        const subject = allSubjects.find(s => s.name === a.subjectName);
+        const assessmentSemester = subject?.semester || 'Semester I';
+        return assessmentSemester === currentSemester &&
+            (allowedGrades.length === 0 || allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(a.grade))) &&
+            (allowedSubjects.length === 0 || allowedSubjects.includes(a.subjectName));
+    }), [allAssessments, allSubjects, allowedGrades, allowedSubjects, currentSemester]);
 
     // Students with NO marks in any of teacher's assessments
     const noMarksStudents = useMemo(() => {

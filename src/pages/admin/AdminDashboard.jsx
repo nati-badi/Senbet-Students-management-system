@@ -8,9 +8,11 @@ import {
     IdcardOutlined,
     HomeOutlined,
     CloudSyncOutlined,
-    WarningOutlined
+    WarningOutlined,
+    EditOutlined,
+    CheckCircleOutlined
 } from '@ant-design/icons';
-import { Layout, Menu, Typography, Badge } from 'antd';
+import { Layout, Menu, Typography, Badge, Tag } from 'antd';
 import { useTranslation } from 'react-i18next';
 
 // Lazy load or import sub-components
@@ -24,6 +26,7 @@ import UrgentMatters from './UrgentMatters';
 import TeacherManagement from './TeacherManagement';
 import ReportsAndBackups from './ReportsAndBackups';
 import StudentAnalytics from './StudentAnalytics';
+import TemplateDesigner from './TemplateDesigner';
 
 const { Text } = Typography;
 const { Content, Sider } = Layout;
@@ -44,14 +47,34 @@ export default function AdminDashboard() {
             label: <span className="text-xs uppercase tracking-widest text-slate-400 px-2">{t('admin.menu')}</span>,
             children: [
                 {
-                    key: '/admin/register',
-                    icon: <UserAddOutlined />,
-                    label: t('admin.registerStudents')
+                    key: '/admin/analytics',
+                    icon: <BookOutlined />,
+                    label: t('admin.analyticsDashboard', 'Analytics Dashboard')
                 },
                 {
                     key: '/admin/urgent',
                     icon: <Badge dot color="red"><WarningOutlined /></Badge>,
                     label: <span className="text-red-500 font-bold">{t('admin.urgentMatters', 'Urgent Matters')}</span>
+                },
+                {
+                    key: '/admin/register',
+                    icon: <UserAddOutlined />,
+                    label: t('admin.registerStudents')
+                },
+                {
+                    key: '/admin/teachers',
+                    icon: <UserAddOutlined />,
+                    label: t('admin.teacherManagement', 'Teacher Management')
+                },
+                {
+                    key: '/admin/subjects',
+                    icon: <BookOutlined />,
+                    label: t('admin.subjects')
+                },
+                {
+                    key: '/admin/assessments',
+                    icon: <FilePdfOutlined />,
+                    label: t('admin.assessments')
                 },
                 {
                     key: '/admin/certificates',
@@ -69,34 +92,36 @@ export default function AdminDashboard() {
                     label: t('admin.systemData')
                 },
                 {
-                    key: '/admin/subjects',
-                    icon: <BookOutlined />,
-                    label: t('admin.subjects')
-                },
-                {
-                    key: '/admin/assessments',
-                    icon: <FilePdfOutlined />,
-                    label: t('admin.assessments')
-                },
-                {
-                    key: '/admin/teachers',
-                    icon: <UserAddOutlined />,
-                    label: t('admin.teacherManagement', 'Teacher Management')
-                },
-                {
                     key: '/admin/reports',
                     icon: <DatabaseOutlined />,
                     label: t('admin.reportsBackups', 'Reports & Backups')
                 },
                 {
-                    key: '/admin/analytics',
-                    icon: <BookOutlined />,
-                    label: t('admin.analyticsDashboard', 'Analytics Dashboard')
-                },
-                {
                     key: '/admin/sync',
                     icon: <CloudSyncOutlined />,
                     label: t('admin.syncCenter', 'Cloud Sync')
+                },
+                {
+                    key: '/admin/attendance-soon',
+                    icon: <CheckCircleOutlined />,
+                    label: (
+                        <div className="flex items-center justify-between w-full menu-item-coming-soon opacity-50">
+                            <span>{t('teacher.attendance', 'Attendance')}</span>
+                            <Tag color="orange" className="text-[8px] px-1 py-0 h-fit leading-none">{t('common.comingSoon', 'Soon')}</Tag>
+                        </div>
+                    ),
+                    disabled: true
+                },
+                {
+                    key: '/admin/templates-soon',
+                    icon: <EditOutlined />,
+                    label: (
+                        <div className="flex items-center justify-between w-full menu-item-coming-soon opacity-50">
+                            <span>{t('admin.templateDesigner', 'Template Designer')}</span>
+                            <Tag color="orange" className="text-[8px] px-1 py-0 h-fit leading-none">{t('common.comingSoon', 'Soon')}</Tag>
+                        </div>
+                    ),
+                    disabled: true
                 },
             ]
         },
@@ -104,6 +129,20 @@ export default function AdminDashboard() {
 
     return (
         <div className="flex flex-col w-full h-full">
+            <style>{`
+                .menu-item-coming-soon {
+                    filter: blur(1px);
+                    opacity: 0.6;
+                    cursor: not-allowed !important;
+                    pointer-events: none;
+                }
+                .ant-menu-item-disabled.menu-item-coming-soon:hover {
+                    background: transparent !important;
+                }
+                .menu-item-coming-soon * {
+                    pointer-events: none !important;
+                }
+            `}</style>
             {/* Tablet/Mobile Navigation (Sidebar is lg+) */}
             <div className="lg:hidden mb-4 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
                 <Menu
@@ -150,6 +189,7 @@ export default function AdminDashboard() {
                     <Route path="/reports" element={<ReportsAndBackups />} />
                     <Route path="/analytics" element={<StudentAnalytics />} />
                     <Route path="/sync" element={<SyncCenter />} />
+                    <Route path="/templates" element={<TemplateDesigner />} />
                 </Routes>
             </Content>
             </Layout>
