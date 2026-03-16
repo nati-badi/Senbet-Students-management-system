@@ -164,7 +164,14 @@ const resources = {
                 "confirmPredict": "Predict marks for {{count}} students based on their performance history in {{subject}}?",
                 "predictSuccess": "Predicted marks for {{count}} students.",
                 "fillSuccess": "Filled marks for {{count}} students.",
-                "noHistory": "Cannot predict: Student has no existing marks in this subject."
+                "noHistory": "Cannot predict: Student has no existing marks in this subject.",
+                "saveMarkError": "Failed to save mark offline!",
+                "saveAttendanceError": "Failed to save attendance!",
+                "bulkUpdateError": "Failed to update all students.",
+                "clearAttendanceError": "Failed to clear attendance.",
+                "markAllPresentSuccess": "Successfully marked all as present",
+                "clearAttendanceSuccess": "Attendance cleared successfully",
+                "noHistoryFound": "No mark history found for these students in this subject. Predictions cannot be made."
             },
             "parent": {
                 "title": "Parent & Student Portal",
@@ -385,7 +392,14 @@ const resources = {
                 "confirmPredict": "ለ {{count}} ተማሪዎች በ {{subject}} ያላቸውን የቀድሞ ውጤት መሰረት በማድረግ ውጤት እንዲገመት ይፈልጋሉ?",
                 "predictSuccess": "ለ {{count}} ተማሪዎች ውጤት ተገምቷል።",
                 "fillSuccess": "ለ {{count}} ተማሪዎች ውጤት ተሞልቷል።",
-                "noHistory": "መገመት አልተቻለም፡ ተማሪው በዚህ ትምህርት ውስጥ እስካሁን የተመዘገበ ውጤት የለውም።"
+                "noHistory": "መገመት አልተቻለም፡ ተማሪው በዚህ ትምህርት ውስጥ እስካሁን የተመዘገበ ውጤት የለውም።",
+                "saveMarkError": "ውጤቱን ማስቀመጥ አልተቻለም!",
+                "saveAttendanceError": "መገኘቱን ማስቀመጥ አልተቻለም!",
+                "bulkUpdateError": "ሁሉንም ተማሪዎች ማዘመን አልተቻለም።",
+                "clearAttendanceError": "መገኘቱን ማጽዳት አልተቻለም።",
+                "markAllPresentSuccess": "ሁሉም መገኘት በተሳካ ሁኔታ ተመዝግቧል",
+                "clearAttendanceSuccess": "መገኘቱ በተሳካ ሁኔታ ተጠርጓል",
+                "noHistoryFound": "ለነዚህ ተማሪዎች በዚህ ትምህርት ውስጥ ምንም የውጤት ታሪክ አልተገኘም። መገመት አይቻልም።"
             },
             "parent": {
                 "title": "የወላጅ እና የተማሪ ፖርታል",

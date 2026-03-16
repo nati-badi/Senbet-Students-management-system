@@ -89,6 +89,11 @@ export default function TeacherDashboard() {
             label: t('app.title')
         },
         {
+            key: '/teacher/analytics',
+            icon: <BarChartOutlined />,
+            label: t('admin.analyticsDashboard', 'Analytics Dashboard')
+        },
+        {
             key: '/teacher/urgent',
             icon: <Badge dot color="red"><WarningOutlined /></Badge>,
             label: <span className="text-red-500 font-bold">{t('admin.urgentMatters', 'Urgent Matters')}</span>
@@ -99,14 +104,15 @@ export default function TeacherDashboard() {
             label: t('teacher.markEntry')
         },
         {
-            key: '/teacher/attendance',
+            key: '/teacher/attendance-soon',
             icon: <CheckCircleOutlined />,
-            label: t('teacher.attendance')
-        },
-        {
-            key: '/teacher/analytics',
-            icon: <BarChartOutlined />,
-            label: t('admin.analyticsDashboard', 'Analytics Dashboard')
+            label: (
+                <div className="flex items-center justify-between w-full menu-item-coming-soon opacity-50">
+                    <span>{t('teacher.attendance', 'Attendance')}</span>
+                    <Tag color="orange" className="text-[8px] px-1 py-0 h-fit leading-none">{t('common.comingSoon', 'Soon')}</Tag>
+                </div>
+            ),
+            disabled: true
         },
     ];
 
@@ -187,6 +193,18 @@ export default function TeacherDashboard() {
                         .dark .teacher-sidebar .ant-menu-item:hover {
                             background-color: #1e293b !important;
                             color: #60a5fa !important;
+                        }
+                        .menu-item-coming-soon {
+                            filter: blur(1px);
+                            opacity: 0.6;
+                            cursor: not-allowed !important;
+                            pointer-events: none;
+                        }
+                        .ant-menu-item-disabled.menu-item-coming-soon:hover {
+                            background: transparent !important;
+                        }
+                        .menu-item-coming-soon * {
+                            pointer-events: none !important;
                         }
                     `}</style>
                 </div>
@@ -393,7 +411,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             }
         } catch (err) {
             console.error("Auto-save failed:", err);
-            message.error("Failed to save mark offline!");
+            message.error(t('teacher.saveMarkError', "Failed to save mark offline!"));
         }
     };
 
@@ -452,12 +470,29 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             return;
         }
 
+        // Pre-filter: only include students who have AT LEAST ONE mark in this subject already
+        const studentsWithHistory = [];
+        for (const student of studentsWithoutMarks) {
+            const historyCount = await db.marks
+                .where('studentId').equals(student.id)
+                .filter(m => m.subject === selectedAssessment.subjectName)
+                .count();
+            if (historyCount > 0) {
+                studentsWithHistory.push(student);
+            }
+        }
+
+        if (studentsWithHistory.length === 0) {
+            message.warning(t('teacher.noHistoryFound', 'No mark history found for these students in this subject. Predictions cannot be made.'));
+            return;
+        }
+
         modal.confirm({
             title: t('teacher.predictMarks'),
-            content: t('teacher.confirmPredict', { count: studentsWithoutMarks.length, subject: selectedAssessment.subjectName }),
+            content: t('teacher.confirmPredict', { count: studentsWithHistory.length, subject: selectedAssessment.subjectName }),
             onOk: async () => {
                 let successCount = 0;
-                for (const student of studentsWithoutMarks) {
+                for (const student of studentsWithHistory) {
                     // Find all marks for this student in the same subject
                     const subjectMarks = await db.marks
                         .where('studentId').equals(student.id)
@@ -738,7 +773,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             }
         } catch (err) {
             console.error("Attendance save failed:", err);
-            message.error("Failed to save attendance!");
+            message.error(t('teacher.saveAttendanceError', "Failed to save attendance!"));
         }
     };
 
@@ -770,7 +805,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             message.success(t('teacher.markAllPresentSuccess', 'Successfully marked all as present'));
         } catch (err) {
             console.error("Bulk attendance failed:", err);
-            message.error("Failed to update all students.");
+            message.error(t('teacher.bulkUpdateError', "Failed to update all students."));
         }
     };
 
@@ -793,7 +828,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             message.success(t('teacher.clearAttendanceSuccess', 'Attendance cleared successfully'));
         } catch (err) {
             console.error("Clear attendance failed:", err);
-            message.error("Failed to clear attendance.");
+            message.error(t('teacher.clearAttendanceError', "Failed to clear attendance."));
         }
     };
 
