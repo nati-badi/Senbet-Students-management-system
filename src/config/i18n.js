@@ -171,7 +171,10 @@ const resources = {
                 "clearAttendanceError": "Failed to clear attendance.",
                 "markAllPresentSuccess": "Successfully marked all as present",
                 "clearAttendanceSuccess": "Attendance cleared successfully",
-                "noHistoryFound": "No mark history found for these students in this subject. Predictions cannot be made."
+                "noHistoryFound": "No mark history found for these students in this subject. Predictions cannot be made.",
+                "attendanceModuleStatus": "Attendance tracking will be enabled in a future update.",
+                "overview": "Overview",
+                "liveCertificate": "Live Certificate"
             },
             "parent": {
                 "title": "Parent & Student Portal",
@@ -399,7 +402,10 @@ const resources = {
                 "clearAttendanceError": "መገኘቱን ማጽዳት አልተቻለም።",
                 "markAllPresentSuccess": "ሁሉም መገኘት በተሳካ ሁኔታ ተመዝግቧል",
                 "clearAttendanceSuccess": "መገኘቱ በተሳካ ሁኔታ ተጠርጓል",
-                "noHistoryFound": "ለነዚህ ተማሪዎች በዚህ ትምህርት ውስጥ ምንም የውጤት ታሪክ አልተገኘም። መገመት አይቻልም።"
+                "noHistoryFound": "ለነዚህ ተማሪዎች በዚህ ትምህርት ውስጥ ምንም የውጤት ታሪክ አልተገኘም። መገመት አይቻልም።",
+                "attendanceModuleStatus": "የክትትል መዝገብ በቅርቡ ወደ ስራ ይገባል።",
+                "overview": "አጠቃላይ እይታ",
+                "liveCertificate": "የምስክር ወረቀት"
             },
             "parent": {
                 "title": "የወላጅ እና የተማሪ ፖርታል",

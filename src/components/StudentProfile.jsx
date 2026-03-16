@@ -20,6 +20,33 @@ import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 
+const EthiopianCross = ({ className }) => (
+    <svg viewBox="0 0 100 100" className={className} fill="currentColor">
+        <rect x="42" y="42" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"/>
+        <circle cx="50" cy="50" r="4" fill="currentColor"/>
+        
+        <path d="M42 42 L42 20 L30 15 L50 0 L70 15 L58 20 L58 42" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+        <circle cx="50" cy="8" r="2.5" fill="currentColor"/>
+        <circle cx="35" cy="18" r="2" fill="currentColor"/>
+        <circle cx="65" cy="18" r="2" fill="currentColor"/>
+
+        <path d="M42 58 L42 80 L30 85 L50 100 L70 85 L58 80 L58 58" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+        <circle cx="50" cy="92" r="2.5" fill="currentColor"/>
+        <circle cx="35" cy="82" r="2" fill="currentColor"/>
+        <circle cx="65" cy="82" r="2" fill="currentColor"/>
+
+        <path d="M42 42 L20 42 L15 30 L0 50 L15 70 L20 58 L42 58" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+        <circle cx="8" cy="50" r="2.5" fill="currentColor"/>
+        <circle cx="18" cy="35" r="2" fill="currentColor"/>
+        <circle cx="18" cy="65" r="2" fill="currentColor"/>
+
+        <path d="M58 42 L80 42 L85 30 L100 50 L85 70 L80 58 L58 58" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+        <circle cx="92" cy="50" r="2.5" fill="currentColor"/>
+        <circle cx="82" cy="35" r="2" fill="currentColor"/>
+        <circle cx="82" cy="65" r="2" fill="currentColor"/>
+    </svg>
+);
+
 const StudentProfile = ({ studentId, visible, onClose }) => {
     const { t } = useTranslation();
 
@@ -190,52 +217,63 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     );
 
     const renderAttendance = () => (
-        <div className="space-y-6 mt-4">
-            <Title level={5} className="!mb-4"><Space><CalendarOutlined /> {t('teacher.attendanceStreak')}</Space></Title>
+        <div className="space-y-6 mt-4 relative">
+            <div className="coming-soon-blur pointer-events-none select-none">
+                <Title level={5} className="!mb-4"><Space><CalendarOutlined /> {t('teacher.attendanceStreak')}</Space></Title>
 
-            <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                <div className="flex flex-wrap gap-1.5 justify-start">
-                    {heatmapDays.map((day, idx) => {
-                        let colorClass = "bg-slate-200 dark:bg-slate-800"; // none
-                        if (day.status === 'present') colorClass = "bg-green-500 border-green-600";
-                        if (day.status === 'late') colorClass = "bg-amber-500 border-amber-600";
-                        if (day.status === 'absent') colorClass = "bg-red-500 border-red-600";
-                        if (day.status === 'no_class') colorClass = "bg-slate-400 border-slate-500";
+                <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <div className="flex flex-wrap gap-1.5 justify-start">
+                        {heatmapDays.map((day, idx) => {
+                            let colorClass = "bg-slate-200 dark:bg-slate-800"; // none
+                            if (day.status === 'present') colorClass = "bg-green-500 border-green-600";
+                            if (day.status === 'late') colorClass = "bg-amber-500 border-amber-600";
+                            if (day.status === 'absent') colorClass = "bg-red-500 border-red-600";
+                            if (day.status === 'no_class') colorClass = "bg-slate-400 border-slate-500";
 
-                        return (
-                            <Tooltip key={idx} title={`${day.date}: ${day.status.toUpperCase()}`}>
-                                <div className={`w-3.5 h-3.5 rounded-sm border ${colorClass} opacity-80 hover:opacity-100 transition-opacity cursor-pointer`} />
-                            </Tooltip>
-                        );
-                    })}
-                </div>
-                <div className="flex gap-4 mt-4 text-xs text-slate-500 justify-end items-center">
-                    <span>{t('teacher.less')}</span>
-                    <div className="flex gap-1.5">
-                        <div className="w-3 h-3 rounded-sm bg-slate-200 dark:bg-slate-800"></div>
-                        <div className="w-3 h-3 rounded-sm bg-slate-400"></div>
-                        <div className="w-3 h-3 rounded-sm bg-red-500"></div>
-                        <div className="w-3 h-3 rounded-sm bg-amber-500"></div>
-                        <div className="w-3 h-3 rounded-sm bg-green-500"></div>
+                            return (
+                                <Tooltip key={idx} title={`${day.date}: ${day.status.toUpperCase()}`}>
+                                    <div className={`w-3.5 h-3.5 rounded-sm border ${colorClass} opacity-80 hover:opacity-100 transition-opacity cursor-pointer`} />
+                                </Tooltip>
+                            );
+                        })}
                     </div>
-                    <span>{t('teacher.more')}</span>
+                    <div className="flex gap-4 mt-4 text-xs text-slate-500 justify-end items-center">
+                        <span>{t('teacher.less')}</span>
+                        <div className="flex gap-1.5">
+                            <div className="w-3 h-3 rounded-sm bg-slate-200 dark:bg-slate-800"></div>
+                            <div className="w-3 h-3 rounded-sm bg-slate-400"></div>
+                            <div className="w-3 h-3 rounded-sm bg-red-500"></div>
+                            <div className="w-3 h-3 rounded-sm bg-amber-500"></div>
+                            <div className="w-3 h-3 rounded-sm bg-green-500"></div>
+                        </div>
+                        <span>{t('teacher.more')}</span>
+                    </div>
                 </div>
-            </div>
 
-            <Row gutter={16}>
-                <Col span={6}>
-                    <Statistic title={t('teacher.totalPresent')} value={totalPresent} valueStyle={{ color: '#22c55e' }} prefix={<CheckCircleOutlined />} />
-                </Col>
-                <Col span={6}>
-                    <Statistic title={t('teacher.totalLate')} value={totalLate} valueStyle={{ color: '#f59e0b' }} prefix={<ClockCircleOutlined />} />
-                </Col>
-                <Col span={6}>
-                    <Statistic title={t('teacher.totalAbsent')} value={totalAbsent} valueStyle={{ color: '#ef4444' }} prefix={<CloseCircleOutlined />} />
-                </Col>
-                <Col span={6}>
-                    <Statistic title={t('teacher.totalNoClass')} value={totalNoClass} valueStyle={{ color: '#64748b' }} prefix={<MinusCircleOutlined />} />
-                </Col>
-            </Row>
+                <Row gutter={16}>
+                    <Col span={6}>
+                        <Statistic title={t('teacher.totalPresent')} value={totalPresent} valueStyle={{ color: '#22c55e' }} prefix={<CheckCircleOutlined />} />
+                    </Col>
+                    <Col span={6}>
+                        <Statistic title={t('teacher.totalLate')} value={totalLate} valueStyle={{ color: '#f59e0b' }} prefix={<ClockCircleOutlined />} />
+                    </Col>
+                    <Col span={6}>
+                        <Statistic title={t('teacher.totalAbsent')} value={totalAbsent} valueStyle={{ color: '#ef4444' }} prefix={<CloseCircleOutlined />} />
+                    </Col>
+                    <Col span={6}>
+                        <Statistic title={t('teacher.totalNoClass')} value={totalNoClass} valueStyle={{ color: '#64748b' }} prefix={<MinusCircleOutlined />} />
+                    </Col>
+                </Row>
+            </div>
+            
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                <Tag color="orange" className="text-sm px-4 py-1.5 shadow-lg border-orange-200 font-bold uppercase tracking-widest">
+                    {t('common.comingSoon', 'Coming Soon')}
+                </Tag>
+                <Text type="secondary" className="mt-2 bg-white/80 dark:bg-slate-900/80 px-4 py-1 rounded-full backdrop-blur-sm text-xs">
+                    {t('teacher.attendanceModuleStatus', 'Attendance tracking will be enabled in a future update.')}
+                </Text>
+            </div>
         </div>
     );
 
@@ -291,18 +329,30 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     );
 
     const renderLiveCertificate = () => {
-        const subjects = [...new Set(gradeAssessments.map(a => a.subjectName))].sort();
-        const subjectRows = subjects.map(subject => {
-            const semIEntry = markHistory.find(m => m.subject === subject && m.semester === 'Semester I');
-            const semIIEntry = markHistory.find(m => m.subject === subject && m.semester === 'Semester II');
+        const subjectsList = [...new Set(gradeAssessments.map(a => a.subjectName))].sort();
+        const subjectRows = subjectsList.map(subject => {
+            const semIAssessments = gradeAssessments.filter(a => {
+                const subjObj = allSubjects.find(s => s.name === a.subjectName);
+                return a.subjectName === subject && (subjObj?.semester || 'Semester I') === 'Semester I';
+            });
+            const semIIAssessments = gradeAssessments.filter(a => {
+                const subjObj = allSubjects.find(s => s.name === a.subjectName);
+                return a.subjectName === subject && subjObj?.semester === 'Semester II';
+            });
             
-            const semIEarned = semIEntry?.hasMark ? semIEntry.score : 0;
-            const semIMax = semIEntry ? semIEntry.maxScore : 0;
-            const semIHasData = semIEntry?.hasMark;
+            const semIEarned = semIAssessments.reduce((acc, a) => {
+                const m = marks?.find(mark => mark.assessmentId === a.id);
+                return acc + (m ? m.score : 0);
+            }, 0);
+            const semIMax = semIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+            const semIHasData = semIAssessments.some(a => marks?.find(m => m.assessmentId === a.id));
 
-            const semIIEarned = semIIEntry?.hasMark ? semIIEntry.score : 0;
-            const semIIMax = semIIEntry ? semIIEntry.maxScore : 0;
-            const semIIHasData = semIIEntry?.hasMark;
+            const semIIEarned = semIIAssessments.reduce((acc, a) => {
+                const m = marks?.find(mark => mark.assessmentId === a.id);
+                return acc + (m ? m.score : 0);
+            }, 0);
+            const semIIMax = semIIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+            const semIIHasData = semIIAssessments.some(a => marks?.find(m => m.assessmentId === a.id));
 
             const totalMax = semIMax + semIIMax;
             const totalEarned = semIEarned + semIIEarned;
@@ -310,96 +360,125 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
             return {
                 subject,
-                semI: semIHasData ? `${semIEarned} / ${semIMax}` : (semIEntry ? '—' : 'N/A'),
-                semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIEntry ? '—' : 'N/A'),
+                semI: semIHasData ? `${semIEarned} / ${semIMax}` : (semIAssessments.length ? '—' : 'N/A'),
+                semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIAssessments.length ? '—' : 'N/A'),
                 avg: avgPct !== '-' ? `${avgPct}%` : '—',
             };
         });
 
-        const overallAvg = totalMaxScore > 0 ? (totalEarnedScore / totalMaxScore * 100).toFixed(1) : 0;
+        const overallAvg = totalMaxScore > 0 ? ((totalEarnedScore / totalMaxScore) * 100).toFixed(1) : 0;
 
         return (
             <div className="mt-4 flex flex-col items-center bg-slate-100 dark:bg-slate-900 p-8 rounded-lg overflow-auto">
-                <div className="w-[190mm] min-h-[250mm] bg-white border-[12px] border-double border-slate-900 p-12 flex flex-col shadow-2xl relative font-serif text-slate-900 shrink-0 transform origin-top" style={{ transform: 'scale(0.8)', marginBottom: '-10%' }}>
-                    {/* Corner Decorations */}
-                    <div className="absolute top-4 left-4 border-t-4 border-l-4 border-slate-900 w-12 h-12" />
-                    <div className="absolute top-4 right-4 border-t-4 border-r-4 border-slate-900 w-12 h-12" />
-                    <div className="absolute bottom-4 left-4 border-b-4 border-l-4 border-slate-900 w-12 h-12" />
-                    <div className="absolute bottom-4 right-4 border-b-4 border-r-4 border-slate-900 w-12 h-12" />
+                {/* Minimalist Ethiopian Orthodox Premium Theme */}
+                <div className="w-[190mm] min-h-[250mm] bg-[#fdfbf7] p-12 flex flex-col shadow-2xl relative font-serif text-[#2c1810] shrink-0 transform origin-top border border-[#e8dfce]" style={{ transform: 'scale(0.8)', marginBottom: '-10%' }}>
+                    
+                    {/* Minimalist Corner Accents */}
+                    <div className="absolute top-6 left-6 w-8 h-8 border-t border-l border-[#d4af37]" />
+                    <div className="absolute top-6 right-6 w-8 h-8 border-t border-r border-[#d4af37]" />
+                    <div className="absolute bottom-6 left-6 w-8 h-8 border-b border-l border-[#d4af37]" />
+                    <div className="absolute bottom-6 right-6 w-8 h-8 border-b border-r border-[#d4af37]" />
 
-                    <div className="flex flex-col items-center mb-8 text-center">
-                        <Title level={3} className="!mb-0 !text-slate-900 italic font-serif">{t('teacher.academicTranscript')}</Title>
-                        <Text className="text-lg uppercase tracking-widest font-bold">{t('teacher.academicTranscript')}</Text>
-                        <div className="w-32 h-1 bg-slate-900 my-4" />
+                    {/* Faint Background Emblem */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+                        <EthiopianCross className="w-96 h-96 text-[#2c1810]" />
                     </div>
 
-                    <div className="border-b-2 border-slate-900 w-full text-center pb-2 mb-8">
-                        <Title level={2} className="!mb-0 text-slate-900">{student?.name}</Title>
-                        <Text className="text-md uppercase font-bold text-slate-500">{student?.baptismalName || 'N/A'} • {formatGrade(student?.grade)}</Text>
+                    {/* Header */}
+                    <div className="flex flex-col items-center mb-10 text-center relative z-10">
+                        <EthiopianCross className="w-12 h-12 text-[#d4af37] mb-4" />
+                        <Title level={3} className="!mb-1 !text-[#2c1810] !font-serif tracking-wide">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
+                        <Text className="text-sm uppercase tracking-[0.2em] text-[#5c4033] font-medium">የተማሪዎች ውጤት መግለጫ</Text>
+                        <div className="w-12 h-px bg-[#d4af37] my-5" />
+                        <Text className="text-base uppercase tracking-widest text-[#8b0000] font-semibold">{t('teacher.academicTranscript')}</Text>
                     </div>
 
-                    {/* Score Breakdown Table internally */}
-                    <div className="w-full mb-8">
+                    {/* Student Info (Minimalist Grid) */}
+                    <div className="w-full flex justify-between items-end border-b border-[#e8dfce] pb-4 mb-10 z-10">
+                        <div className="flex flex-col gap-1">
+                            <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-semibold">ሙሉ ስም / {t('admin.name')}</Text>
+                            <Text className="text-xl font-medium text-[#2c1810]">{student?.name}</Text>
+                            <Text className="text-sm italic text-[#5c4033]">{student?.baptismalName || 'N/A'}</Text>
+                        </div>
+                        <div className="flex gap-12 text-right">
+                            <div className="flex flex-col gap-1">
+                                <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-semibold">ክፍል / {t('admin.grade')}</Text>
+                                <Text className="text-lg text-[#2c1810]">{studentGradeNorm}</Text>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-semibold">ዓ.ም / Year</Text>
+                                <Text className="text-lg text-[#2c1810]">{student?.academicYear ? dayjs(student.academicYear).format('YYYY') : '-'}</Text>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Minimalist Data Table */}
+                    <div className="w-full mb-12 z-10">
                         <table className="w-full border-collapse text-sm">
                             <thead>
-                                <tr className="bg-slate-900 text-white">
-                                    <th className="p-2 text-left border border-slate-900">{t('admin.subjects')}</th>
-                                    <th className="p-2 text-center border border-slate-900">{t('common.semester')} I</th>
-                                    <th className="p-2 text-center border border-slate-900">{t('common.semester')} II</th>
-                                    <th className="p-2 text-center border border-slate-900">Average</th>
+                                <tr>
+                                    <th className="p-3 text-left font-medium text-[#8c7361] uppercase tracking-wider text-xs border-b border-[#d4af37]/30">የትምህርት አይነት</th>
+                                    <th className="p-3 text-center font-medium text-[#8c7361] uppercase tracking-wider text-xs border-b border-[#d4af37]/30">፩ኛ መንፈቀ ዓመት (1st Sem)</th>
+                                    <th className="p-3 text-center font-medium text-[#8c7361] uppercase tracking-wider text-xs border-b border-[#d4af37]/30">፪ኛ መንፈቀ ዓመት (2nd Sem)</th>
+                                    <th className="p-3 text-center font-medium text-[#8c7361] uppercase tracking-wider text-xs border-b border-[#d4af37]/30">አማካይ ውጤት (Avg)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {subjectRows.length === 0 ? (
-                                    <tr><td colSpan={4} className="text-center p-8 italic text-slate-400 border border-slate-200">No assessments defined</td></tr>
+                                    <tr><td colSpan={4} className="text-center p-8 italic text-[#8c7361]">No assessments defined</td></tr>
                                 ) : (
-                                    subjectRows.map((row, i) => (
-                                        <tr key={row.subject} className={i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}>
-                                            <td className="p-2 font-bold border border-slate-200">{row.subject}</td>
-                                            <td className="p-2 text-center border border-slate-200">{row.semI}</td>
-                                            <td className="p-2 text-center border border-slate-200">{row.semII}</td>
-                                            <td className="p-2 text-center font-bold border border-slate-200">{row.avg}</td>
+                                    subjectRows.map((row) => (
+                                        <tr key={row.subject} className="group hover:bg-[#faf8f5] transition-colors border-b border-[#e8dfce]/50">
+                                            <td className="p-3 text-[#2c1810]">{row.subject}</td>
+                                            <td className="p-3 text-center text-[#5c4033]">{row.semI}</td>
+                                            <td className="p-3 text-center text-[#5c4033]">{row.semII}</td>
+                                            <td className="p-3 text-center font-medium text-[#2c1810]">{row.avg}</td>
                                         </tr>
                                     ))
                                 )}
                             </tbody>
                             <tfoot>
-                                <tr className="bg-slate-900 text-white font-bold">
-                                    <td className="p-2 border border-slate-900">{t('teacher.overallAvg')}</td>
-                                    <td colSpan={2} className="border border-slate-900"></td>
-                                    <td className="p-2 text-center border border-slate-900 text-lg">{averagePercentage}%</td>
+                                <tr>
+                                    <td className="p-4 pt-6 text-[#2c1810] uppercase tracking-widest font-semibold text-xs">አጠቃላይ ድምር (Grand Total)</td>
+                                    <td colSpan={2}></td>
+                                    <td className="p-4 pt-6 text-center text-[#8b0000] font-semibold text-lg">{averagePercentage}%</td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
 
+                    {/* Status Banners */}
                     {missingAssessments.length > 0 && (
-                        <div className="mt-auto bg-red-50 border border-red-600 text-red-700 p-4 rounded text-center text-sm font-bold uppercase tracking-widest relative z-10">
+                        <div className="mt-auto border border-[#8b0000]/20 bg-[#8b0000]/5 text-[#8b0000] p-3 text-center text-xs font-semibold uppercase tracking-widest z-10">
                             <WarningOutlined className="mr-2" />
                             {t('teacher.incompleteTranscript', { count: missingAssessments.length })}
                         </div>
                     )}
                     {missingAssessments.length === 0 && gradeAssessments.length > 0 && (
-                        <div className="mt-auto bg-green-50 border border-green-600 text-green-700 p-4 rounded text-center text-sm font-bold uppercase tracking-widest relative z-10">
-                            <FileProtectOutlined className="mr-2" />
+                        <div className="mt-auto border border-[#d4af37]/30 bg-[#d4af37]/5 text-[#5c4033] p-3 text-center text-xs font-semibold uppercase tracking-widest z-10">
+                            <FileProtectOutlined className="mr-2 text-[#d4af37]" />
                             {t('teacher.readyForFinal')}
                         </div>
                     )}
-
-                    {/* Seal Placeholder */}
-                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-32 h-32 border-4 border-double border-slate-200 rounded-full flex items-center justify-center opacity-30 rotate-12 pointer-events-none">
-                        <div className="text-[8px] font-bold text-center text-slate-300 uppercase leading-none">{t('teacher.officialPreview')}</div>
-                    </div>
                 </div>
             </div>
         );
     };
 
     const items = [
-        { key: '1', label: <span><UserOutlined /> Overview</span>, children: renderOverview() },
-        { key: '2', label: <span><CalendarOutlined /> Attendance</span>, children: renderAttendance() },
-        { key: '3', label: <span><BookOutlined /> Marks & Tracker</span>, children: renderMarks() },
-        { key: '4', label: <span><FileProtectOutlined /> Live Certificate</span>, children: renderLiveCertificate() },
+        { key: '1', label: <span><UserOutlined /> {t('teacher.overview', 'Overview')}</span>, children: renderOverview() },
+        { 
+            key: '2', 
+            label: (
+                <div className="flex items-center gap-2">
+                    <span><CalendarOutlined /> {t('teacher.attendance')}</span>
+                    <Tag color="orange" className="text-[10px] px-1 py-0 h-fit leading-none m-0">{t('common.comingSoon', 'Soon')}</Tag>
+                </div>
+            ), 
+            children: renderAttendance() 
+        },
+        { key: '3', label: <span><BookOutlined /> {t('teacher.marksHistory', 'Marks & Tracker')}</span>, children: renderMarks() },
+        { key: '4', label: <span><FileProtectOutlined /> {t('teacher.liveCertificate', 'Live Certificate')}</span>, children: renderLiveCertificate() },
     ];
 
     return (
@@ -413,6 +492,12 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             className="student-profile-modal"
             destroyOnHidden
         >
+            <style>{`
+                .coming-soon-blur {
+                    filter: blur(4px);
+                    opacity: 0.5;
+                }
+            `}</style>
             {(isLoading) ? (
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
                     <span>Loading...</span>

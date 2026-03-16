@@ -11,6 +11,33 @@ import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
 
 const { Title, Text } = Typography;
 
+const EthiopianCross = ({ className }) => (
+    <svg viewBox="0 0 100 100" className={className} fill="currentColor">
+        <rect x="42" y="42" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"/>
+        <circle cx="50" cy="50" r="4" fill="currentColor"/>
+        
+        <path d="M42 42 L42 20 L30 15 L50 0 L70 15 L58 20 L58 42" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+        <circle cx="50" cy="8" r="2.5" fill="currentColor"/>
+        <circle cx="35" cy="18" r="2" fill="currentColor"/>
+        <circle cx="65" cy="18" r="2" fill="currentColor"/>
+
+        <path d="M42 58 L42 80 L30 85 L50 100 L70 85 L58 80 L58 58" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+        <circle cx="50" cy="92" r="2.5" fill="currentColor"/>
+        <circle cx="35" cy="82" r="2" fill="currentColor"/>
+        <circle cx="65" cy="82" r="2" fill="currentColor"/>
+
+        <path d="M42 42 L20 42 L15 30 L0 50 L15 70 L20 58 L42 58" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+        <circle cx="8" cy="50" r="2.5" fill="currentColor"/>
+        <circle cx="18" cy="35" r="2" fill="currentColor"/>
+        <circle cx="18" cy="65" r="2" fill="currentColor"/>
+
+        <path d="M58 42 L80 42 L85 30 L100 50 L85 70 L80 58 L58 58" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+        <circle cx="92" cy="50" r="2.5" fill="currentColor"/>
+        <circle cx="82" cy="35" r="2" fill="currentColor"/>
+        <circle cx="82" cy="65" r="2" fill="currentColor"/>
+    </svg>
+);
+
 export default function DocumentGenerator({ type }) {
     const { t } = useTranslation();
     const [selectedGrade, setSelectedGrade] = useState(null);
@@ -208,81 +235,93 @@ function CertificateTemplate({ student, marks, subjects = [], assessments = [] }
     const { t } = useTranslation();
 
     return (
-        <div className="w-[190mm] h-[277mm] bg-white border-[12px] border-double border-slate-900 p-8 flex flex-col items-center text-slate-900 relative font-serif">
-            {/* Corner Decorations */}
-            <div className="absolute top-4 left-4 border-t-4 border-l-4 border-slate-900 w-12 h-12" />
-            <div className="absolute top-4 right-4 border-t-4 border-r-4 border-slate-900 w-12 h-12" />
-            <div className="absolute bottom-4 left-4 border-b-4 border-l-4 border-slate-900 w-12 h-12" />
-            <div className="absolute bottom-4 right-4 border-b-4 border-r-4 border-slate-900 w-12 h-12" />
+        <div className="w-[190mm] h-[277mm] bg-[#fdfbf7] p-12 flex flex-col relative font-serif text-[#2c1810] border border-[#e8dfce]">
+            {/* Minimalist Corner Accents */}
+            <div className="absolute top-8 left-8 w-10 h-10 border-t border-l border-[#d4af37]" />
+            <div className="absolute top-8 right-8 w-10 h-10 border-t border-r border-[#d4af37]" />
+            <div className="absolute bottom-8 left-8 w-10 h-10 border-b border-l border-[#d4af37]" />
+            <div className="absolute bottom-8 right-8 w-10 h-10 border-b border-r border-[#d4af37]" />
 
-            <div className="flex flex-col items-center mb-6 text-center">
-                <Title level={3} className="!mb-0 !text-slate-900 font-serif">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
-                <Text className="text-sm uppercase tracking-widest font-bold">Finote Birhan Senbet School</Text>
-                <div className="w-24 h-0.5 bg-slate-900 my-2" />
-                <Title level={2} className="!mb-2 uppercase tracking-tighter text-slate-800">{t('admin.finalCertificates', 'Academic Report Card')}</Title>
+            {/* Faint Background Emblem */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+                <EthiopianCross className="w-[500px] h-[500px] text-[#2c1810]" />
             </div>
 
-            <div className="w-full grid grid-cols-2 gap-4 mb-6 border border-slate-200 p-4 rounded-xl text-sm">
-                <div>
-                    <Text type="secondary" className="uppercase text-[10px] font-bold block">{t('admin.name')}</Text>
-                    <Text strong className="text-lg">{student.name}</Text>
+            {/* Header */}
+            <div className="flex flex-col items-center mb-12 text-center relative z-10">
+                <EthiopianCross className="w-16 h-16 text-[#d4af37] mb-6" />
+                <Title level={2} className="!mb-2 !text-[#2c1810] !font-serif tracking-wide">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
+                <Text className="text-base uppercase tracking-[0.2em] text-[#5c4033] font-medium">የተማሪዎች ውጤት መግለጫ</Text>
+                <div className="w-16 h-px bg-[#d4af37] my-6" />
+                <Text className="text-xl uppercase tracking-widest text-[#8b0000] font-semibold">{t('admin.finalCertificates', 'Academic Report Card')}</Text>
+            </div>
+
+            {/* Student Info (Minimalist Grid) */}
+            <div className="w-full flex justify-between items-end border-b border-[#e8dfce] pb-6 mb-12 z-10">
+                <div className="flex flex-col gap-1.5">
+                    <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ሙሉ ስም / {t('admin.name')}</Text>
+                    <Text className="text-2xl font-medium text-[#2c1810]">{student.name}</Text>
+                    <Text className="text-base italic text-[#5c4033]">{student.baptismalName || '-'}</Text>
                 </div>
-                <div>
-                    <Text type="secondary" className="uppercase text-[10px] font-bold block">{t('admin.baptismalName', 'Baptismal Name')}</Text>
-                    <Text strong>{student.baptismalName || '-'}</Text>
-                </div>
-                <div>
-                    <Text type="secondary" className="uppercase text-[10px] font-bold block">{t('admin.grade')}</Text>
-                    <Text strong>{student.grade}</Text>
-                </div>
-                <div>
-                    <Text type="secondary" className="uppercase text-[10px] font-bold block">Year</Text>
-                    <Text strong>{student.academicYear || dayjs().format('YYYY')}</Text>
+                <div className="flex gap-16 text-right">
+                    <div className="flex flex-col gap-1.5">
+                        <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ክፍል / {t('admin.grade')}</Text>
+                        <Text className="text-xl text-[#2c1810]">{student.grade}</Text>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ዓ.ም / Year</Text>
+                        <Text className="text-xl text-[#2c1810]">{student.academicYear || dayjs().format('YYYY')}</Text>
+                    </div>
                 </div>
             </div>
 
-            <table className="w-full border-collapse border border-slate-900 text-sm mb-8">
-                <thead>
-                    <tr className="bg-slate-50">
-                        <th className="p-2 text-left border border-slate-900">{t('admin.subjects')}</th>
-                        <th className="p-2 text-center border border-slate-900">{t('admin.semester1', 'Semester I')}</th>
-                        <th className="p-2 text-center border border-slate-900">{t('admin.semester2', 'Semester II')}</th>
-                        <th className="p-2 text-center border border-slate-900">Average</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {subjectRows.map((row, idx) => (
-                        <tr key={idx}>
-                            <td className="p-2 border border-slate-900 font-bold">{row.subject}</td>
-                            <td className="p-2 text-center border border-slate-900">{row.semI}</td>
-                            <td className="p-2 text-center border border-slate-900">{row.semII}</td>
-                            <td className="p-2 text-center border border-slate-900 font-bold bg-slate-50/50">{row.avg}</td>
+            {/* Minimalist Data Table */}
+            <div className="w-full mb-12 z-10">
+                <table className="w-full border-collapse text-base">
+                    <thead>
+                        <tr>
+                            <th className="p-4 text-left font-medium text-[#8c7361] uppercase tracking-wider text-sm border-b border-[#d4af37]/30">የትምህርት አይነት</th>
+                            <th className="p-4 text-center font-medium text-[#8c7361] uppercase tracking-wider text-sm border-b border-[#d4af37]/30">፩ኛ መንፈቀ ዓመት (1st Sem)</th>
+                            <th className="p-4 text-center font-medium text-[#8c7361] uppercase tracking-wider text-sm border-b border-[#d4af37]/30">፪ኛ መንፈቀ ዓመት (2nd Sem)</th>
+                            <th className="p-4 text-center font-medium text-[#8c7361] uppercase tracking-wider text-sm border-b border-[#d4af37]/30">አማካይ ውጤት (Avg)</th>
                         </tr>
-                    ))}
-                </tbody>
-                <tfoot>
-                    <tr className="bg-slate-900 text-white font-bold">
-                        <td className="p-3 border border-slate-900 uppercase tracking-wider">{t('admin.totalScore', 'Grand Total')}</td>
-                        <td colSpan={2} className="p-3 text-center border border-slate-900">{overallEarned} / {overallMax}</td>
-                        <td className="p-3 text-center border border-slate-900 text-xl">{overallAvg}%</td>
-                    </tr>
-                </tfoot>
-            </table>
+                    </thead>
+                    <tbody>
+                        {subjectRows.map((row, idx) => (
+                            <tr key={idx} className="border-b border-[#e8dfce]/50">
+                                <td className="p-4 text-[#2c1810]">{row.subject}</td>
+                                <td className="p-4 text-center text-[#5c4033]">{row.semI}</td>
+                                <td className="p-4 text-center text-[#5c4033]">{row.semII}</td>
+                                <td className="p-4 text-center font-medium text-[#2c1810]">{row.avg}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td className="p-5 pt-8 text-[#2c1810] uppercase tracking-widest font-semibold text-sm">አጠቃላይ ድምር (Grand Total)</td>
+                            <td colSpan={2} className="p-5 pt-8 text-center text-[#5c4033]">{overallEarned} / {overallMax}</td>
+                            <td className="p-5 pt-8 text-center text-[#8b0000] font-semibold text-2xl">{overallAvg}%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
 
-            <div className="w-full grid grid-cols-2 gap-12 text-center mt-auto pb-8">
+            {/* Signatures */}
+            <div className="w-full grid grid-cols-2 gap-16 text-center mt-auto pb-8 z-10">
                 <div className="flex flex-col items-center">
-                    <div className="w-48 border-b border-slate-900 mb-2 h-12" />
-                    <span className="text-xs font-bold uppercase tracking-tighter">School Administrator</span>
+                    <div className="w-56 border-b border-[#2c1810]/40 mb-3 h-16" />
+                    <span className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8c7361]">የትምህርት ቤቱ አስተዳዳሪ</span>
                 </div>
                 <div className="flex flex-col items-center">
-                    <div className="w-48 border-b border-slate-900 mb-2 h-12" />
-                    <span className="text-xs font-bold uppercase tracking-tighter">Grade Coordinator</span>
+                    <div className="w-56 border-b border-[#2c1810]/40 mb-3 h-16" />
+                    <span className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8c7361]">የክፍል አስተባባሪ</span>
                 </div>
             </div>
 
-            <div className="absolute bottom-20 left-10 opacity-30 transform -rotate-12 pointer-events-none">
-                <div className="w-32 h-32 border-4 border-double border-slate-400 rounded-full flex items-center justify-center">
-                    <Text className="text-[10px] font-bold text-center uppercase text-slate-400">Official Seal</Text>
+            {/* Faint Seal Position */}
+            <div className="absolute bottom-24 left-16 opacity-10 transform -rotate-12 pointer-events-none">
+                <div className="w-40 h-40 border-2 border-dashed border-[#8b0000] rounded-full flex items-center justify-center">
+                    <Text className="text-xs font-bold text-center uppercase tracking-widest text-[#8b0000]">ኦፊሴላዊ<br/>ማህተም</Text>
                 </div>
             </div>
         </div>
