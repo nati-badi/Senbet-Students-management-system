@@ -146,7 +146,16 @@ const resources = {
                 "academicTranscript": "Academic Transcript",
                 "incompleteTranscript": "Incomplete Transcript - Missing {{count}} Assessment(s)",
                 "readyForFinal": "Complete - Ready for Final Generation",
-                "officialPreview": "Official Preview"
+                "officialPreview": "Official Preview",
+                "bulkActions": "Bulk Actions",
+                "fillConstant": "Fill Constant Mark",
+                "predictMarks": "Predict Missing Marks",
+                "fillValue": "Fill Value",
+                "fillPrompt": "Enter a mark to fill for all empty slots (0 - {{max}})",
+                "confirmPredict": "Predict marks for {{count}} students based on their performance history in {{subject}}?",
+                "predictSuccess": "Predicted marks for {{count}} students.",
+                "fillSuccess": "Filled marks for {{count}} students.",
+                "noHistory": "Cannot predict: Student has no existing marks in this subject."
             },
             "parent": {
                 "title": "Parent & Student Portal",
@@ -349,7 +358,16 @@ const resources = {
                 "academicTranscript": "የውጤት መግለጫ",
                 "incompleteTranscript": "ያልተሟላ የውጤት መግለጫ - {{count}} ምዘናዎች ቀርተዋል",
                 "readyForFinal": "የተሟላ - ለህትመት ዝግጁ",
-                "officialPreview": "ኦፊሴላዊ ቅድመ እይታ"
+                "officialPreview": "ኦፊሴላዊ ቅድመ እይታ",
+                "bulkActions": "ጅምላ እርምጃዎች",
+                "fillConstant": "ተመሳሳይ ውጤት ለሁሉም ሙላ",
+                "predictMarks": "ቀሪ ውጤቶችን ገምት (Predict)",
+                "fillValue": "የሚሞላ ውጤት",
+                "fillPrompt": "ለሁሉም ባዶ ቦታዎች የሚሞላ ውጤት ያስገቡ (0 - {{max}})",
+                "confirmPredict": "ለ {{count}} ተማሪዎች በ {{subject}} ያላቸውን የቀድሞ ውጤት መሰረት በማድረግ ውጤት እንዲገመት ይፈልጋሉ?",
+                "predictSuccess": "ለ {{count}} ተማሪዎች ውጤት ተገምቷል።",
+                "fillSuccess": "ለ {{count}} ተማሪዎች ውጤት ተሞልቷል።",
+                "noHistory": "መገመት አልተቻለም፡ ተማሪው በዚህ ትምህርት ውስጥ እስካሁን የተመዘገበ ውጤት የለውም።"
             },
             "parent": {
                 "title": "የወላጅ እና የተማሪ ፖርታል",

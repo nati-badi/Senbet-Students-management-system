@@ -247,6 +247,7 @@ function SpeedEntryMarks({ teacher }) {
     const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
     const [localMarks, setLocalMarks] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
+    const [modal, contextHolder] = Modal.useModal();
 
     const allStudentsData = useLiveQuery(() => db.students.toArray());
     const assessmentsData = useLiveQuery(() => db.assessments.toArray());
@@ -349,6 +350,99 @@ function SpeedEntryMarks({ teacher }) {
         }
     };
 
+    const handleFillConstantMark = () => {
+        if (!selectedAssessment) return;
+        
+        const studentsWithoutMarks = studentsInGrade.filter(s => localMarks[s.id] === undefined || localMarks[s.id] === '');
+        if (studentsWithoutMarks.length === 0) {
+            message.info(t('teacher.fullyGraded', 'All students already have marks.'));
+            return;
+        }
+
+        modal.confirm({
+            title: t('teacher.fillConstant'),
+            content: (
+                <div className="py-4">
+                    <Text>{t('teacher.fillPrompt', { max: selectedAssessment.maxScore })}</Text>
+                    <Input 
+                        type="number" 
+                        min={0} 
+                        max={selectedAssessment.maxScore} 
+                        placeholder={t('teacher.fillValue')}
+                        className="mt-2"
+                        onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            window._tempBulkValue = isNaN(val) ? '' : val;
+                        }}
+                    />
+                </div>
+            ),
+            onOk: async () => {
+                const val = window._tempBulkValue;
+                if (val === undefined || val === '') return;
+                if (val > selectedAssessment.maxScore) {
+                    message.error(t('teacher.invalidScoreRange', { max: selectedAssessment.maxScore }));
+                    return;
+                }
+
+                let count = 0;
+                for (const student of studentsWithoutMarks) {
+                    await handleMarkChange(student.id, val.toString());
+                    count++;
+                }
+                message.success(t('teacher.fillSuccess', { count }));
+                delete window._tempBulkValue;
+            }
+        });
+    };
+
+    const handlePredictMarks = async () => {
+        if (!selectedAssessment) return;
+
+        const studentsWithoutMarks = studentsInGrade.filter(s => localMarks[s.id] === undefined || localMarks[s.id] === '');
+        if (studentsWithoutMarks.length === 0) {
+            message.info(t('teacher.fullyGraded'));
+            return;
+        }
+
+        modal.confirm({
+            title: t('teacher.predictMarks'),
+            content: t('teacher.confirmPredict', { count: studentsWithoutMarks.length, subject: selectedAssessment.subjectName }),
+            onOk: async () => {
+                let successCount = 0;
+                for (const student of studentsWithoutMarks) {
+                    // Find all marks for this student in the same subject
+                    const subjectMarks = await db.marks
+                        .where('studentId').equals(student.id)
+                        .filter(m => m.subject === selectedAssessment.subjectName)
+                        .toArray();
+
+                    if (subjectMarks.length > 0) {
+                        // Calculate average percentage
+                        let totalPercentage = 0;
+                        for (const m of subjectMarks) {
+                            const assessment = allAssessments.find(a => a.id === m.assessmentId);
+                            if (assessment && assessment.maxScore > 0) {
+                                totalPercentage += (m.score / assessment.maxScore);
+                            }
+                        }
+                        const avgPercentage = totalPercentage / subjectMarks.length;
+                        const predictedScore = Math.round(avgPercentage * selectedAssessment.maxScore * 10) / 10;
+                        
+                        await handleMarkChange(student.id, predictedScore.toString());
+                        successCount++;
+                    }
+                }
+
+                if (successCount > 0) {
+                    message.success(t('teacher.predictSuccess', { count: successCount }));
+                } else {
+                    message.warning(t('teacher.noHistory'));
+                }
+            }
+        });
+    };
+
     const columns = [
         { title: t('admin.name'), dataIndex: 'name', key: 'name' },
         { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
@@ -392,6 +486,7 @@ function SpeedEntryMarks({ teacher }) {
                 <Text type="secondary">{t('teacher.enterMarksInfo')}</Text>
             </div>
 
+            {contextHolder}
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Form layout="vertical">
                     <Row gutter={16} align="bottom">
@@ -454,6 +549,24 @@ function SpeedEntryMarks({ teacher }) {
                     </Tag>
                 </Title>
                 <div className="hidden sm:block flex-grow border-t border-slate-200 dark:border-slate-700 mx-2"></div>
+                {selectedAssessment && (
+                    <Space>
+                        <Button 
+                            icon={<BarChartOutlined />} 
+                            onClick={handlePredictMarks}
+                            disabled={!selectedAssessmentId || studentsInGrade.length === 0}
+                        >
+                            {t('teacher.predictMarks')}
+                        </Button>
+                        <Button 
+                            icon={<EditOutlined />} 
+                            onClick={handleFillConstantMark}
+                            disabled={!selectedAssessmentId || studentsInGrade.length === 0}
+                        >
+                            {t('teacher.fillConstant')}
+                        </Button>
+                    </Space>
+                )}
                 <Input
                     placeholder={t('common.searchPlaceholder')}
                     value={searchQuery}
@@ -461,7 +574,7 @@ function SpeedEntryMarks({ teacher }) {
                     prefix={<SearchOutlined className="text-slate-400" />}
                     allowClear
                     disabled={!selectedAssessmentId}
-                    className="w-full sm:w-[300px]"
+                    className="w-full sm:w-[250px]"
                 />
             </div>
 
