@@ -19,13 +19,26 @@ export default function SyncCenter() {
             if (result.success) {
                 setSyncStats({
                     pushed: result.pushed,
-                    pulled: result.pulled
+                    pulled: result.pulled,
+                    tableStatus: result.tableStatus
                 });
                 setLastSync(new Date().toLocaleTimeString());
-                notification.success({
-                    message: 'Sync Successful',
-                    description: `Pushed ${result.pushed} records and pulled ${result.pulled} records.`
-                });
+                
+                const failedTables = Object.entries(result.tableStatus || {})
+                    .filter(([_, status]) => status.push === 'error' || status.pull === 'error')
+                    .map(([name]) => name);
+
+                if (failedTables.length > 0) {
+                    notification.warning({
+                        message: 'Sync Partial Success',
+                        description: `Synced successfully but failed for tables: ${failedTables.join(', ')}. Check Supabase schema.`
+                    });
+                } else {
+                    notification.success({
+                        message: 'Sync Successful',
+                        description: `Pushed ${result.pushed} records and pulled ${result.pulled} records.`
+                    });
+                }
             } else {
                 notification.error({
                     message: 'Sync Failed',
@@ -109,6 +122,30 @@ export default function SyncCenter() {
                     </div>
                 </Space>
             </Card>
+
+            {syncStats?.tableStatus && (
+                <Card title="Table Details" className="mt-4">
+                    <List
+                        itemLayout="horizontal"
+                        dataSource={Object.entries(syncStats.tableStatus)}
+                        renderItem={([name, status]) => (
+                            <List.Item
+                                extra={
+                                    <Space>
+                                        <Badge status={status.push === 'error' ? 'error' : (status.push === 'ok' ? 'success' : 'default')} text={`Push: ${status.push}`} />
+                                        <Badge status={status.pull === 'error' ? 'error' : (status.pull === 'ok' ? 'success' : 'default')} text={`Pull: ${status.pull}`} />
+                                    </Space>
+                                }
+                            >
+                                <List.Item.Meta
+                                    title={<Text strong className="capitalize">{name}</Text>}
+                                    description={status.error ? <Text type="danger" size="small">Error: {status.error}</Text> : `Last synced: ${lastSync}`}
+                                />
+                            </List.Item>
+                        )}
+                    />
+                </Card>
+            )}
 
             <Card title="How to Sync" className="mt-4">
                 <Paragraph>

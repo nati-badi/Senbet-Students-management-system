@@ -111,8 +111,8 @@ export default function TeacherDashboard() {
     ];
 
     return (
-        <div className="flex flex-col w-full h-full">
-            <Card className="mb-4 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800">
+        <div className="flex flex-col w-full gap-4">
+            <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="min-w-0">
                         <Text type="secondary" className="text-xs uppercase tracking-wider">
@@ -139,7 +139,7 @@ export default function TeacherDashboard() {
                 </div>
             </Card>
             {/* Mobile Navigation */}
-            <div className="lg:hidden mb-4 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+            <div className="lg:hidden bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
                 <Menu
                     mode="horizontal"
                     selectedKeys={[location.pathname]}
@@ -149,12 +149,9 @@ export default function TeacherDashboard() {
                 />
             </div>
 
-            <Layout className="bg-transparent">
-                <Sider
-                    width={240}
-                    style={{ flexShrink: 0 }}
-                    className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden lg:block"
-                >
+            {/* Desktop: Sidebar + Content */}
+            <div className="flex flex-row gap-6 items-start">
+                <div className="hidden lg:flex flex-col flex-shrink-0 w-[240px] bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden teacher-sidebar">
                     <div style={{ padding: '16px' }}>
                         <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
                             {t('teacher.menu')}
@@ -167,18 +164,43 @@ export default function TeacherDashboard() {
                         onClick={({ key }) => navigate(key)}
                         className="border-none"
                     />
-                </Sider>
+                    <style>{`
+                        .teacher-sidebar .ant-menu-item-selected {
+                            background-color: #eff6ff !important;
+                            color: #2563eb !important;
+                            border-right: 3px solid #2563eb;
+                            font-weight: 600;
+                        }
+                        .dark .teacher-sidebar .ant-menu-item-selected {
+                            background-color: #1e3a5f !important;
+                            color: #60a5fa !important;
+                            border-right: 3px solid #60a5fa;
+                        }
+                        .teacher-sidebar .ant-menu-item-selected .ant-menu-item-icon,
+                        .teacher-sidebar .ant-menu-item-selected span {
+                            color: inherit !important;
+                        }
+                        .teacher-sidebar .ant-menu-item:hover {
+                            background-color: #f0f9ff !important;
+                            color: #2563eb !important;
+                        }
+                        .dark .teacher-sidebar .ant-menu-item:hover {
+                            background-color: #1e293b !important;
+                            color: #60a5fa !important;
+                        }
+                    `}</style>
+                </div>
 
-                <Content className="bg-transparent p-3 sm:p-4 md:p-6 min-h-[600px]">
+                <div className="flex-1 min-w-0 min-h-[600px]">
                     <Routes>
                         <Route path="/" element={<Navigate to="mark-entry" replace />} />
-                        <Route path="/mark-entry" element={<SpeedEntryMarks teacher={teacherSession} />} />
-                        <Route path="/attendance" element={<AttendanceModule teacher={teacherSession} />} />
-                        <Route path="/analytics" element={<StudentAnalytics />} />
+                        <Route path="/mark-entry" element={<SpeedEntryMarks teacher={teacherSession} setProfileStudentId={setProfileStudentId} />} />
+                        <Route path="/attendance" element={<AttendanceModule teacher={teacherSession} setProfileStudentId={setProfileStudentId} />} />
+                        <Route path="/analytics" element={<StudentAnalytics isTeacherView={true} teacher={teacherSession} />} />
                         <Route path="/urgent" element={<TeacherUrgentMatters teacher={teacherSession} />} />
                     </Routes>
-                </Content>
-            </Layout>
+                </div>
+            </div>
 
             <StudentProfile
                 studentId={profileStudentId}
@@ -239,15 +261,21 @@ function TeacherLogin({ onLogin }) {
     );
 }
 
-function SpeedEntryMarks({ teacher }) {
+function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
-    const [selectedGrade, setSelectedGrade] = useState('');
-    const [selectedAssessmentId, setSelectedAssessmentId] = useState('');
+
+    // Persist selection state in sessionStorage so navigation between sidebar items doesn't reset it
+    const [selectedGrade, setSelectedGrade] = useState(() => sessionStorage.getItem('sem_mark_grade') || '');
+    const [selectedAssessmentId, setSelectedAssessmentId] = useState(() => sessionStorage.getItem('sem_mark_assessment') || '');
     const [localMarks, setLocalMarks] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
     const [modal, contextHolder] = Modal.useModal();
+
+    // Keep sessionStorage in sync
+    useEffect(() => { sessionStorage.setItem('sem_mark_grade', selectedGrade); }, [selectedGrade]);
+    useEffect(() => { sessionStorage.setItem('sem_mark_assessment', selectedAssessmentId); }, [selectedAssessmentId]);
 
     const allStudentsData = useLiveQuery(() => db.students.toArray());
     const assessmentsData = useLiveQuery(() => db.assessments.toArray());
@@ -318,6 +346,21 @@ function SpeedEntryMarks({ teacher }) {
     const handleMarkChange = async (studentId, value) => {
         const score = parseFloat(value);
         setLocalMarks(prev => ({ ...prev, [studentId]: value }));
+
+        // If the field is cleared, delete the mark from DB so other components update live
+        if (value === '' || value === null || value === undefined) {
+            try {
+                const existingMark = await db.marks
+                    .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
+                    .first();
+                if (existingMark) {
+                    await db.marks.delete(existingMark.id);
+                }
+            } catch (err) {
+                console.error("Failed to delete mark:", err);
+            }
+            return;
+        }
 
         if (isNaN(score)) return;
 
@@ -613,14 +656,22 @@ function SpeedEntryMarks({ teacher }) {
 
 function AttendanceModule({ setProfileStudentId, teacher }) {
     const { t } = useTranslation();
-    const [selectedGrade, setSelectedGrade] = useState('');
-    const [attendanceDate, setAttendanceDate] = useState(dayjs().format('YYYY-MM-DD'));
+
+    // Persist selection state in sessionStorage so navigation between sidebar items doesn't reset it
+    const [selectedGrade, setSelectedGrade] = useState(() => sessionStorage.getItem('sem_att_grade') || '');
+    const [attendanceDate, setAttendanceDate] = useState(() => sessionStorage.getItem('sem_att_date') || dayjs().format('YYYY-MM-DD'));
     const [localAttendance, setLocalAttendance] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
 
+    // Keep sessionStorage in sync
+    useEffect(() => { sessionStorage.setItem('sem_att_grade', selectedGrade); }, [selectedGrade]);
+    useEffect(() => { sessionStorage.setItem('sem_att_date', attendanceDate); }, [attendanceDate]);
+
     const allStudentsData = useLiveQuery(() => db.students.toArray());
+    const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
     const allStudents = allStudentsData || [];
     const isLoading = allStudentsData === undefined;
+    const currentSemesterSetting = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
     const dbGrades2 = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
     const extraGradeOptions2 = dbGrades2

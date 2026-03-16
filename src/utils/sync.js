@@ -18,6 +18,7 @@ export async function syncData() {
         const TABLES = ['students', 'attendance', 'marks', 'subjects', 'assessments', 'teachers'];
         let pushedCount = 0;
         let pulledCount = 0;
+        let tableStatus = {}; // { tableName: { push: 'ok', pull: 'ok', error: null } }
 
         // --- 1. SETTINGS SYNC (Special Case) ---
         console.log("Syncing settings...");
@@ -55,9 +56,12 @@ export async function syncData() {
         for (const tableName of TABLES) {
             try {
                 const tableDb = db[tableName];
-                if (!tableDb) continue;
+                if (!tableDb) {
+                    console.log(`Skipping push for table ${tableName} (not in Dexie)`);
+                    continue;
+                }
 
-                // Get records where synced === 0
+                console.log(`Checking unsynced records for table: ${tableName}`);
                 let unsyncedRecords = await tableDb.where('synced').equals(0).toArray();
 
                 if (unsyncedRecords.length > 0) {
@@ -91,7 +95,9 @@ export async function syncData() {
                         .upsert(cleanRecords, { onConflict: 'id' });
 
                     if (error) {
-                        console.warn(`Warning: Error pushing to ${tableName}:`, error.message);
+                        const errorMsg = `Push error for ${tableName}: ${error.message}`;
+                        console.warn(errorMsg);
+                        tableStatus[tableName] = { ...tableStatus[tableName], push: 'error', error: error.message };
                         continue; // Skip to next table
                     }
 
@@ -101,6 +107,9 @@ export async function syncData() {
 
                     pushedCount += cleanRecords.length;
                     console.log(`Pushed ${cleanRecords.length} records to ${tableName}`);
+                    tableStatus[tableName] = { ...tableStatus[tableName], push: 'ok' };
+                } else {
+                    tableStatus[tableName] = { ...tableStatus[tableName], push: 'idle' };
                 }
             } catch (err) {
                 console.warn(`Critical error pushing table ${tableName}:`, err);
@@ -112,16 +121,24 @@ export async function syncData() {
         for (const tableName of TABLES) {
             try {
                 const tableDb = db[tableName];
-                if (!tableDb) continue;
+                if (!tableDb) {
+                    console.log(`Skipping pull for table ${tableName} (not in Dexie)`);
+                    continue;
+                }
 
+                console.log(`Pulling data for table: ${tableName}`);
                 const { data, error } = await supabase
                     .from(tableName)
                     .select('*');
 
                 if (error) {
-                    console.warn(`Warning: Error pulling from ${tableName}:`, error.message);
+                    const errorMsg = `Pull error for ${tableName}: ${error.message}`;
+                    console.warn(errorMsg);
+                    tableStatus[tableName] = { ...tableStatus[tableName], pull: 'error', error: error.message };
                     continue; // Skip to next table
                 }
+
+                tableStatus[tableName] = { ...tableStatus[tableName], pull: 'ok' };
 
                 if (data && data.length > 0) {
                     // Get local unsynced IDs to avoid overwriting them
@@ -146,10 +163,13 @@ export async function syncData() {
                             } else if (tableName === 'marks') {
                                 if (record.studentid !== undefined) mapped.studentId = record.studentid;
                                 if (record.assessmentid !== undefined) mapped.assessmentId = record.assessmentid;
+                                if (record.subject !== undefined) mapped.subject = record.subject;
                                 if (record.assessmentdate !== undefined) mapped.assessmentDate = record.assessmentdate;
                             } else if (tableName === 'attendance') {
                                 if (record.studentid !== undefined) mapped.studentId = record.studentid;
                             } else if (tableName === 'teachers') {
+                                if (record.name !== undefined) mapped.name = record.name;
+                                if (record.phone !== undefined) mapped.phone = record.phone;
                                 if (record.accesscode !== undefined) mapped.accessCode = record.accesscode;
                                 if (record.assignedgrades !== undefined) mapped.assignedGrades = record.assignedgrades;
                                 if (record.assignedsubjects !== undefined) mapped.assignedSubjects = record.assignedsubjects;
@@ -169,11 +189,11 @@ export async function syncData() {
             }
         }
 
-        console.log(`Synchronization finished. Pushed: ${pushedCount}, Pulled: ${pulledCount}`);
-        return { success: true, pushed: pushedCount, pulled: pulledCount };
+        console.log(`Synchronization finished. Pushed: ${pushedCount} records, Pulled: ${pulledCount} records.`);
+        return { success: true, pushed: pushedCount, pulled: pulledCount, tableStatus };
 
     } catch (error) {
-        console.error("Sync process error:", error);
+        console.error("Sync process fatal error:", error);
         return { success: false, error: error.message || "An unknown error occurred during sync." };
     }
 }

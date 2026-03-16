@@ -9,7 +9,7 @@ import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUti
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-export default function StudentAnalytics({ isTeacherView = false }) {
+export default function StudentAnalytics({ isTeacherView = false, teacher = null }) {
     const { t } = useTranslation();
     const students = useLiveQuery(() => db.students.toArray()) || [];
     const marks = useLiveQuery(() => db.marks.toArray()) || [];
@@ -17,14 +17,24 @@ export default function StudentAnalytics({ isTeacherView = false }) {
     const attendance = useLiveQuery(() => db.attendance.toArray()) || [];
 
     const dbGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
-    const gradeOptions = [
+    const allGradeOptions = [
         ...GRADE_OPTIONS,
         ...dbGrades
             .filter(g => !GRADE_OPTIONS.some(o => o.value === String(g)))
             .map(g => ({ value: String(g), label: formatGrade(g) }))
     ];
 
-    const [selectedGrade, setSelectedGrade] = useState('All');
+    const allowedGrades = Array.isArray(teacher?.assignedGrades) ? teacher.assignedGrades : [];
+    const gradeOptions = isTeacherView && allowedGrades.length > 0
+        ? allGradeOptions.filter(o => allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(o.value)))
+        : allGradeOptions;
+
+    const [selectedGrade, setSelectedGrade] = useState(() => {
+        if (isTeacherView && gradeOptions.length > 0) {
+            return gradeOptions[0].value;
+        }
+        return 'All';
+    });
     const [selectedSemester, setSelectedSemester] = useState('Semester I');
 
     // Calculate Top Students
