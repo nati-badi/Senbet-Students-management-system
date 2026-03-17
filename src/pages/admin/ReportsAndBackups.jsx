@@ -5,6 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useTranslation } from 'react-i18next';
 import * as XLSX from 'xlsx';
+import { formatEthiopianDate } from '../../utils/dateUtils';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -29,7 +30,7 @@ export default function ReportsAndBackups() {
             'Grade': s.grade,
             'Portal Code': s.portalCode || '',
             'Parent Contact': s.parentContact,
-            'Date of Entry': new Date(s.academicYear).toLocaleDateString()
+            'Date of Entry': formatEthiopianDate(s.academicYear, true)
         }));
 
         const ws = XLSX.utils.json_to_sheet(data);

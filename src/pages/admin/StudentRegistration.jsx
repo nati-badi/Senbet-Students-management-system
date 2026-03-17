@@ -9,6 +9,7 @@ import Papa from 'papaparse';
 import { db } from '../../db/database';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade, disabledDate } from '../../utils/gradeUtils';
 import { validateAmharic, validateEthiopianPhone } from '../../utils/validators';
+import { formatEthiopianDate } from '../../utils/dateUtils';
 import StudentProfile from '../../components/StudentProfile';
 
 const { Title, Text } = Typography;
@@ -39,31 +40,6 @@ export default function StudentRegistration() {
         setIsFormValid(!!(allValues.name && allValues.grade));
     };
 
-    const formatEthiopianDate = (dateInput) => {
-        const dateObj = (dateInput && typeof dateInput === 'string' && dateInput.includes('T'))
-            ? new Date(dateInput)
-            : (dateInput ? null : new Date());
-
-        if (!dateObj || isNaN(dateObj.getTime())) return dateInput || '—';
-
-        const isAmharic = (i18n.language || 'am').startsWith('am');
-        const locale = isAmharic ? 'am-ET-u-ca-ethiopic' : 'en-ET-u-ca-ethiopic';
-
-        try {
-            const formatter = new Intl.DateTimeFormat(locale, {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-            let formatted = formatter.format(dateObj);
-            if (!isAmharic) {
-                formatted = formatted.replace(/(AM|PM|ERA1|ERA0)/gi, '').trim() + ' E.C.';
-            }
-            return formatted;
-        } catch (e) {
-            return dateInput || '—';
-        }
-    };
 
     const regDateOfEntry = Form.useWatch('dateOfEntry', form);
     const editDateOfEntry = Form.useWatch('dateOfEntry', editForm);

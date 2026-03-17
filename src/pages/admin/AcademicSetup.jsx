@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { GRADE_OPTIONS, formatGrade, getNextGrade } from '../../utils/gradeUtils';
+import { computeEthiopianYear } from '../../utils/dateUtils';
 import dayjs from 'dayjs';
 
 const { Title, Text, Paragraph } = Typography;
@@ -13,12 +14,6 @@ export default function AcademicSetup() {
     const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     
-    // Auto compute Ethiopian Academic Year
-    const computeEthiopianYear = () => {
-        const d = dayjs();
-        // Ethiopian New Year is in September (month index 8)
-        return (d.month() >= 8 ? d.year() - 7 : d.year() - 8) + ' E.C.';
-    };
 
     const [yearInput, setYearInput] = useState(computeEthiopianYear());
     const [semesterInput, setSemesterInput] = useState('Semester I');

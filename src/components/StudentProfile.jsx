@@ -16,6 +16,7 @@ import {
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
 import { useTranslation } from 'react-i18next';
+import { formatEthiopianDate } from '../utils/dateUtils';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -202,7 +203,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             {formatGrade(student?.grade)}
                         </Tag>
                         <div>
-                            <Text type="secondary" className="text-xs uppercase tracking-widest">{t('common.entryDate')}: {student?.academicYear ? dayjs(student.academicYear).format('MMM YYYY') : '-'}</Text>
+                            <Text type="secondary" className="text-xs uppercase tracking-widest">{t('common.entryDate')}: {formatEthiopianDate(student?.academicYear)}</Text>
                         </div>
                     </Col>
                 </Row>
@@ -486,7 +487,11 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             </div>
                             <div className="flex flex-col gap-1">
                                 <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-semibold">ዓ.ም / Year</Text>
-                                <Text className="text-lg text-[#2c1810]">{student?.academicYear ? dayjs(student.academicYear).format('YYYY') : '-'}</Text>
+                                <Text className="text-lg text-[#2c1810]">
+                                    {String(student?.academicYear).includes('E.C.') 
+                                        ? student.academicYear 
+                                        : `${dayjs(student?.academicYear).format('YYYY')} E.C.`}
+                                </Text>
                             </div>
                         </div>
                     </div>

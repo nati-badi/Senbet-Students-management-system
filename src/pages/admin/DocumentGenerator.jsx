@@ -179,7 +179,8 @@ export default function DocumentGenerator({ type }) {
                     doc.text(`Grade: ${student.grade || 'N/A'}`, margin + 5, startY + 64);
                     
                     // Top Right Info (Year / Semester)
-                    doc.text(`Year: ${activeAcademicYear}`, pageWidth - margin - 5, startY + 50, { align: 'right' });
+                    const displayYear = activeAcademicYear.includes('E.C.') ? activeAcademicYear : `${activeAcademicYear} E.C.`;
+                    doc.text(`Year: ${displayYear}`, pageWidth - margin - 5, startY + 50, { align: 'right' });
                     doc.text(`Semester: ${activeSemester}`, pageWidth - margin - 5, startY + 56, { align: 'right' });
 
                     // --- Calculate Marks & Render Table ---
@@ -424,7 +425,11 @@ function IDCardTemplate({ student }) {
                         </div>
                         <div>
                             <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Year / ዘመን</span>
-                            <div className="text-[9px] font-bold">{student.academicYear || dayjs().format('YYYY')}</div>
+                            <div className="text-[9px] font-bold">
+                                {String(student.academicYear || dayjs().format('YYYY')).includes('E.C.') 
+                                    ? student.academicYear 
+                                    : `${dayjs(student.academicYear).format('YYYY')} E.C.`}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -521,7 +526,11 @@ function CertificateTemplate({ student, marks, subjects = [], assessments = [] }
                     </div>
                     <div className="flex flex-col gap-1.5">
                         <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ዓ.ም / Year</Text>
-                        <Text className="text-xl text-[#2c1810]">{student.academicYear || dayjs().format('YYYY')}</Text>
+                        <Text className="text-xl text-[#2c1810]">
+                            {String(student.academicYear || dayjs().format('YYYY')).includes('E.C.') 
+                                ? student.academicYear 
+                                : `${dayjs(student.academicYear).format('YYYY')} E.C.`}
+                        </Text>
                     </div>
                 </div>
             </div>
