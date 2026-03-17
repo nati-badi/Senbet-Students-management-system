@@ -290,7 +290,6 @@ function HomeSection({ onNavigate }) {
                             {[
                                 { key: 'calendar', emoji: '📅' },
                                 { key: 'uniform', emoji: '👔' },
-                                { key: 'conduct', emoji: '📋' },
                                 { key: 'library', emoji: '📚' },
                             ].map((link, i) => (
                                 <button
