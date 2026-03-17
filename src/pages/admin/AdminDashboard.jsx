@@ -23,6 +23,7 @@ import SubjectManagement from './SubjectManagement';
 import AssessmentManagement from './AssessmentManagement';
 import SyncCenter from './SyncCenter';
 import UrgentMatters from './UrgentMatters';
+import AcademicSetup from './AcademicSetup';
 import TeacherManagement from './TeacherManagement';
 import ReportsAndBackups from './ReportsAndBackups';
 import StudentAnalytics from './StudentAnalytics';
@@ -95,6 +96,11 @@ export default function AdminDashboard() {
                     key: '/admin/reports',
                     icon: <DatabaseOutlined />,
                     label: t('admin.reportsBackups', 'Reports & Backups')
+                },
+                {
+                    key: '/admin/academic-setup',
+                    icon: <CheckCircleOutlined />,
+                    label: t('admin.academicSetup', 'Academic Setup')
                 },
                 {
                     key: '/admin/sync',
@@ -190,6 +196,7 @@ export default function AdminDashboard() {
                     <Route path="/analytics" element={<StudentAnalytics />} />
                     <Route path="/sync" element={<SyncCenter />} />
                     <Route path="/templates" element={<TemplateDesigner />} />
+                    <Route path="/academic-setup" element={<AcademicSetup />} />
                 </Routes>
             </Content>
             </Layout>

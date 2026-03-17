@@ -64,7 +64,12 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
     const allAssessments = useLiveQuery(() => db.assessments.toArray()) || [];
     const allSubjects = useLiveQuery(() => db.subjects.toArray()) || [];
-    const isLoading = student === undefined || allAssessments === undefined || allSubjects === undefined;
+    const allStudents = useLiveQuery(() => db.students.toArray()) || [];
+    const allMarks = useLiveQuery(() => db.marks.toArray()) || [];
+    const settings = useLiveQuery(() => db.settings.toArray()) || [];
+    const isLoading = student === undefined || allAssessments === undefined || allSubjects === undefined || allStudents === undefined || allMarks === undefined || settings === undefined;
+
+    const activeSemester = useMemo(() => settings?.find(s => s.key === 'currentSemester')?.value || 'Semester I', [settings]);
 
 
     // --- Formatters ---
@@ -354,8 +359,18 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             const semIIMax = semIIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
             const semIIHasData = semIIAssessments.some(a => marks?.find(m => m.assessmentId === a.id));
 
-            const totalMax = semIMax + semIIMax;
-            const totalEarned = semIEarned + semIIEarned;
+            let totalMax = 0;
+            let totalEarned = 0;
+
+            if (activeSemester === 'Semester I') {
+                totalMax = semIMax;
+                totalEarned = semIEarned;
+            } else {
+                 // For Semester II, average the whole year
+                totalMax = semIMax + semIIMax;
+                totalEarned = semIEarned + semIIEarned;
+            }
+
             const avgPct = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(0) : '-';
 
             return {
@@ -363,10 +378,74 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                 semI: semIHasData ? `${semIEarned} / ${semIMax}` : (semIAssessments.length ? '—' : 'N/A'),
                 semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIAssessments.length ? '—' : 'N/A'),
                 avg: avgPct !== '-' ? `${avgPct}%` : '—',
+                rowMax: totalMax,
+                rowEarned: totalEarned
             };
         });
 
-        const overallAvg = totalMaxScore > 0 ? ((totalEarnedScore / totalMaxScore) * 100).toFixed(1) : 0;
+        // Compute real grand total based on visible row max/earned
+        let liveTotalMax = 0;
+        let liveTotalEarned = 0;
+        subjectRows.forEach(row => {
+            liveTotalMax += row.rowMax;
+            liveTotalEarned += row.rowEarned;
+        });
+
+        const overallAvg = liveTotalMax > 0 ? ((liveTotalEarned / liveTotalMax) * 100).toFixed(1) : 0;
+
+        // Rank Calculations
+        const calculateRanks = () => {
+            if (!student || !allStudents || !allMarks || !allAssessments || !allSubjects) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
+
+            // Find all assessments for the student's normalized grade
+            const gradeAssesses = allAssessments.filter(a => normalizeGrade(a.grade) === studentGradeNorm);
+            if (gradeAssesses.length === 0) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
+            
+            const assessIds = gradeAssesses.map(a => a.id);
+            const pertinentMarks = allMarks.filter(m => assessIds.includes(m.assessmentId));
+
+            // Calculate percentage for all students in the same normalized grade
+            const studentsInGrade = allStudents.filter(s => normalizeGrade(s.grade) === studentGradeNorm);
+            
+            const rankings = studentsInGrade.map(s => {
+                let sTotalScore = 0;
+                let sTotalMax = 0;
+                
+                gradeAssesses.forEach(a => {
+                    const subjObj = allSubjects.find(subj => subj.name === a.subjectName);
+                    const isSem1 = (subjObj?.semester || 'Semester I') === 'Semester I';
+                    
+                    if (activeSemester === 'Semester I') {
+                        if (!isSem1) return; // Skip Sem 2 marks from rank calc if we are in Sem I
+                    }
+
+                    const mark = pertinentMarks.find(m => m.studentId === s.id && m.assessmentId === a.id);
+                    if (mark) sTotalScore += mark.score;
+                    sTotalMax += a.maxScore;
+                });
+                
+                const sPercentage = sTotalMax > 0 ? (sTotalScore / sTotalMax) * 100 : 0;
+                return { id: s.id, grade: s.grade, percentage: sPercentage, hasData: sTotalMax > 0 };
+            }).filter(s => s.hasData); // Only rank students with data
+
+            // Sort by percentage descending
+            rankings.sort((a, b) => b.percentage - a.percentage);
+
+            // Overall Grade Rank
+            const overallRankIndex = rankings.findIndex(r => r.id === student?.id);
+            const overallRank = overallRankIndex !== -1 ? overallRankIndex + 1 : 'N/A';
+            const totalInGrade = rankings.length;
+
+            // Class Rank (exact grade match)
+            const classRankings = rankings.filter(r => r.grade === student?.grade);
+            const classRankIndex = classRankings.findIndex(r => r.id === student?.id);
+            const classRank = classRankIndex !== -1 ? classRankIndex + 1 : 'N/A';
+            const totalInClass = classRankings.length;
+
+            return { classRank, overallRank, totalInClass, totalInGrade };
+        };
+
+        const { classRank, overallRank, totalInClass, totalInGrade } = calculateRanks();
 
         return (
             <div className="mt-4 flex flex-col items-center bg-slate-100 dark:bg-slate-900 p-8 rounded-lg overflow-auto">
@@ -441,8 +520,22 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                                 <tr>
                                     <td className="p-4 pt-6 text-[#2c1810] uppercase tracking-widest font-semibold text-xs">አጠቃላይ ድምር (Grand Total)</td>
                                     <td colSpan={2}></td>
-                                    <td className="p-4 pt-6 text-center text-[#8b0000] font-semibold text-lg">{averagePercentage}%</td>
+                                    <td className="p-4 pt-6 text-center text-[#8b0000] font-semibold text-lg">{overallAvg}%</td>
                                 </tr>
+                                {totalInClass > 0 && (
+                                    <tr>
+                                        <td className="p-4 pt-2 pb-1 text-[#2c1810] uppercase tracking-widest font-semibold text-xs">ክፍል ደረጃ ({t('teacher.classRank')})</td>
+                                        <td colSpan={2}></td>
+                                        <td className="p-4 pt-2 pb-1 text-center font-medium text-lg text-[#2c1810]">{classRank} / {totalInClass}</td>
+                                    </tr>
+                                )}
+                                {totalInGrade > 0 && (
+                                    <tr>
+                                        <td className="p-4 pt-1 text-[#2c1810] uppercase tracking-widest font-semibold text-xs text-opacity-80">ለጠቅላላው ክፍል የተሰጠ ደረጃ ({t('teacher.overallGradeRank')})</td>
+                                        <td colSpan={2}></td>
+                                        <td className="p-4 pt-1 text-center font-medium text-md text-[#5c4033]">{overallRank} / {totalInGrade}</td>
+                                    </tr>
+                                )}
                             </tfoot>
                         </table>
                     </div>

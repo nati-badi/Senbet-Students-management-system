@@ -41,3 +41,11 @@ export const normalizeGrade = (rawGrade) => {
 export const disabledDate = (current) => {
     return current && current > dayjs().endOf('day');
 };
+
+export const getNextGrade = (rawGrade) => {
+    const normalized = normalizeGrade(rawGrade);
+    const num = parseInt(normalized);
+    if (isNaN(num)) return rawGrade; // If we couldn't parse it, return as is
+    if (num >= 12) return '13'; // Graduate / Other
+    return String(num + 1);
+};

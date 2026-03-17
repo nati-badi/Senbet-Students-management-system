@@ -1,12 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Typography, Card, Select, Button, Space, message } from 'antd';
 import { FilePdfOutlined, IdcardOutlined, UserOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import dayjs from 'dayjs';
-import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
+import { db } from '../../db/database';
 
 
 const { Title, Text } = Typography;
@@ -44,37 +46,284 @@ export default function DocumentGenerator({ type }) {
     const [isGenerating, setIsGenerating] = useState(false);
     
     const students = useLiveQuery(() => db.students.toArray()) || [];
-    const allMarks = useLiveQuery(() => db.marks.toArray()) || [];
+    const marks = useLiveQuery(() => db.marks.toArray()) || [];
     const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
     const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
+    const settings = useLiveQuery(() => db.settings.toArray()) || [];
+
+    const activeAcademicYear = useMemo(() => settings.find(s => s.key === 'currentAcademicYear')?.value || '-', [settings]);
+    const activeSemester = useMemo(() => settings.find(s => s.key === 'currentSemester')?.value || 'Semester I', [settings]);
+
+    const normalizeGrade = (g) => {
+        if (!g) return '';
+        const match = String(g).match(/(\d+)/);
+        return match ? match[1] : g;
+    };
     const uniqueGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
     const gradeStudents = students.filter(s => s.grade === selectedGrade);
 
     const handleGenerate = async () => {
         if (!selectedGrade || gradeStudents.length === 0) return;
         setIsGenerating(true);
-        const doc = new jsPDF(type === 'id-card' ? 'p' : 'p', 'mm', 'a4');
+        
+        const isIdCard = type === 'id-card';
+        const doc = new jsPDF({
+            orientation: isIdCard ? 'l' : 'p',
+            unit: 'mm',
+            format: isIdCard ? [86, 54] : 'a4'
+        });
+
+        const studentsToProcess = gradeStudents; // Assuming gradeStudents is already filtered by selectedGrade
+
+        if (studentsToProcess.length === 0) {
+            message.warning("No students found to generate documents for.");
+            setIsGenerating(false);
+            return;
+        }
+
+        // --- PRE-CALCULATE ALL RANKS IF WE ARE DOING CERTIFICATES ---
+        let rankMap = {};
+        if (!isIdCard) {
+            const studentGradeNorm = normalizeGrade(selectedGrade);
+            const gradeAssesses = assessments.filter(a => normalizeGrade(a.grade) === studentGradeNorm);
+            const assessIds = gradeAssesses.map(a => a.id);
+            const pertinentMarks = marks.filter(m => assessIds.includes(m.assessmentId));
+            const studentsInGrade = students.filter(s => normalizeGrade(s.grade) === studentGradeNorm);
+            
+            const rankings = studentsInGrade.map(s => {
+                let sTotalScore = 0;
+                let sTotalMax = 0;
+                
+                gradeAssesses.forEach(a => {
+                    // Check if assessment matches the correct semester constraints
+                    const subjObj = subjects.find(subj => subj.name === a.subjectName);
+                    const isSem1 = (subjObj?.semester || 'Semester I') === 'Semester I';
+                    
+                    if (activeSemester === 'Semester I') {
+                        if (!isSem1) return; // Skip sem2 for sem1 ranking
+                    } // For Semester II, we tally EVERYTHING (Sem 1 + Sem 2)
+
+                    const mark = pertinentMarks.find(m => m.studentId === s.id && m.assessmentId === a.id);
+                    if (mark) sTotalScore += mark.score;
+                    sTotalMax += (parseFloat(a.maxScore) || 0);
+                });
+                
+                const sPercentage = sTotalMax > 0 ? (sTotalScore / sTotalMax) * 100 : 0;
+                return { id: s.id, grade: s.grade, percentage: sPercentage, hasData: sTotalMax > 0 };
+            }).filter(s => s.hasData);
+
+            rankings.sort((a, b) => b.percentage - a.percentage);
+
+            const totalInGrade = rankings.length;
+
+            studentsToProcess.forEach(s => {
+                const overallRankIndex = rankings.findIndex(r => r.id === s.id);
+                const overallRank = overallRankIndex !== -1 ? overallRankIndex + 1 : 'N/A';
+
+                const classRankings = rankings.filter(r => r.grade === s.grade);
+                const classRankIndex = classRankings.findIndex(r => r.id === s.id);
+                const classRank = classRankIndex !== -1 ? classRankIndex + 1 : 'N/A';
+                const totalInClass = classRankings.length;
+
+                rankMap[s.id] = { classRank, overallRank, totalInClass, totalInGrade };
+            });
+        }
 
         try {
-            for (let i = 0; i < gradeStudents.length; i++) {
-                const student = gradeStudents[i];
-                const element = document.getElementById(`temp-${type}-${student.id}`);
-                if (!element) continue;
-
+            for (let i = 0; i < studentsToProcess.length; i++) {
+                const student = studentsToProcess[i];
+                
                 if (i > 0) doc.addPage();
 
-                const canvas = await html2canvas(element, {
-                    scale: 3,
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: null
-                });
+                if (isIdCard) {
+                    const element = document.getElementById(`temp-${type}-${student.id}`);
+                    if (!element) continue;
 
-                const imgData = canvas.toDataURL('image/png');
-                const pdfWidth = doc.internal.pageSize.getWidth();
-                const imgProps = doc.getImageProperties(imgData);
-                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    const canvas = await html2canvas(element, {
+                        scale: 3,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: null
+                    });
+
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdfWidth = doc.internal.pageSize.getWidth();
+                    const imgProps = doc.getImageProperties(imgData);
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                } else {
+                    // Certificate generation directly with jsPDF
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const margin = 15;
+                    const startY = 20;
+
+                    // Header
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(18);
+                    doc.text("Senbet School Academic Report", pageWidth / 2, startY, { align: 'center' });
+                    doc.setFontSize(12);
+                    doc.text("Finote Birhan Senbet School", pageWidth / 2, startY + 8, { align: 'center' });
+                    doc.line(margin, startY + 15, pageWidth - margin, startY + 15);
+
+                    // Top Left Info (Name / Grade)
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(14);
+                    doc.text(`Name: ${student.name}`, margin + 5, startY + 50);
+                    doc.setFontSize(10);
+                    doc.setTextColor(115, 115, 115); // text-slate-500
+                    doc.text(`Baptismal Name: ${student.baptismalName || '-'}`, margin + 5, startY + 56);
+                    
+                    doc.setFont("helvetica", "normal");
+                    doc.setTextColor(15, 23, 42); // slate-900
+                    doc.text(`Grade: ${student.grade || 'N/A'}`, margin + 5, startY + 64);
+                    
+                    // Top Right Info (Year / Semester)
+                    doc.text(`Year: ${activeAcademicYear}`, pageWidth - margin - 5, startY + 50, { align: 'right' });
+                    doc.text(`Semester: ${activeSemester}`, pageWidth - margin - 5, startY + 56, { align: 'right' });
+
+                    // --- Calculate Marks & Render Table ---
+                    const gradeAssesses = assessments.filter(a => normalizeGrade(a.grade) === normalizeGrade(selectedGrade));
+                    const studentMarks = marks.filter(m => m.studentId === student.id);
+                    
+                    // Get unique subjects
+                    const subjectsList = [...new Set(gradeAssesses.map(a => a.subjectName))].sort();
+                    
+                    let tableBody = [];
+                    let totalMaxScore = 0;
+                    let totalEarnedScore = 0;
+
+                    subjectsList.forEach(subjectName => {
+                        const subjObj = subjects.find(s => s.name === subjectName);
+                        
+                        const semIAssessments = gradeAssesses.filter(a => a.subjectName === subjectName && (subjObj?.semester || 'Semester I') === 'Semester I');
+                        const semIIAssessments = gradeAssesses.filter(a => a.subjectName === subjectName && subjObj?.semester === 'Semester II');
+
+                        const semIEarned = semIAssessments.reduce((acc, a) => {
+                            const m = studentMarks.find(mark => mark.assessmentId === a.id);
+                            return acc + (m ? m.score : 0);
+                        }, 0);
+                        const semIMax = semIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+                        const semIHasData = semIAssessments.some(a => studentMarks.find(m => m.assessmentId === a.id));
+
+                        const semIIEarned = semIIAssessments.reduce((acc, a) => {
+                            const m = studentMarks.find(mark => mark.assessmentId === a.id);
+                            return acc + (m ? m.score : 0);
+                        }, 0);
+                        const semIIMax = semIIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
+                        const semIIHasData = semIIAssessments.some(a => studentMarks.find(m => m.assessmentId === a.id));
+
+                        let rowTotalMax = 0;
+                        let rowTotalEarned = 0;
+
+                        if (activeSemester === 'Semester I') {
+                            rowTotalMax = semIMax;
+                            rowTotalEarned = semIEarned;
+                        } else {
+                            // Semester II aggregates both
+                            rowTotalMax = semIMax + semIIMax;
+                            rowTotalEarned = semIEarned + semIIEarned;
+                        }
+
+                        totalMaxScore += rowTotalMax;
+                        totalEarnedScore += rowTotalEarned;
+
+                        const rowAvg = rowTotalMax > 0 ? `${((rowTotalEarned / rowTotalMax) * 100).toFixed(0)}%` : '—';
+                        const semIRender = semIHasData ? `${semIEarned}/${semIMax}` : (semIAssessments.length ? '—' : 'N/A');
+                        const semIIRender = semIIHasData ? `${semIIEarned}/${semIIMax}` : (semIIAssessments.length ? '—' : 'N/A');
+
+                        if (activeSemester === 'Semester I') {
+                            tableBody.push([
+                                subjectName,
+                                semIRender,
+                                rowAvg
+                            ]);
+                        } else {
+                            tableBody.push([
+                                subjectName,
+                                semIRender,
+                                semIIRender,
+                                rowAvg
+                            ]);
+                        }
+                    });
+
+                    const averagePercentage = totalMaxScore > 0 ? ((totalEarnedScore / totalMaxScore) * 100).toFixed(1) : 0;
+                    
+                    // Add final Total row inside the table
+                    if (activeSemester === 'Semester I') {
+                        tableBody.push([
+                            { content: 'Grand Total', styles: { fontStyle: 'bold', textColor: [44, 24, 16] } },
+                            '',
+                            { content: `${averagePercentage}%`, styles: { fontStyle: 'bold', textColor: [139, 0, 0] } }
+                        ]);
+                    } else {
+                        tableBody.push([
+                            { content: 'Grand Total', styles: { fontStyle: 'bold', textColor: [44, 24, 16] } },
+                            '',
+                            '',
+                            { content: `${averagePercentage}%`, styles: { fontStyle: 'bold', textColor: [139, 0, 0] } }
+                        ]);
+                    }
+
+                    autoTable(doc, {
+                        startY: startY + 74,
+                        head: [
+                            activeSemester === 'Semester I' 
+                                ? ['Subject', 'Semester I', 'Average'] 
+                                : ['Subject', 'Semester I', 'Semester II', 'Average']
+                        ],
+                        body: tableBody,
+                        theme: 'grid',
+                        styles: {
+                            font: 'helvetica',
+                            fontSize: 10,
+                            cellPadding: 3,
+                            textColor: [44, 24, 16], // text-[#2c1810]
+                        },
+                        headStyles: {
+                            fillColor: [245, 245, 245], // light gray
+                            textColor: [140, 115, 97], // text-[#8c7361]
+                            fontStyle: 'bold',
+                            fontSize: 9,
+                            halign: 'center',
+                        },
+                        columnStyles: {
+                            0: { halign: 'left', cellWidth: 50 },
+                            1: { halign: 'center' },
+                            2: { halign: 'center' },
+                            3: { halign: 'center', fontStyle: 'bold' },
+                        },
+                        didParseCell: function (data) {
+                            if (data.section === 'body' && data.row.index === tableBody.length - 1) {
+                                data.cell.styles.fontStyle = 'bold';
+                                data.cell.styles.textColor = [44, 24, 16];
+                                if (data.column.index === (activeSemester === 'Semester I' ? 2 : 3)) {
+                                    data.cell.styles.textColor = [139, 0, 0]; // text-[#8b0000]
+                                    data.cell.styles.fontSize = 12;
+                                }
+                            }
+                        },
+                    });
+
+                    const finalY = doc.autoTable.previous.finalY;
+
+                    // Ranks
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(10);
+                    doc.setTextColor(15, 23, 42); // slate-900
+                    doc.text(`Class Rank: ${rankMap[student.id]?.classRank || 'N/A'} / ${rankMap[student.id]?.totalInClass || '0'}`, margin + 5, finalY + 15);
+                    doc.text(`Overall Grade Rank: ${rankMap[student.id]?.overallRank || 'N/A'} / ${rankMap[student.id]?.totalInGrade || '0'}`, margin + 5, finalY + 22);
+
+                    // Footer (Signatures)
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(10);
+                    doc.setTextColor(140, 115, 97); // text-[#8c7361]
+                    doc.text("School Administrator", margin + 5, pageHeight - 30);
+                    doc.text("Class Coordinator", pageWidth - margin - 5, pageHeight - 30, { align: 'right' });
+                    doc.line(margin + 5, pageHeight - 35, margin + 60, pageHeight - 35);
+                    doc.line(pageWidth - margin - 60, pageHeight - 35, pageWidth - margin - 5, pageHeight - 35);
+                }
             }
             doc.save(`Senbet_${type === 'id-card' ? 'ID_Cards' : 'Certificates'}_${selectedGrade}.pdf`);
             message.success(t('common.success', 'Generation complete!'));
@@ -130,9 +379,11 @@ export default function DocumentGenerator({ type }) {
                         {type === 'id-card' ? (
                             <IDCardTemplate student={student} />
                         ) : (
+                            // CertificateTemplate is now largely replaced by direct jsPDF drawing in handleGenerate
+                            // This component might still be used for visual preview or if some parts are still HTML-rendered
                             <CertificateTemplate 
                                 student={student} 
-                                marks={allMarks.filter(m => m.studentId === student.id)} 
+                                marks={marks.filter(m => m.studentId === student.id)} 
                                 subjects={subjects}
                                 assessments={assessments}
                             />
