@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo.jpg",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -27,8 +27,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-barcode-scanner"
-    ]
+    "plugins": []
   }
 }

@@ -115,7 +115,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     const studentGradeNorm = useMemo(() => normalizeGrade(student?.grade), [student]);
     const gradeAssessments = useMemo(() => {
         if (!allAssessments || !studentGradeNorm) return [];
-        return allAssessments.filter(a => normalizeGrade(a.grade) === studentGradeNorm);
+        return allAssessments.filter(a => normalizeGrade(a.grade) === studentGradeNorm && !a.isSystemConductAssessment);
     }, [allAssessments, studentGradeNorm]);
 
     // Map marks to assessments
@@ -468,26 +468,26 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                     <div className="flex flex-col items-center mb-10 text-center relative z-10">
                         <EthiopianCross className="w-12 h-12 text-[#d4af37] mb-4" />
                         <Title level={3} className="!mb-1 !text-[#2c1810] !font-serif tracking-wide">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
-                        <Text className="text-sm uppercase tracking-[0.2em] text-[#5c4033] font-medium">የተማሪዎች ውጤት መግለጫ</Text>
+                        <Text className="text-sm uppercase tracking-[0.2em] text-[#5c4033] font-bold">የተማሪዎች ውጤት መግለጫ</Text>
                         <div className="w-12 h-px bg-[#d4af37] my-5" />
-                        <Text className="text-base uppercase tracking-widest text-[#8b0000] font-semibold">{t('teacher.academicTranscript')}</Text>
+                        <Text className="text-base uppercase tracking-widest text-[#8b0000] font-extrabold">Academic Transcript</Text>
                     </div>
 
                     {/* Student Info (Minimalist Grid) */}
                     <div className="w-full flex justify-between items-end border-b border-[#e8dfce] pb-4 mb-10 z-10">
                         <div className="flex flex-col gap-1">
-                            <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-semibold">ሙሉ ስም / {t('admin.name')}</Text>
-                            <Text className="text-xl font-medium text-[#2c1810]">{student?.name}</Text>
-                            <Text className="text-sm italic text-[#5c4033]">{student?.baptismalName || 'N/A'}</Text>
+                            <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-bold">ሙሉ ስም / Name</Text>
+                            <Title level={4} className="!mb-0 !text-[#2c1810]">{student?.name}</Title>
+                            <Text className="text-sm italic text-[#5c4033] font-medium">{student?.baptismalName || 'N/A'}</Text>
                         </div>
                         <div className="flex gap-12 text-right">
                             <div className="flex flex-col gap-1">
-                                <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-semibold">ክፍል / {t('admin.grade')}</Text>
-                                <Text className="text-lg text-[#2c1810]">{studentGradeNorm}</Text>
+                                <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-bold">ክፍል / Grade</Text>
+                                <Text className="text-lg font-bold text-[#2c1810]">{formatGrade(student?.grade)}</Text>
                             </div>
                             <div className="flex flex-col gap-1">
-                                <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-semibold">ዓ.ም / Year</Text>
-                                <Text className="text-lg text-[#2c1810]">
+                                <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-bold">ዓ.ም / Academic Year</Text>
+                                <Text className="text-lg font-bold text-[#2c1810]">
                                     {String(student?.academicYear).includes('E.C.') 
                                         ? student.academicYear 
                                         : `${dayjs(student?.academicYear).format('YYYY')} E.C.`}
@@ -501,10 +501,10 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                         <table className="w-full border-collapse text-sm">
                             <thead>
                                 <tr>
-                                    <th className="p-3 text-left font-medium text-[#8c7361] uppercase tracking-wider text-xs border-b border-[#d4af37]/30">የትምህርት አይነት</th>
-                                    <th className="p-3 text-center font-medium text-[#8c7361] uppercase tracking-wider text-xs border-b border-[#d4af37]/30">፩ኛ መንፈቀ ዓመት (1st Sem)</th>
-                                    <th className="p-3 text-center font-medium text-[#8c7361] uppercase tracking-wider text-xs border-b border-[#d4af37]/30">፪ኛ መንፈቀ ዓመት (2nd Sem)</th>
-                                    <th className="p-3 text-center font-medium text-[#8c7361] uppercase tracking-wider text-xs border-b border-[#d4af37]/30">አማካይ ውጤት (Avg)</th>
+                                    <th className="p-3 text-left font-bold text-[#8c7361] uppercase tracking-wider text-[10px] border-b border-[#d4af37]/30">የትምህርት አይነት / Subject</th>
+                                    <th className="p-3 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[10px] border-b border-[#d4af37]/30">፩ኛ መንፈቀ ዓመት / SEM I</th>
+                                    <th className="p-3 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[10px] border-b border-[#d4af37]/30">፪ኛ መንፈቀ ዓመት / SEM II</th>
+                                    <th className="p-3 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[10px] border-b border-[#d4af37]/30">አማካይ / Average</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -523,22 +523,22 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             </tbody>
                             <tfoot>
                                 <tr>
-                                    <td className="p-4 pt-6 text-[#2c1810] uppercase tracking-widest font-semibold text-xs">አጠቃላይ ድምር (Grand Total)</td>
+                                    <td className="p-4 pt-8 text-[#2c1810] uppercase tracking-widest font-bold text-[11px]">አጠቃላይ ድምር / Grand Total</td>
                                     <td colSpan={2}></td>
-                                    <td className="p-4 pt-6 text-center text-[#8b0000] font-semibold text-lg">{overallAvg}%</td>
+                                    <td className="p-4 pt-8 text-center text-[#8b0000] font-black text-xl">{overallAvg}%</td>
                                 </tr>
                                 {totalInClass > 0 && (
                                     <tr>
-                                        <td className="p-4 pt-2 pb-1 text-[#2c1810] uppercase tracking-widest font-semibold text-xs">ክፍል ደረጃ ({t('teacher.classRank')})</td>
+                                        <td className="p-4 pt-2 pb-1 text-[#5c4033] uppercase tracking-widest font-bold text-[10px]">ክፍል ደረጃ / Class Rank</td>
                                         <td colSpan={2}></td>
-                                        <td className="p-4 pt-2 pb-1 text-center font-medium text-lg text-[#2c1810]">{classRank} / {totalInClass}</td>
+                                        <td className="p-4 pt-2 pb-1 text-center font-bold text-lg text-[#2c1810]">{classRank} / {totalInClass}</td>
                                     </tr>
                                 )}
                                 {totalInGrade > 0 && (
                                     <tr>
-                                        <td className="p-4 pt-1 text-[#2c1810] uppercase tracking-widest font-semibold text-xs text-opacity-80">ለጠቅላላው ክፍል የተሰጠ ደረጃ ({t('teacher.overallGradeRank')})</td>
+                                        <td className="p-4 pt-1 text-[#8c7361] uppercase tracking-widest font-bold text-[10px]">አጠቃላይ ደረጃ / Grade Rank</td>
                                         <td colSpan={2}></td>
-                                        <td className="p-4 pt-1 text-center font-medium text-md text-[#5c4033]">{overallRank} / {totalInGrade}</td>
+                                        <td className="p-4 pt-1 text-center font-bold text-sm text-[#5c4033]">{overallRank} / {totalInGrade}</td>
                                     </tr>
                                 )}
                             </tfoot>

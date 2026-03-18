@@ -287,8 +287,10 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     // Persist selection state in sessionStorage so navigation between sidebar items doesn't reset it
     const [selectedGrade, setSelectedGrade] = useState(() => sessionStorage.getItem('sem_mark_grade') || '');
     const [selectedAssessmentId, setSelectedAssessmentId] = useState(() => sessionStorage.getItem('sem_mark_assessment') || '');
-    const [localMarks, setLocalMarks] = useState({});
+    const [marks, setMarks] = useState({});
+    const [modifiedMarks, setModifiedMarks] = useState(new Set());
     const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(false);
     const [modal, contextHolder] = Modal.useModal();
 
     // Keep sessionStorage in sync
@@ -360,65 +362,91 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             marks.forEach(m => {
                 markMap[m.studentId] = m.score;
             });
-            setLocalMarks(markMap);
+            setMarks(markMap);
+            setModifiedMarks(new Set()); // Clear modified marks on assessment change
         }
         loadMarks();
     }, [selectedAssessmentId]);
 
-    const handleMarkChange = async (studentId, value) => {
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleMarkChange = (studentId, value) => {
         const score = parseFloat(value);
-        setLocalMarks(prev => ({ ...prev, [studentId]: value }));
-
-        // If the field is cleared, delete the mark from DB so other components update live
-        if (value === '' || value === null || value === undefined) {
-            try {
-                const existingMark = await db.marks
-                    .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
-                    .first();
-                if (existingMark) {
-                    await db.marks.delete(existingMark.id);
-                }
-            } catch (err) {
-                console.error("Failed to delete mark:", err);
-            }
-            return;
-        }
-
-        if (isNaN(score)) return;
-
-        if (selectedAssessment && score > selectedAssessment.maxScore) {
+        if (value !== '' && !isNaN(score) && selectedAssessment && score > selectedAssessment.maxScore) {
             message.warning(t('teacher.invalidScoreRange', { max: selectedAssessment.maxScore }));
             return;
         }
+        setMarks(prev => ({ ...prev, [studentId]: value }));
+        setModifiedMarks(prev => {
+            const next = new Set(prev);
+            next.add(studentId);
+            return next;
+        });
+    };
 
+    const handleSaveMarks = async () => {
+        if (!selectedAssessmentId) return;
+        if (modifiedMarks.size === 0) {
+            message.info(t('teacher.noChanges', 'No changes to save.'));
+            return;
+        }
+
+        setIsSaving(true);
         try {
-            const existingMark = await db.marks
-                .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
-                .first();
+            const selectedAssessment = allAssessments.find(a => a.id === selectedAssessmentId);
 
-            if (existingMark) {
-                await db.marks.update(existingMark.id, { score, synced: 0 });
-            } else {
-                await db.marks.add({
-                    id: crypto.randomUUID(),
-                    studentId,
-                    assessmentId: selectedAssessmentId,
-                    subject: selectedAssessment.subjectName,
-                    assessmentDate: selectedAssessment.date,
-                    score,
-                    synced: 0
-                });
+            for (const studentId of modifiedMarks) {
+                const value = marks[studentId];
+                const score = parseFloat(value);
+
+                if (value === '' || value === null || value === undefined || isNaN(score)) {
+                    // If value is cleared, delete existing mark if any
+                    const existingMark = await db.marks
+                        .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
+                        .first();
+                    if (existingMark) {
+                        await db.marks.delete(existingMark.id);
+                    }
+                    continue;
+                }
+
+                if (score > selectedAssessment.maxScore) continue;
+
+                const existingMark = await db.marks
+                    .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
+                    .first();
+
+                if (existingMark) {
+                    console.log(`Updating existing mark for student ${studentId}: ${score}`);
+                    await db.marks.update(existingMark.id, { score, synced: 0 });
+                } else {
+                    console.log(`Adding new mark for student ${studentId}: ${score}`);
+                    await db.marks.add({
+                        id: crypto.randomUUID(),
+                        studentId: studentId,
+                        assessmentId: selectedAssessmentId,
+                        subject: selectedAssessment.subjectName,
+                        assessmentDate: selectedAssessment.date,
+                        score,
+                        synced: 0
+                    });
+                }
             }
+
+            setModifiedMarks(new Set());
+            message.success(t('teacher.saveSuccess', 'Marks saved successfully!'));
         } catch (err) {
-            console.error("Auto-save failed:", err);
-            message.error(t('teacher.saveMarkError', "Failed to save mark offline!"));
+            console.error("Save failed:", err);
+            message.error(t('teacher.saveError', 'Failed to save marks!'));
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleFillConstantMark = () => {
         if (!selectedAssessment) return;
-        
-        const studentsWithoutMarks = studentsInGrade.filter(s => localMarks[s.id] === undefined || localMarks[s.id] === '');
+
+        const studentsWithoutMarks = studentsInGrade.filter(s => marks[s.id] === undefined || marks[s.id] === '');
         if (studentsWithoutMarks.length === 0) {
             message.info(t('teacher.fullyGraded', 'All students already have marks.'));
             return;
@@ -429,10 +457,10 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             content: (
                 <div className="py-4">
                     <Text>{t('teacher.fillPrompt', { max: selectedAssessment.maxScore })}</Text>
-                    <Input 
-                        type="number" 
-                        min={0} 
-                        max={selectedAssessment.maxScore} 
+                    <Input
+                        type="number"
+                        min={0}
+                        max={selectedAssessment.maxScore}
                         placeholder={t('teacher.fillValue')}
                         className="mt-2"
                         onChange={(e) => {
@@ -452,7 +480,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
                 let count = 0;
                 for (const student of studentsWithoutMarks) {
-                    await handleMarkChange(student.id, val.toString());
+                    handleMarkChange(student.id, val.toString());
                     count++;
                 }
                 message.success(t('teacher.fillSuccess', { count }));
@@ -464,7 +492,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const handlePredictMarks = async () => {
         if (!selectedAssessment) return;
 
-        const studentsWithoutMarks = studentsInGrade.filter(s => localMarks[s.id] === undefined || localMarks[s.id] === '');
+        const studentsWithoutMarks = studentsInGrade.filter(s => marks[s.id] === undefined || marks[s.id] === '');
         if (studentsWithoutMarks.length === 0) {
             message.info(t('teacher.fullyGraded'));
             return;
@@ -491,7 +519,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             title: t('teacher.predictMarks'),
             content: t('teacher.confirmPredict', { count: studentsWithHistory.length, subject: selectedAssessment.subjectName }),
             onOk: async () => {
-                let successCount = 0;
+                const predictions = [];
                 for (const student of studentsWithHistory) {
                     // Find all marks for this student in the same subject
                     const subjectMarks = await db.marks
@@ -510,17 +538,16 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         }
                         const avgPercentage = totalPercentage / subjectMarks.length;
                         const predictedScore = Math.round(avgPercentage * selectedAssessment.maxScore * 10) / 10;
-                        
-                        await handleMarkChange(student.id, predictedScore.toString());
-                        successCount++;
+                        predictions.push({ id: student.id, score: predictedScore });
                     }
                 }
 
-                if (successCount > 0) {
-                    message.success(t('teacher.predictSuccess', { count: successCount }));
-                } else {
-                    message.warning(t('teacher.noHistory'));
+                let count = 0;
+                for (const p of predictions) {
+                    handleMarkChange(p.id, p.score.toString());
+                    count++;
                 }
+                message.success(t('teacher.predictionSuccess', { count }));
             }
         });
     };
@@ -537,7 +564,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 <Input
                     type="number"
                     placeholder={selectedAssessment ? `0-${selectedAssessment.maxScore}` : ''}
-                    value={localMarks[record.id] || ''}
+                    value={marks[record.id] || ''}
                     onChange={e => handleMarkChange(record.id, e.target.value)}
                     style={{ textAlign: 'right' }}
                     max={selectedAssessment?.maxScore}
@@ -635,17 +662,35 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     </Tag>
                 </Title>
                 <div className="hidden sm:block flex-grow border-t border-slate-200 dark:border-slate-700 mx-2"></div>
+                <Input
+                    placeholder={t('common.search', 'Search students...')}
+                    prefix={<SearchOutlined className="text-slate-400" />}
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    style={{ maxWidth: '300px' }}
+                    allowClear
+                    disabled={!selectedGrade}
+                />
                 {selectedAssessment && (
                     <Space>
-                        <Button 
-                            icon={<BarChartOutlined />} 
-                            onClick={handlePredictMarks}
+                        <Button
+                            type="primary"
+                            icon={<SaveOutlined />}
+                            onClick={handleSaveMarks}
+                            loading={isSaving}
                             disabled={!selectedAssessmentId || studentsInGrade.length === 0}
+                        >
+                            {t('common.save', 'Save Marks')}
+                        </Button>
+                        <Button
+                            icon={<BarChartOutlined />}
+                            onClick={handlePredictMarks}
+                            disabled={!selectedAssessmentId || studentsInGrade.length === 0 || isSaving}
                         >
                             {t('teacher.predictMarks')}
                         </Button>
-                        <Button 
-                            icon={<EditOutlined />} 
+                        <Button
+                            icon={<EditOutlined />}
                             onClick={handleFillConstantMark}
                             disabled={!selectedAssessmentId || studentsInGrade.length === 0}
                         >
@@ -653,15 +698,6 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         </Button>
                     </Space>
                 )}
-                <Input
-                    placeholder={t('common.searchPlaceholder')}
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    prefix={<SearchOutlined className="text-slate-400" />}
-                    allowClear
-                    disabled={!selectedAssessmentId}
-                    className="w-full sm:w-[250px]"
-                />
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden w-full">
@@ -703,8 +739,11 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
     // Persist selection state in sessionStorage so navigation between sidebar items doesn't reset it
     const [selectedGrade, setSelectedGrade] = useState(() => sessionStorage.getItem('sem_att_grade') || '');
     const [attendanceDate, setAttendanceDate] = useState(() => sessionStorage.getItem('sem_att_date') || dayjs().format('YYYY-MM-DD'));
-    const [localAttendance, setLocalAttendance] = useState({});
+    const [attendance, setAttendance] = useState({});
+    const [modifiedAttendance, setModifiedAttendance] = useState(new Set());
+    const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+
 
     // Keep sessionStorage in sync
     useEffect(() => { sessionStorage.setItem('sem_att_grade', selectedGrade); }, [selectedGrade]);
@@ -746,90 +785,98 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             records.forEach(r => {
                 attMap[r.studentId] = r.status;
             });
-            setLocalAttendance(attMap);
+            setAttendance(attMap);
+            setModifiedAttendance(new Set()); // Clear modified attendance on date/grade change
         }
         loadAttendance();
     }, [selectedGrade, attendanceDate]);
 
-    const handleAttendanceChange = async (studentId, status) => {
-        setLocalAttendance(prev => ({ ...prev, [studentId]: status }));
+    const [isSaving, setIsSaving] = useState(false);
 
-        try {
-            const existingRecord = await db.attendance
-                .filter(a => a.studentId === studentId && a.date === attendanceDate)
-                .first();
-
-            if (existingRecord) {
-                await db.attendance.update(existingRecord.id, { status, semester: currentSemesterSetting, synced: 0 });
-            } else {
-                await db.attendance.add({
-                    id: crypto.randomUUID(),
-                    studentId,
-                    date: attendanceDate,
-                    status,
-                    semester: currentSemesterSetting,
-                    synced: 0
-                });
-            }
-        } catch (err) {
-            console.error("Attendance save failed:", err);
-            message.error(t('teacher.saveAttendanceError', "Failed to save attendance!"));
-        }
+    const handleAttendanceChange = (studentId, status) => {
+        setAttendance(prev => ({ ...prev, [studentId]: status }));
+        setModifiedAttendance(prev => {
+            const next = new Set(prev);
+            next.add(studentId);
+            return next;
+        });
     };
 
-    const handleMarkAllPresent = async () => {
-        if (!selectedGrade || studentsInGrade.length === 0) return;
+    const handleSaveAttendance = async () => {
+        if (!attendanceDate) return;
+        if (modifiedAttendance.size === 0) {
+            message.info(t('teacher.noChanges', 'No changes to save.'));
+            return;
+        }
 
-        const newAttendance = { ...localAttendance };
+        setIsSaving(true);
         try {
-            for (const student of studentsInGrade) {
-                newAttendance[student.id] = 'present';
+            for (const studentId of modifiedAttendance) {
+                const status = attendance[studentId];
+                // If status is undefined (e.g., cleared), delete the record
+                if (!status) {
+                    const existingRecord = await db.attendance
+                        .where('[studentId+date]')
+                        .equals([studentId, attendanceDate])
+                        .first();
+                    if (existingRecord) {
+                        await db.attendance.delete(existingRecord.id);
+                    }
+                    continue;
+                }
+
                 const existingRecord = await db.attendance
-                    .filter(a => a.studentId === student.id && a.date === attendanceDate)
+                    .where('[studentId+date]')
+                    .equals([studentId, attendanceDate])
                     .first();
 
                 if (existingRecord) {
-                    await db.attendance.update(existingRecord.id, { status: 'present', semester: currentSemesterSetting, synced: 0 });
+                    await db.attendance.update(existingRecord.id, { status, semester: currentSemesterSetting, synced: 0 });
                 } else {
                     await db.attendance.add({
                         id: crypto.randomUUID(),
-                        studentId: student.id,
+                        studentId: studentId,
                         date: attendanceDate,
-                        status: 'present',
+                        status,
                         semester: currentSemesterSetting,
                         synced: 0
                     });
                 }
             }
-            setLocalAttendance(newAttendance);
-            message.success(t('teacher.markAllPresentSuccess', 'Successfully marked all as present'));
-        } catch (err) {
-            console.error("Bulk attendance failed:", err);
-            message.error(t('teacher.bulkUpdateError', "Failed to update all students."));
-        }
-    };
 
-    const handleClearAttendance = async () => {
+            setModifiedAttendance(new Set());
+            message.success(t('teacher.saveSuccess', 'Attendance saved successfully!'));
+        } catch (err) {
+            console.error("Attendance save failed:", err);
+            message.error(t('teacher.saveError', 'Failed to save attendance!'));
+        } finally {
+            setIsSaving(false);
+        }
+    }; const handleMarkAllPresent = () => {
         if (!selectedGrade || studentsInGrade.length === 0) return;
 
-        const newAttendance = { ...localAttendance };
-        try {
-            for (const student of studentsInGrade) {
-                delete newAttendance[student.id];
-                const existingRecord = await db.attendance
-                    .filter(a => a.studentId === student.id && a.date === attendanceDate)
-                    .first();
-
-                if (existingRecord) {
-                    await db.attendance.delete(existingRecord.id);
-                }
-            }
-            setLocalAttendance(newAttendance);
-            message.success(t('teacher.clearAttendanceSuccess', 'Attendance cleared successfully'));
-        } catch (err) {
-            console.error("Clear attendance failed:", err);
-            message.error(t('teacher.clearAttendanceError', "Failed to clear attendance."));
+        for (const student of studentsInGrade) {
+            handleAttendanceChange(student.id, 'present');
         }
+        message.success(t('teacher.markAllPresentSuccess', 'Successfully marked all as present locally. Click Save to persist.'));
+    };
+
+    const handleClearAttendance = () => {
+        if (!selectedGrade || studentsInGrade.length === 0) return;
+
+        for (const student of studentsInGrade) {
+            setAttendance(prev => {
+                const next = { ...prev };
+                delete next[student.id];
+                return next;
+            });
+            setModifiedAttendance(prev => {
+                const next = new Set(prev);
+                next.add(student.id);
+                return next;
+            });
+        }
+        message.success(t('teacher.attendanceCleared', 'Attendance cleared locally. Click Save to persist.'));
     };
 
     const handleScanSuccess = async (decodedText) => {
@@ -862,7 +909,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             key: 'status',
             align: 'right',
             render: (_, record) => {
-                const currentStatus = localAttendance[record.id] || 'present';
+                const currentStatus = attendance[record.id] || 'present';
                 return (
                     <Radio.Group
                         value={currentStatus}
@@ -992,18 +1039,26 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                             <Form.Item label=" " colon={false} style={{ marginBottom: 0 }}>
                                 <Space className="w-full justify-end" size="small" wrap>
                                     <Button
+                                        type="primary"
+                                        icon={<SaveOutlined />}
+                                        onClick={handleSaveAttendance}
+                                        loading={isSaving}
+                                        disabled={!selectedGrade || studentsInGrade.length === 0}
+                                    >
+                                        {t('common.save', 'Save Attendance')}
+                                    </Button>
+                                    <Button
                                         icon={<DeleteOutlined />}
                                         onClick={handleClearAttendance}
-                                        disabled={!selectedGrade || studentsInGrade.length === 0}
+                                        disabled={!selectedGrade || studentsInGrade.length === 0 || isSaving}
                                         danger
                                     >
                                         {t('teacher.clearAttendance')}
                                     </Button>
                                     <Button
-                                        type="primary"
                                         icon={<TeamOutlined />}
                                         onClick={handleMarkAllPresent}
-                                        disabled={!selectedGrade || studentsInGrade.length === 0}
+                                        disabled={!selectedGrade || studentsInGrade.length === 0 || isSaving}
                                     >
                                         {t('teacher.markAllPresent')}
                                     </Button>

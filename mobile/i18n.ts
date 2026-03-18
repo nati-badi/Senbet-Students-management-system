@@ -6,8 +6,8 @@ const resources = {
   en: {
     translation: {
       "app": {
-        "title": "Senbet Teacher",
-        "welcome": "Welcome to Arsema Senbet School",
+        "title": "በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት",
+        "welcome": "ወደ አርሴማ ሰንበት ትምህርት ቤት እንኳን በደህና መጡ",
         "description": "Offline-first student management.",
       },
       "common": {
@@ -67,7 +67,7 @@ const resources = {
   am: {
     translation: {
       "app": {
-        "title": "ሰንበት መምህር",
+        "title": "በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት",
         "welcome": "ወደ አርሴማ ሰንበት ትምህርት ቤት እንኳን በደህና መጡ",
         "description": "ያለበይነመረብ የሚሰራ የተማሪዎች አስተዳደር።",
       },
