@@ -167,6 +167,7 @@ export default function App() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [lastSyncISO, setLastSyncISO] = useState<string | null>(null);
   const [profileStudent, setProfileStudent] = useState<Student | null>(null);
 
   const C = isDark ? THEMES.dark : THEMES.light;
@@ -185,6 +186,7 @@ export default function App() {
           AsyncStorage.getItem('cached_subjects'),
           AsyncStorage.getItem('cached_settings'),
           AsyncStorage.getItem('last_sync_time'),
+          AsyncStorage.getItem('last_sync_iso'),
         ]);
 
         if (savedAuth) setTeacher(JSON.parse(savedAuth));
@@ -198,6 +200,7 @@ export default function App() {
         
         if (await AsyncStorage.getItem('cached_attendance')) setAttendance(JSON.parse(await AsyncStorage.getItem('cached_attendance') || '[]'));
         if (savedLastSync) setLastSync(savedLastSync);
+        if (await AsyncStorage.getItem('last_sync_iso')) setLastSyncISO(await AsyncStorage.getItem('last_sync_iso'));
 
       } catch (e) {
         console.error('Initial load error', e);
@@ -224,82 +227,142 @@ export default function App() {
     if (!isBackground) setSyncing(true);
 
     try {
-      // Fetch latest teacher data to keep assigned subjects/grades live
-      const { data: tRes, error: tErr } = await supabase
+      // 1. Fetch Teacher profile first to get assigned grades/subjects
+      const { data: activeTeacher, error: tErr } = await supabase
         .from('teachers')
         .select('*')
         .eq('id', teacher.id)
         .single();
         
-      let activeTeacher = teacher;
-      if (tRes && !tErr) {
-        activeTeacher = tRes;
-        
-        // Deep compare to prevent infinite render loops where the background sync triggers a state update,
-        // which triggers a re-render, which triggers another background sync.
-        if (JSON.stringify(tRes) !== JSON.stringify(teacher)) {
+      if (activeTeacher && !tErr) {
+        if (JSON.stringify(activeTeacher) !== JSON.stringify(teacher)) {
           setTeacher(activeTeacher);
           await AsyncStorage.setItem('senbet_teacher_auth', JSON.stringify(activeTeacher));
         }
       }
 
-      // 1. Students: Fetch all. Narrowing by grade on Supabase is unreliable due to format discrepancies (e.g. "1" vs "Grade 1").
-      // We will filter LOCALLY in the components using normG.
-      const { data: sRes, error: sErr } = await supabase.from('students').select('*').order('name');
-      if (sErr) throw sErr;
+      const myGrades = (activeTeacher || teacher).assignedgrades || [];
+      const lastSyncTimestamp = lastSyncISO ? lastSyncISO : '1970-01-01T00:00:00Z';
 
-      // 2. Assessments: Fetch all. Same logic as students.
-      const { data: aRes, error: aErr } = await supabase.from('assessments').select('*').order('name');
-      if (aErr) throw aErr;
-
-      const aIds = (aRes || []).map(a => a.id);
-      let mRes: any[] = [];
-      if (aIds.length > 0) {
-        const { data, error: mErr } = await supabase.from('marks').select('*').in('assessmentid', aIds);
-        if (mErr) throw mErr;
-        mRes = data || [];
+      // 2. Optimized Parallel Fetching with Delta Sync
+      // We still do a broad-ish fetch but filtered by grades if possible
+      const studentsQuery = supabase.from('students').select('*');
+      const assessmentsQuery = supabase.from('assessments').select('*');
+      
+      // Add server-side grade filters if teacher has assigned grades
+      if (myGrades.length > 0) {
+        // We include both numeric and "Grade X" formats to be safe
+        const expandedGrades = [...myGrades, ...myGrades.map(g => `Grade ${g}`)];
+        studentsQuery.in('grade', expandedGrades);
+        assessmentsQuery.in('grade', expandedGrades);
       }
 
+      // Delta filtering: Only fetch what changed since last sync
+      studentsQuery.gt('updated_at', lastSyncTimestamp);
+      assessmentsQuery.gt('updated_at', lastSyncTimestamp);
+
+      const [sRes, aRes, subRes, setRes] = await Promise.all([
+        studentsQuery.order('name'),
+        assessmentsQuery.order('name'),
+        supabase.from('subjects').select('*'),
+        supabase.from('settings').select('*')
+      ]);
+
+      if (sRes.error) throw sRes.error;
+      if (aRes.error) throw aRes.error;
+
+      const now = formatEthiopianTime(new Date());
+      const nowISO = new Date().toISOString();
+
+      // 3. Update Students & Assessments synchronously in memory for downstream fetch
+      const mergedStudents: Student[] = [...students];
+      (sRes.data || []).forEach(st => {
+        const idx = mergedStudents.findIndex(s => s.id === st.id);
+        if (idx !== -1) mergedStudents[idx] = st;
+        else mergedStudents.push(st);
+      });
+
+      const mergedAssessments: Assessment[] = [...assessments];
+      (aRes.data || []).forEach(as => {
+        const idx = mergedAssessments.findIndex(a => a.id === as.id);
+        if (idx !== -1) mergedAssessments[idx] = as;
+        else mergedAssessments.push(as);
+      });
+
+      // 4. Fetch Marks for ALL relevant assessments
+      // (Even if assessments didn't change, marks might have)
+      const assessmentIds = mergedAssessments.map(a => a.id);
+      if (assessmentIds.length > 0) {
+        const { data: mData, error: mErr } = await supabase
+          .from('marks')
+          .select('*')
+          .in('assessmentid', assessmentIds)
+          .gt('updated_at', lastSyncTimestamp);
+        
+        if (!mErr && mData) {
+          setMarks(prev => {
+            const next = [...prev];
+            mData.forEach(mk => {
+              const idx = next.findIndex(m => m.id === mk.id);
+              if (idx !== -1) next[idx] = mk;
+              else next.push(mk);
+            });
+            AsyncStorage.setItem('cached_marks', JSON.stringify(next));
+            return next;
+          });
+        }
+      }
+
+      setStudents(mergedStudents);
+      setAssessments(mergedAssessments);
+      AsyncStorage.setItem('cached_students', JSON.stringify(mergedStudents));
+      AsyncStorage.setItem('cached_assessments', JSON.stringify(mergedAssessments));
+
+      // 5. Attendance (usually just today's)
       const { data: attRes, error: attErr } = await supabase
         .from('attendance')
         .select('*')
         .eq('date', dayjs().format('YYYY-MM-DD'));
-      if (attErr) throw attErr;
-
-      const { data: subRes } = await supabase.from('subjects').select('*');
-      const { data: setRes } = await supabase.from('settings').select('*');
-      const sMap: Record<string, string> = {};
-      if (setRes) {
-        setRes.forEach((r: any) => { sMap[r.key] = r.value; });
+      
+      if (!attErr && attRes) {
+        setAttendance(attRes);
+        AsyncStorage.setItem('cached_attendance', JSON.stringify(attRes));
       }
 
-      const now = formatEthiopianTime(new Date());
-      setStudents(sRes || []);
-      setAssessments(aRes || []);
-      setMarks(mRes);
-      setAttendance(attRes || []);
-      setSubjects(subRes || []);
+      const sMap: Record<string, string> = {};
+      if (setRes.data) {
+        setRes.data.forEach((r: any) => { sMap[r.key] = r.value; });
+      }
+
+      setSubjects(subRes.data || []);
       setSettings(sMap);
       setLastSync(now);
+      setLastSyncISO(nowISO);
 
       await Promise.all([
-        AsyncStorage.setItem('cached_students', JSON.stringify(sRes || [])),
-        AsyncStorage.setItem('cached_assessments', JSON.stringify(aRes || [])),
-        AsyncStorage.setItem('cached_marks', JSON.stringify(mRes)),
-        AsyncStorage.setItem('cached_attendance', JSON.stringify(attRes || [])),
-        AsyncStorage.setItem('cached_subjects', JSON.stringify(subRes || [])),
+        AsyncStorage.setItem('cached_subjects', JSON.stringify(subRes.data || [])),
         AsyncStorage.setItem('cached_settings', JSON.stringify(sMap)),
         AsyncStorage.setItem('last_sync_time', now),
+        AsyncStorage.setItem('last_sync_iso', nowISO),
       ]);
 
       if (!isBackground) showToast('✅ Sync complete — data updated', 'success');
     } catch (err: any) {
-      console.error('Sync error', err);
-      if (!isBackground) showToast('⚠️ Sync failed — using offline data', 'error');
+      const isNetError = err?.message?.includes('fetch') || err?.message?.includes('network') || err?.code === 'PGRST301';
+      
+      if (isBackground) {
+        // Silent log for background failures
+        if (isNetError) console.log('Mobile: Sync skipped (offline or network drop)');
+        else console.warn('Mobile: Background sync failed', err.message);
+      } else {
+        console.error('Mobile: Manual sync error', err);
+        const msg = isNetError ? '⚠️ Connection lost — using offline data' : '⚠️ Sync failed — using offline data';
+        showToast(msg, 'error');
+      }
     } finally {
       if (!isBackground) setSyncing(false);
     }
-  }, [teacher]);
+  }, [teacher, lastSyncISO, students, assessments, marks]);
 
   useEffect(() => {
     if (teacher) syncData(true);
@@ -324,7 +387,7 @@ export default function App() {
     setTeacher(null);
     setStudents([]); setAssessments([]); setMarks([]); setAttendance([]);
     await AsyncStorage.multiRemove([
-      'senbet_teacher_auth', 'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'last_sync_time'
+      'senbet_teacher_auth', 'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'last_sync_time', 'last_sync_iso'
     ]);
   };
 
@@ -360,11 +423,7 @@ export default function App() {
                 <View style={[s.sidebarIcon, { backgroundColor: C.amber + '10' }]}>{isDark ? <Sun size={18} color={C.amber} /> : <Moon size={18} color={C.slate} />}</View>
                 <Text style={s.sidebarText}>{isDark ? 'Light Mode' : 'Dark Mode'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => { syncData(); props.navigation.closeDrawer(); }} style={s.sidebarItem}>
-                <View style={[s.sidebarIcon, { backgroundColor: C.green + '10' }]}><RefreshCw size={18} color={C.green} /></View>
-                <Text style={[s.sidebarText, { flex: 1 }]}>{t('common.sync')}</Text>
-                {syncing && <ActivityIndicator size="small" color={C.accent} />}
-              </TouchableOpacity>
+
               <TouchableOpacity onPress={handleLogout} style={[s.sidebarItem, { marginTop: 24 }]}>
                 <View style={[s.sidebarIcon, { backgroundColor: C.red + '10' }]}><LogOut size={18} color={C.red} /></View>
                 <Text style={[s.sidebarText, { color: C.red, fontWeight: '800' }]}>{t('common.logout')}</Text>
@@ -1022,6 +1081,10 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       setMarkIds({});
       return;
     }
+    // Clear local inputs before loading new assessment data to prevent ghost marks
+    setMarks({});
+    setMarkIds({});
+    
     const map: Record<string, string> = {};
     const idMap: Record<string, string> = {};
     marksData
@@ -1245,14 +1308,9 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
           value={search}
           onChangeText={setSearch}
         />
-      </View>
 
-      <FlatList
-        data={paginate(filteredStudents, page)}
-        keyExtractor={item => item.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-        ListHeaderComponent={selectedAssessment ? (
-          <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16, padding: 16 }]}>
+        {selectedAssessment && (
+          <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16, padding: 16, backgroundColor: C.accent + '08', borderWidth: 1, borderColor: C.accent + '22' }]}>
             <Text style={{ color: C.accent, fontWeight: '800', textAlign: 'center', marginBottom: 12, fontSize: 16 }}>
               {selectedAssessment.name} - Max Score: {selectedAssessment.maxscore}
             </Text>
@@ -1267,7 +1325,14 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
               </TouchableOpacity>
             </View>
           </View>
-        ) : null}
+        )}
+      </View>
+
+      <FlatList
+        data={paginate(filteredStudents, page)}
+        keyExtractor={item => item.id}
+        contentContainerStyle={{ padding: 16, paddingBottom: 150 }}
+        ListHeaderComponent={null}
         renderItem={({ item }) => (
           <View style={[s.markRow, { padding: 12, borderRadius: 16 }]}>
             <View style={{ flex: 1 }}>

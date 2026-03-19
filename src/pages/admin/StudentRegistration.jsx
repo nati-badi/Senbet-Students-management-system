@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Typography, Row, Col, Card, Form, Input, Select, DatePicker, Button, Table, Tag, Space, Tooltip, Popconfirm, Modal, notification, Upload, message, Skeleton, Empty } from 'antd';
 import { SearchOutlined, FilterOutlined, DownloadOutlined, UploadOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
@@ -209,14 +209,16 @@ export default function StudentRegistration() {
             .map(g => ({ value: g, label: g })),
     ];
 
-    const filteredStudents = students.filter(s => {
-        const query = (searchQuery || "").toLowerCase();
-        const matchesSearch = (s.name || "").toLowerCase().includes(query) ||
-            (s.baptismalName || "").toLowerCase().includes(query) ||
-            (s.parentContact || "").includes(searchQuery);
-        const matchesGrade = !filterGrade || String(s.grade) === String(filterGrade);
-        return matchesSearch && matchesGrade;
-    });
+    const filteredStudents = useMemo(() => {
+        return students.filter(s => {
+            const query = (searchQuery || "").toLowerCase();
+            const matchesSearch = (s.name || "").toLowerCase().includes(query) ||
+                (s.baptismalName || "").toLowerCase().includes(query) ||
+                (s.parentContact || "").includes(searchQuery);
+            const matchesGrade = !filterGrade || String(s.grade) === String(filterGrade);
+            return matchesSearch && matchesGrade;
+        });
+    }, [students, searchQuery, filterGrade]);
 
     useEffect(() => {
         try {

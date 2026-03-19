@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     EditOutlined,
@@ -352,13 +352,15 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const gradeOptions = allowedGrades.length > 0
         ? gradeOptionsUnrestricted.filter(o => allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(o.value)))
         : gradeOptionsUnrestricted;
-    const studentsInGrade = allStudents
-        .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
-        .filter(s => {
-            if (!searchQuery) return true;
-            const q = searchQuery.toLowerCase();
-            return s.name?.toLowerCase().includes(q);
-        });
+    const studentsInGrade = useMemo(() => {
+        return allStudents
+            .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
+            .filter(s => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return s.name?.toLowerCase().includes(q) || s.id?.toLowerCase().includes(q);
+            });
+    }, [allStudents, selectedGrade, searchQuery]);
 
     useEffect(() => {
         if (location.state?.assessmentId) {
@@ -798,13 +800,15 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
     const gradeOptions2 = allowedGrades.length > 0
         ? gradeOptions2Unrestricted.filter(o => allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(o.value)))
         : gradeOptions2Unrestricted;
-    const studentsInGrade = allStudents
-        .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
-        .filter(s => {
-            if (!searchQuery) return true;
-            const q = searchQuery.toLowerCase();
-            return s.name?.toLowerCase().includes(q);
-        });
+    const studentsInGrade = useMemo(() => {
+        return allStudents
+            .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
+            .filter(s => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return s.name?.toLowerCase().includes(q) || s.id?.toLowerCase().includes(q);
+            });
+    }, [allStudents, selectedGrade, searchQuery]);
 
     useEffect(() => {
         if (!selectedGrade || !attendanceDate) return;
