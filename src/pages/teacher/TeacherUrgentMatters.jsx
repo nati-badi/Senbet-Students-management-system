@@ -32,8 +32,15 @@ export default function TeacherUrgentMatters({ teacher }) {
         );
     }, [allStudents, allowedGrades]);
 
+    const isConduct = (a) => {
+        const sName = (a.subjectName || '').toLowerCase();
+        const aName = (a.name || '').toLowerCase();
+        return sName.includes('conduct') || sName.includes('attitude') || aName.includes('conduct') || aName.includes('attitude');
+    };
+
     // Assessments this teacher is responsible for
     const myAssessments = useMemo(() => allAssessments.filter(a => {
+        if (isConduct(a)) return false;
         const subject = allSubjects.find(s => s.name === a.subjectName);
         const assessmentSemester = subject?.semester || 'Semester I';
         return assessmentSemester === currentSemester &&

@@ -46,6 +46,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
+import { syncData } from '../../utils/sync';
+import { supabase } from '../../utils/supabaseClient';
 import dayjs from 'dayjs';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import StudentProfile from '../../components/StudentProfile';
@@ -72,7 +74,14 @@ export default function TeacherDashboard() {
         }
     });
 
-    if (!teacherSession) {
+    const liveTeacher = useLiveQuery(
+        () => teacherSession?.id ? db.teachers.get(teacherSession.id) : null,
+        [teacherSession?.id]
+    );
+
+    const activeTeacher = liveTeacher || teacherSession;
+
+    if (!activeTeacher) {
         return <TeacherLogin onLogin={setTeacherSession} />;
     }
 
@@ -126,17 +135,27 @@ export default function TeacherDashboard() {
                         </Text>
                         <div className="flex items-center gap-2 flex-wrap">
                             <Title level={4} style={{ margin: 0 }} className="truncate">
-                                {teacherSession.name}
+                                {activeTeacher.name}
                             </Title>
                             <Tag color="purple">{t('teacher.portal', 'Teacher Portal')}</Tag>
                         </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                            {(teacherSession.assignedGrades || []).slice(0, 6).map(g => (
-                                <Tag key={`g-${g}`} color="blue">{formatGrade(g)}</Tag>
-                            ))}
-                            {(teacherSession.assignedSubjects || []).slice(0, 6).map(s => (
-                                <Tag key={`s-${s}`} color="geekblue">{s}</Tag>
-                            ))}
+                        <div className="flex flex-col gap-2 mt-3">
+                            {activeTeacher.assignedGrades?.length > 0 && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <Text type="secondary" className="text-xs uppercase tracking-wider font-semibold">{t('teacher.grades', 'Grades')}:</Text>
+                                    {activeTeacher.assignedGrades.slice(0, 6).map(g => (
+                                        <Tag key={`g-${g}`} color="blue" className="m-0">{formatGrade(g)}</Tag>
+                                    ))}
+                                </div>
+                            )}
+                            {activeTeacher.assignedSubjects?.length > 0 && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <Text type="secondary" className="text-xs uppercase tracking-wider font-semibold">{t('teacher.subjects', 'Subjects')}:</Text>
+                                    {activeTeacher.assignedSubjects.slice(0, 6).map(s => (
+                                        <Tag key={`s-${s}`} color="geekblue" className="m-0">{s}</Tag>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <Button danger onClick={handleTeacherLogout}>
@@ -212,10 +231,10 @@ export default function TeacherDashboard() {
                 <div className="flex-1 min-w-0 min-h-[600px]">
                     <Routes>
                         <Route path="/" element={<Navigate to="mark-entry" replace />} />
-                        <Route path="/mark-entry" element={<SpeedEntryMarks teacher={teacherSession} setProfileStudentId={setProfileStudentId} />} />
-                        <Route path="/attendance" element={<AttendanceModule teacher={teacherSession} setProfileStudentId={setProfileStudentId} />} />
-                        <Route path="/analytics" element={<StudentAnalytics isTeacherView={true} teacher={teacherSession} />} />
-                        <Route path="/urgent" element={<TeacherUrgentMatters teacher={teacherSession} />} />
+                        <Route path="/mark-entry" element={<SpeedEntryMarks teacher={activeTeacher} setProfileStudentId={setProfileStudentId} />} />
+                        <Route path="/attendance" element={<AttendanceModule teacher={activeTeacher} setProfileStudentId={setProfileStudentId} />} />
+                        <Route path="/analytics" element={<StudentAnalytics isTeacherView={true} teacher={activeTeacher} />} />
+                        <Route path="/urgent" element={<TeacherUrgentMatters teacher={activeTeacher} />} />
                     </Routes>
                 </div>
             </div>
@@ -394,6 +413,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         setIsSaving(true);
         try {
             const selectedAssessment = allAssessments.find(a => a.id === selectedAssessmentId);
+            const idsToDelete = [];
 
             for (const studentId of modifiedMarks) {
                 const value = marks[studentId];
@@ -405,6 +425,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
                         .first();
                     if (existingMark) {
+                        idsToDelete.push(existingMark.id);
                         await db.marks.delete(existingMark.id);
                     }
                     continue;
@@ -417,10 +438,8 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     .first();
 
                 if (existingMark) {
-                    console.log(`Updating existing mark for student ${studentId}: ${score}`);
                     await db.marks.update(existingMark.id, { score, synced: 0 });
                 } else {
-                    console.log(`Adding new mark for student ${studentId}: ${score}`);
                     await db.marks.add({
                         id: crypto.randomUUID(),
                         studentId: studentId,
@@ -433,8 +452,15 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 }
             }
 
+            // Perform explicit Supabase deletion for cleared marks (Plan B)
+            if (idsToDelete.length > 0) {
+                const { error: delError } = await supabase.from('marks').delete().in('id', idsToDelete);
+                if (delError) console.warn("Supabase deletion warning:", delError);
+            }
+
             setModifiedMarks(new Set());
             message.success(t('teacher.saveSuccess', 'Marks saved successfully!'));
+            syncData().catch(console.error);
         } catch (err) {
             console.error("Save failed:", err);
             message.error(t('teacher.saveError', 'Failed to save marks!'));
@@ -620,14 +646,21 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                     placeholder={t('teacher.selectAssessment')}
                                     value={selectedAssessmentId}
                                     onChange={setSelectedAssessmentId}
-                                    options={filteredAssessments.map(a => {
-                                        const subject = allSubjects.find(s => s.name === a.subjectName);
-                                        const sem = subject?.semester || 'Semester I';
-                                        return {
-                                            value: a.id,
-                                            label: `${a.name} (${a.subjectName}) - ${t(`admin.${sem === 'Semester I' ? 'semester1' : 'semester2'}`, sem)}`
-                                        };
-                                    })}
+                                    options={Object.entries(
+                                        filteredAssessments.reduce((acc, a) => {
+                                            const subject = allSubjects.find(s => s.name === a.subjectName);
+                                            const sem = subject?.semester || 'Semester I';
+                                            const semText = t(`admin.${sem === 'Semester I' ? 'semester1' : 'semester2'}`, sem);
+                                            const groupLabel = `${a.subjectName} • ${semText}`;
+                                            
+                                            if (!acc[groupLabel]) acc[groupLabel] = [];
+                                            acc[groupLabel].push({
+                                                value: a.id,
+                                                label: `${a.name} (Max: ${a.maxScore})`
+                                            });
+                                            return acc;
+                                        }, {})
+                                    ).map(([label, opts]) => ({ label, options: opts }))}
                                     allowClear
                                     showSearch
                                     disabled={!selectedGrade}
@@ -811,6 +844,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
 
         setIsSaving(true);
         try {
+            const idsToDelete = [];
             for (const studentId of modifiedAttendance) {
                 const status = attendance[studentId];
                 // If status is undefined (e.g., cleared), delete the record
@@ -820,6 +854,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                         .equals([studentId, attendanceDate])
                         .first();
                     if (existingRecord) {
+                        idsToDelete.push(existingRecord.id);
                         await db.attendance.delete(existingRecord.id);
                     }
                     continue;
@@ -844,8 +879,15 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                 }
             }
 
+            // Perform explicit Supabase deletion for cleared attendance (Plan B)
+            if (idsToDelete.length > 0) {
+                const { error: delError } = await supabase.from('attendance').delete().in('id', idsToDelete);
+                if (delError) console.warn("Supabase attendance deletion warning:", delError);
+            }
+
             setModifiedAttendance(new Set());
             message.success(t('teacher.saveSuccess', 'Attendance saved successfully!'));
+            syncData().catch(console.error);
         } catch (err) {
             console.error("Attendance save failed:", err);
             message.error(t('teacher.saveError', 'Failed to save attendance!'));

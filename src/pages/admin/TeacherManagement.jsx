@@ -3,6 +3,7 @@ import { Typography, Card, Table, Button, Space, Modal, Form, Input, Select, Pop
 import { UserAddOutlined, EditOutlined, DeleteOutlined, KeyOutlined, CopyOutlined } from '@ant-design/icons';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
+import { syncData } from '../../utils/sync';
 import { useTranslation } from 'react-i18next';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
 
@@ -68,6 +69,7 @@ export default function TeacherManagement() {
                 });
                 message.success('Teacher added successfully');
             }
+            syncData().catch(console.error);
             handleCancel();
         } catch (error) {
             console.error('Error saving teacher:', error);
@@ -90,6 +92,7 @@ export default function TeacherManagement() {
         try {
             await db.teachers.delete(id);
             message.success('Teacher deleted successfully');
+            syncData().catch(console.error);
         } catch (error) {
             console.error('Error deleting teacher:', error);
             message.error('Failed to delete teacher');

@@ -18,7 +18,7 @@ export default function StudentRegistration() {
     const { t, i18n } = useTranslation();
     const [form] = Form.useForm();
     const [editForm] = Form.useForm();
-    
+
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
     const [searchQuery, setSearchQuery] = useState(() => {
@@ -211,9 +211,9 @@ export default function StudentRegistration() {
 
     const filteredStudents = students.filter(s => {
         const query = (searchQuery || "").toLowerCase();
-        const matchesSearch = (s.name || "").toLowerCase().includes(query) || 
-                              (s.baptismalName || "").toLowerCase().includes(query) ||
-                              (s.parentContact || "").includes(searchQuery);
+        const matchesSearch = (s.name || "").toLowerCase().includes(query) ||
+            (s.baptismalName || "").toLowerCase().includes(query) ||
+            (s.parentContact || "").includes(searchQuery);
         const matchesGrade = !filterGrade || String(s.grade) === String(filterGrade);
         return matchesSearch && matchesGrade;
     });
@@ -231,7 +231,7 @@ export default function StudentRegistration() {
         { title: t('admin.baptismalName'), dataIndex: 'baptismalName', key: 'baptismalName', sorter: (a, b) => (a.baptismalName || '').localeCompare(b.baptismalName || '') },
         { title: t('admin.gender'), dataIndex: 'gender', render: (t) => <Tag color={t === 'Male' ? 'blue' : 'magenta'}>{t || '—'}</Tag>, sorter: (a, b) => (a.gender || '').localeCompare(b.gender || '') },
         { title: t('admin.grade'), dataIndex: 'grade', render: (t) => <Tag color="green">{formatGrade(t)}</Tag>, sorter: (a, b) => normalizeGrade(a.grade) - normalizeGrade(b.grade) },
-        { title: t('admin.portalCode', 'Portal Code'), dataIndex: 'portalCode', render: (code) => <Text copyable font-family="monospace">{code}</Text> },
+        { title: t('admin.portalCode', 'Portal Code'), dataIndex: 'portalCode', render: (code) => <Text copyable style={{ fontFamily: 'monospace' }}>{code}</Text> },
         { title: t('admin.contact'), dataIndex: 'parentContact' },
         { title: t('admin.dateOfEntry'), dataIndex: 'academicYear', render: (t) => <span className="text-xs text-slate-500">{formatEthiopianDate(t)}</span>, sorter: (a, b) => new Date(a.academicYear || 0) - new Date(b.academicYear || 0) },
         {
@@ -280,12 +280,12 @@ export default function StudentRegistration() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
                     <Input prefix={<SearchOutlined />} placeholder={t('admin.searchPlaceholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} allowClear className="max-w-md" />
-                    <Select 
+                    <Select
                         placeholder={`← ${t('admin.allGrades', 'All Grades')} (Filter by Grade)`}
-                        value={filterGrade} 
-                        onChange={setFilterGrade} 
-                        allowClear 
-                        className="w-64" 
+                        value={filterGrade}
+                        onChange={setFilterGrade}
+                        allowClear
+                        className="w-64"
                         options={allGradeOptions}
                         popupMatchSelectWidth={false}
                     />

@@ -1,20 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  SafeAreaView,
-  ActivityIndicator,
-  Alert,
-  TextInput,
-  ScrollView,
-  Platform,
-  Modal,
-  Image,
-  Image as RNImage,
+  StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image, Image as RNImage, Linking, Animated
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import dayjs from 'dayjs';
@@ -30,7 +16,7 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import {
-  Home, Users, CalendarCheck, BarChart3, AlertTriangle, Settings, LogOut, Moon, Sun, Languages, RefreshCw, TrendingUp, Info, BookOpen
+  Home, Users, CalendarCheck, BarChart3, AlertTriangle, Settings, LogOut, Moon, Sun, Languages, RefreshCw, TrendingUp, Info, BookOpen, Key, Phone
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 
@@ -50,6 +36,7 @@ interface Student {
   baptismalname?: string;
   parentcontact?: string;
   academicyear?: string;
+  portalcode?: string;
 }
 interface Assessment {
   id: string;
@@ -58,7 +45,6 @@ interface Assessment {
   grade: string;
   maxscore: number;
   date: string;
-  issystemconductassessment?: boolean;
 }
 interface Teacher {
   id: string;
@@ -99,8 +85,22 @@ const THEMES = {
     muted: '#64748b',
     input: '#f1f5f9',
     glass: 'rgba(255, 255, 255, 0.8)',
-  }
+  },
 };
+
+// ── Grade helpers ──────────────────────────────────────────────
+const normG = (g: any) => {
+  if (!g) return '';
+  const m = String(g).match(/\d+/);
+  return m ? m[0] : String(g).trim();
+};
+
+const isConduct = (a: any) => {
+  const sName = (a.subjectname || '').toLowerCase();
+  const aName = (a.name || '').toLowerCase();
+  return sName.includes('conduct') || sName.includes('attitude') || aName.includes('conduct') || aName.includes('attitude');
+};
+
 
 import Svg, { Rect, Circle, Path } from 'react-native-svg';
 
@@ -139,17 +139,32 @@ const paginate = (data: any[], page: number) => data.slice(0, (page + 1) * PAGE_
 // ═══════════════════════════════════════════════════════════════
 //  ROOT APP
 // ═══════════════════════════════════════════════════════════════
+
 export default function App() {
   const { t, i18n } = useTranslation();
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isDark, setIsDark] = useState(true);
 
+  const [toast, setToast] = useState<{msg: string, type: 'success'|'error'|'info', visible: boolean}>({msg: '', type: 'success', visible: false});
+  const toastOp = useRef(new Animated.Value(0)).current;
+
+  const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ msg, type, visible: true });
+    Animated.sequence([
+      Animated.timing(toastOp, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.delay(2000),
+      Animated.timing(toastOp, { toValue: 0, duration: 300, useNativeDriver: true })
+    ]).start(() => setToast(prev => ({...prev, visible: false})));
+  }, [toastOp]);
+
   // Data states
   const [students, setStudents] = useState<Student[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [marks, setMarks] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [settings, setSettings] = useState<Record<string, string>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [profileStudent, setProfileStudent] = useState<Student | null>(null);
@@ -161,12 +176,14 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [savedAuth, savedTheme, savedStudents, savedAssessments, savedMarks, savedLastSync] = await Promise.all([
+        const [savedAuth, savedTheme, savedStudents, savedAssessments, savedMarks, savedSubjects, savedSettings, savedLastSync] = await Promise.all([
           AsyncStorage.getItem('senbet_teacher_auth'),
           AsyncStorage.getItem('senbet_theme'),
           AsyncStorage.getItem('cached_students'),
           AsyncStorage.getItem('cached_assessments'),
           AsyncStorage.getItem('cached_marks'),
+          AsyncStorage.getItem('cached_subjects'),
+          AsyncStorage.getItem('cached_settings'),
           AsyncStorage.getItem('last_sync_time'),
         ]);
 
@@ -175,6 +192,10 @@ export default function App() {
         if (savedStudents) setStudents(JSON.parse(savedStudents));
         if (savedAssessments) setAssessments(JSON.parse(savedAssessments));
         if (savedMarks) setMarks(JSON.parse(savedMarks));
+        
+        try { if (savedSubjects) setSubjects(JSON.parse(savedSubjects)); } catch(e){}
+        try { if (savedSettings) setSettings(JSON.parse(savedSettings)); } catch(e){}
+        
         if (await AsyncStorage.getItem('cached_attendance')) setAttendance(JSON.parse(await AsyncStorage.getItem('cached_attendance') || '[]'));
         if (savedLastSync) setLastSync(savedLastSync);
 
@@ -203,21 +224,32 @@ export default function App() {
     if (!isBackground) setSyncing(true);
 
     try {
-      let sQuery = supabase.from('students').select('*').order('name');
-      if (teacher.assignedgrades && teacher.assignedgrades.length > 0) {
-        sQuery = sQuery.in('grade', teacher.assignedgrades);
+      // Fetch latest teacher data to keep assigned subjects/grades live
+      const { data: tRes, error: tErr } = await supabase
+        .from('teachers')
+        .select('*')
+        .eq('id', teacher.id)
+        .single();
+        
+      let activeTeacher = teacher;
+      if (tRes && !tErr) {
+        activeTeacher = tRes;
+        
+        // Deep compare to prevent infinite render loops where the background sync triggers a state update,
+        // which triggers a re-render, which triggers another background sync.
+        if (JSON.stringify(tRes) !== JSON.stringify(teacher)) {
+          setTeacher(activeTeacher);
+          await AsyncStorage.setItem('senbet_teacher_auth', JSON.stringify(activeTeacher));
+        }
       }
-      const { data: sRes, error: sErr } = await sQuery;
+
+      // 1. Students: Fetch all. Narrowing by grade on Supabase is unreliable due to format discrepancies (e.g. "1" vs "Grade 1").
+      // We will filter LOCALLY in the components using normG.
+      const { data: sRes, error: sErr } = await supabase.from('students').select('*').order('name');
       if (sErr) throw sErr;
 
-      let aQuery = supabase.from('assessments').select('*').order('name');
-      if (teacher.assignedgrades && teacher.assignedgrades.length > 0) {
-        aQuery = aQuery.in('grade', teacher.assignedgrades);
-      }
-      if (teacher.assignedsubjects && teacher.assignedsubjects.length > 0) {
-        aQuery = aQuery.in('subjectname', teacher.assignedsubjects);
-      }
-      const { data: aRes, error: aErr } = await aQuery;
+      // 2. Assessments: Fetch all. Same logic as students.
+      const { data: aRes, error: aErr } = await supabase.from('assessments').select('*').order('name');
       if (aErr) throw aErr;
 
       const aIds = (aRes || []).map(a => a.id);
@@ -234,11 +266,20 @@ export default function App() {
         .eq('date', dayjs().format('YYYY-MM-DD'));
       if (attErr) throw attErr;
 
+      const { data: subRes } = await supabase.from('subjects').select('*');
+      const { data: setRes } = await supabase.from('settings').select('*');
+      const sMap: Record<string, string> = {};
+      if (setRes) {
+        setRes.forEach((r: any) => { sMap[r.key] = r.value; });
+      }
+
       const now = formatEthiopianTime(new Date());
       setStudents(sRes || []);
       setAssessments(aRes || []);
       setMarks(mRes);
       setAttendance(attRes || []);
+      setSubjects(subRes || []);
+      setSettings(sMap);
       setLastSync(now);
 
       await Promise.all([
@@ -246,13 +287,15 @@ export default function App() {
         AsyncStorage.setItem('cached_assessments', JSON.stringify(aRes || [])),
         AsyncStorage.setItem('cached_marks', JSON.stringify(mRes)),
         AsyncStorage.setItem('cached_attendance', JSON.stringify(attRes || [])),
+        AsyncStorage.setItem('cached_subjects', JSON.stringify(subRes || [])),
+        AsyncStorage.setItem('cached_settings', JSON.stringify(sMap)),
         AsyncStorage.setItem('last_sync_time', now),
       ]);
 
-      if (!isBackground) Alert.alert('Sync Complete', 'Data updated from cloud.');
+      if (!isBackground) showToast('✅ Sync complete — data updated', 'success');
     } catch (err: any) {
       console.error('Sync error', err);
-      if (!isBackground) Alert.alert('Sync Failed', 'Could not reach server. Using offline data.');
+      if (!isBackground) showToast('⚠️ Sync failed — using offline data', 'error');
     } finally {
       if (!isBackground) setSyncing(false);
     }
@@ -267,6 +310,16 @@ export default function App() {
     await AsyncStorage.setItem('senbet_teacher_auth', JSON.stringify(t));
   };
 
+  // Auto-sync every 5 minutes
+  useEffect(() => {
+    if (!teacher) return;
+    const interval = setInterval(() => {
+      console.log('Mobile: Running background auto-sync...');
+      syncData();
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [teacher]);
+
   const handleLogout = async () => {
     setTeacher(null);
     setStudents([]); setAssessments([]); setMarks([]); setAttendance([]);
@@ -277,46 +330,6 @@ export default function App() {
 
   if (authLoading) return <View style={[s.center, { backgroundColor: C.bg }]}><ActivityIndicator size="large" color={C.accent} /></View>;
   if (!teacher) return <TeacherLogin onLogin={handleLogin} isDark={isDark} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} />;
-
-  // ── Tab Navigator ───────────────────────────────────────────
-  function Tabs({ navigation }: any) {
-    return (
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarStyle: { 
-            borderTopWidth: 1, 
-            borderTopColor: C.border,
-            backgroundColor: C.card, 
-            height: Platform.OS === 'ios' ? 88 : 64, 
-            paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-            paddingTop: 8,
-            elevation: 0, 
-            shadowOpacity: 0 
-          },
-          tabBarActiveTintColor: C.accent,
-          tabBarInactiveTintColor: C.muted,
-          tabBarShowLabel: false,
-          tabBarIcon: ({ color, focused }) => {
-            const size = focused ? 24 : 20;
-            if (route.name === 'Dashboard') return <Home size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-            if (route.name === 'Students') return <Users size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-            if (route.name === 'Attendance') return <CalendarCheck size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-            if (route.name === 'Marks') return <BarChart3 size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-            if (route.name === 'Analytics') return <TrendingUp size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-            return <AlertTriangle size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-          }
-        })}
-      >
-        <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} />}</Tab.Screen>
-        <Tab.Screen name="Students">{() => <StudentsTab teacher={teacher!} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
-        <Tab.Screen name="Attendance">{() => <AttendanceTab teacher={teacher!} students={students} attendanceData={attendance} onRefresh={() => syncData()} C={C} s={s} />}</Tab.Screen>
-        <Tab.Screen name="Marks">{() => <MarksTab teacher={teacher!} students={students} assessments={assessments} marksData={marks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
-        <Tab.Screen name="Analytics">{() => <AnalyticsTab students={students} assessments={assessments} marks={marks} C={C} s={s} />}</Tab.Screen>
-        <Tab.Screen name="Urgent">{() => <UrgentMattersTab teacher={teacher!} students={students} assessments={assessments} marksData={marks} C={C} s={s} />}</Tab.Screen>
-      </Tab.Navigator>
-    );
-  }
 
   return (
     <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
@@ -372,22 +385,58 @@ export default function App() {
       >
         <Drawer.Screen
           name="Main"
-          component={Tabs}
           options={{
             title: t('app.title'),
             drawerIcon: ({ color }) => <Home size={18} color={color} />,
             drawerLabel: t('dashboard.title')
           }}
-        />
+        >
+          {(props: any) => (
+            <Tab.Navigator
+              screenOptions={({ route }) => ({
+                headerShown: false,
+                tabBarStyle: { 
+                  borderTopWidth: 1, 
+                  borderTopColor: C.border,
+                  backgroundColor: C.card, 
+                  height: Platform.OS === 'ios' ? 88 : 64, 
+                  paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+                  paddingTop: 8,
+                  elevation: 0, 
+                  shadowOpacity: 0 
+                },
+                tabBarActiveTintColor: C.accent,
+                tabBarInactiveTintColor: C.muted,
+                tabBarShowLabel: false,
+                tabBarIcon: ({ color, focused }) => {
+                  const size = focused ? 24 : 20;
+                  if (route.name === 'Dashboard') return <Home size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                  if (route.name === 'Students') return <Users size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                  if (route.name === 'Attendance') return <CalendarCheck size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                  if (route.name === 'Marks') return <BarChart3 size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                  if (route.name === 'Analytics') return <TrendingUp size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                  return <AlertTriangle size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                }
+              })}
+            >
+              <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} showToast={showToast} />}</Tab.Screen>
+              <Tab.Screen name="Students">{(props: any) => <StudentsTab {...props} teacher={teacher!} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
+              <Tab.Screen name="Attendance">{(props: any) => <AttendanceTab {...props} teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={() => syncData()} C={C} s={s} showToast={showToast} />}</Tab.Screen>
+              <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} showToast={showToast} />}</Tab.Screen>
+              <Tab.Screen name="Analytics">{(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} />}</Tab.Screen>
+              <Tab.Screen name="Urgent">{(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}</Tab.Screen>
+            </Tab.Navigator>
+          )}
+        </Drawer.Screen>
         <Drawer.Screen
           name="StudentList"
           options={{
             title: t('teacher.students'),
             drawerIcon: ({ color }) => <Users size={18} color={color} />
           }}
-        >{() => (
+        >{(props: any) => (
           <View style={{ flex: 1 }}>
-            <StudentsTab teacher={teacher} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />
+            <StudentsTab {...props} teacher={teacher} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />
           </View>
         )}</Drawer.Screen>
         <Drawer.Screen
@@ -396,7 +445,7 @@ export default function App() {
             title: t('teacher.urgent'),
             drawerIcon: ({ color }) => <AlertTriangle size={18} color={color} />
           }}
-        >{() => <UrgentMattersTab teacher={teacher} students={students} assessments={assessments} marksData={marks} C={C} s={s} />}</Drawer.Screen>
+        >{(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}</Drawer.Screen>
       </Drawer.Navigator>
 
       <StudentProfileModal
@@ -408,6 +457,18 @@ export default function App() {
         C={C}
         s={s}
       />
+
+      {toast.visible && (
+        <Animated.View style={{
+          position: 'absolute', bottom: Platform.OS === 'ios' ? 110 : 90, alignSelf: 'center', opacity: toastOp,
+          backgroundColor: toast.type === 'error' ? C.red : (toast.type === 'info' ? C.amber : C.green),
+          paddingHorizontal: 24, paddingVertical: 14, borderRadius: 30, elevation: 5,
+          shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.3, shadowRadius: 8,
+          flexDirection: 'row', alignItems: 'center', zIndex: 9999
+        }}>
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>{toast.msg}</Text>
+        </Animated.View>
+      )}
     </NavigationContainer>
   );
 }
@@ -487,20 +548,43 @@ function TeacherLogin({ onLogin, isDark, toggleTheme, toggleLanguage }: { onLogi
 // ═══════════════════════════════════════════════════════════════
 //  DASHBOARD TAB
 // ═══════════════════════════════════════════════════════════════
-function DashboardTab({ teacher, students, assessments, marks, attendance, C, s, setTab, onSync, isSyncing }: {
-  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], attendance: any[], C: any, s: any, setTab: (t: any) => void, onSync: () => void, isSyncing: boolean
+function DashboardTab({ teacher, students: allStudents, assessments: allAssessments, marks, attendance, C, s, setTab, onSync, isSyncing, showToast }: {
+  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], attendance: any[], C: any, s: any, setTab: (t: any) => void, onSync: () => void, isSyncing: boolean, showToast?: (msg: string, type: 'success'|'error'|'info') => void
 }) {
   const { t } = useTranslation();
   const today = formatEthiopianDate(new Date());
+  const [refreshing, setRefreshing] = useState(false);
 
+  // Filter data for THIS teacher's dashboard (Memoized to prevent infinite loops)
+  const myGrades = teacher.assignedgrades || [];
+  const students = useMemo(() => 
+    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, myGrades]
+  );
+  const assessments = useMemo(() => 
+    allAssessments.filter(a => myGrades.length === 0 || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade)),
+    [allAssessments, myGrades]
+  );
+
+  const handleRefresh = async () => { setRefreshing(true); await onSync(); setRefreshing(false); };
+
+  // Dashboard missing marks: use same logic as Urgent Matters (all students * all assessments for their grade)
+  const missingCount = students.reduce((acc, st) => {
+    const stGrade = normG(st.grade);
+    const stAsses = assessments.filter(a => 
+      normG(a.grade) === stGrade && !isConduct(a)
+    );
+    const missing = stAsses.filter(a => !marks.some(m => m.studentid === st.id && m.assessmentid === a.id));
+    return acc + missing.length;
+  }, 0);
   const stats = [
     { label: t('dashboard.totalStudents'), value: students.length, icon: <Users size={24} color={C.accent} stroke={C.accent} />, bg: C.accentMuted },
     { label: t('dashboard.attendanceToday'), value: attendance.filter(a => a.status === 'present' || a.status === 'late').length, icon: <CalendarCheck size={24} color={C.green} stroke={C.green} />, bg: C.green + '15' },
-    { label: t('teacher.missingMarks'), value: assessments.length * students.length - marks.length, icon: <AlertTriangle size={24} color={C.red} stroke={C.red} />, bg: C.red + '15' },
+    { label: t('teacher.missingMarks'), value: missingCount, icon: <AlertTriangle size={24} color={C.red} stroke={C.red} />, bg: C.red + '15' },
   ];
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
       <View style={{ marginBottom: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View>
           <Text style={[s.sectionTitle, { marginBottom: 4 }]}>{t('dashboard.title')}</Text>
@@ -555,12 +639,27 @@ function DashboardTab({ teacher, students, assessments, marks, attendance, C, s,
 // ═══════════════════════════════════════════════════════════════
 //  STUDENTS TAB
 // ═══════════════════════════════════════════════════════════════
-function StudentsTab({ teacher, students, onRefresh, C, s, onStudentPress }: {
-  teacher: Teacher, students: Student[], onRefresh: () => Promise<void>, C: any, s: any, onStudentPress: (s: Student) => void
+function StudentsTab({ route, navigation, teacher, students: allStudents, onRefresh, C, s, onStudentPress }: {
+  route: any, navigation: any, teacher: Teacher, students: Student[], onRefresh: () => Promise<void>, C: any, s: any, onStudentPress: (s: Student) => void
 }) {
   const { t } = useTranslation();
+  
+  // Filter for THIS teacher (Memoized)
+  const myGrades = teacher.assignedgrades || [];
+  const students = useMemo(() => 
+    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, myGrades]
+  );
+
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (route.params?.search) {
+      setSearch(route.params.search);
+    }
+  }, [route.params]);
+
 
   const [page, setPage] = useState(0);
   const handleRefresh = async () => {
@@ -623,9 +722,16 @@ function StudentsTab({ teacher, students, onRefresh, C, s, onStudentPress }: {
 // ═══════════════════════════════════════════════════════════════
 //  ATTENDANCE TAB  (uses lowercase: studentid)
 // ═══════════════════════════════════════════════════════════════
-function AttendanceTab({ teacher, students, attendanceData, onRefresh, C, s }: {
-  teacher: Teacher, students: Student[], attendanceData: any[], onRefresh: () => void, C: any, s: any
+function AttendanceTab({ route, navigation, teacher, students: allStudents, attendanceData, setAttendanceData, onRefresh, C, s, showToast }: {
+  route: any, navigation: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void
 }) {
+  // Filter for THIS teacher (Memoized)
+  const myGrades = teacher.assignedgrades || [];
+  const students = useMemo(() => 
+    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, myGrades]
+  );
+
   const { t } = useTranslation();
   const [grades, setGrades] = useState<string[]>([]);
   const [selectedGrade, setSelectedGrade] = useState('');
@@ -656,9 +762,9 @@ function AttendanceTab({ teacher, students, attendanceData, onRefresh, C, s }: {
     const student = students.find(st => st.id === data);
     if (student) {
       setAttendance(prev => ({ ...prev, [student.id]: 'present' }));
-      Alert.alert('Success', `Marked ${student.name} as Present`);
+      showToast?.(`✅ ${student.name} marked Present`, 'success');
     } else {
-      Alert.alert('Not Found', 'Student ID not recognized.');
+      showToast?.('❌ Student ID not recognized', 'error');
     }
   };
 
@@ -706,11 +812,33 @@ function AttendanceTab({ teacher, students, attendanceData, onRefresh, C, s }: {
         updated_at: new Date().toISOString()
       }));
 
-      const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'id' });
-      if (error) throw error;
-      Alert.alert('Success', 'Attendance saved successfully.');
+      // Immediate local update for "persistence" feel
+      const newAttendanceData = [...attendanceData];
+      records.forEach(r => {
+        const idx = newAttendanceData.findIndex(exist => exist.studentid === r.studentid && exist.date === r.date);
+        if (r.status === null) {
+          if (idx !== -1) newAttendanceData.splice(idx, 1);
+        } else {
+          if (idx !== -1) newAttendanceData[idx] = r;
+          else newAttendanceData.push(r);
+        }
+      });
+      setAttendanceData(newAttendanceData);
+
+      const toUpsert = records.filter(r => r.status !== null);
+      const { error: upErr } = await supabase.from('attendance').upsert(toUpsert);
+      if (upErr) throw upErr;
+      
+      const toDelete = records.filter(r => r.status === null).map(r => r.id);
+      if (toDelete.length > 0) {
+        const { error: delErr } = await supabase.from('attendance').delete().in('id', toDelete);
+        if (delErr) throw delErr;
+      }
+      
+      showToast?.('✅ Attendance saved', 'success');
+      onRefresh();
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showToast?.('❌ ' + e.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -835,12 +963,30 @@ function AttendanceTab({ teacher, students, attendanceData, onRefresh, C, s }: {
 // ═══════════════════════════════════════════════════════════════
 //  MARKS TAB  (uses lowercase: studentid, assessmentid, etc.)
 // ═══════════════════════════════════════════════════════════════
-function MarksTab({ teacher, students, assessments, marksData, onRefresh, C, s, onStudentPress }: {
-  teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void
+function MarksTab({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, showToast }: {
+  route: any, navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, showToast?: (msg: string, type: 'success'|'error'|'info') => void
 }) {
+  // Filter for THIS teacher (Memoized)
+  const myGrades = teacher.assignedgrades || [];
+  const mySubjects = teacher.assignedsubjects || [];
+  
+  const students = useMemo(() => 
+    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, myGrades]
+  );
+  const assessments = useMemo(() => 
+    allAssessments.filter(a => {
+      const isGradeMatch = myGrades.length === 0 || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
+      const isSubjectMatch = mySubjects.length === 0 || mySubjects.includes(a.subjectname);
+      return isGradeMatch && isSubjectMatch && !isConduct(a);
+    }),
+    [allAssessments, myGrades, mySubjects]
+  );
+
   const { t } = useTranslation();
   const [grades, setGrades] = useState<string[]>([]);
   const [selectedGrade, setSelectedGrade] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [marks, setMarks] = useState<Record<string, string>>({});
   const [markIds, setMarkIds] = useState<Record<string, string>>({});
@@ -850,6 +996,19 @@ function MarksTab({ teacher, students, assessments, marksData, onRefresh, C, s, 
   const [bulkVisible, setBulkVisible] = useState(false);
   const [bulkScore, setBulkScore] = useState('');
   const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    if (route.params?.assessmentId) {
+      const ass = assessments.find(a => a.id === route.params.assessmentId);
+      if (ass) {
+        setSelectedGrade(String(ass.grade));
+        setSelectedSubject(ass.subjectname);
+        setSelectedAssessment(ass);
+      }
+    } else if (route.params?.grade) {
+      setSelectedGrade(String(route.params.grade));
+    }
+  }, [route.params, assessments]);
 
   useEffect(() => {
     const uniqueGrades = [...new Set(students.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
@@ -876,6 +1035,11 @@ function MarksTab({ teacher, students, assessments, marksData, onRefresh, C, s, 
   }, [selectedAssessment, marksData]);
 
   const gradeAssessments = assessments.filter((a) => String(a.grade) === selectedGrade);
+  const gradeSubjects = teacher?.assignedsubjects?.length 
+    ? [...teacher.assignedsubjects].sort()
+    : [...new Set(gradeAssessments.map(a => a.subjectname))].filter(Boolean).sort();
+  const filteredAssessments = selectedSubject ? gradeAssessments.filter(a => a.subjectname === selectedSubject) : [];
+  
   const gradeStudents = students.filter((st) => String(st.grade) === selectedGrade);
   const filteredStudents = gradeStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
 
@@ -883,29 +1047,150 @@ function MarksTab({ teacher, students, assessments, marksData, onRefresh, C, s, 
     if (!selectedAssessment) return;
     setSaving(true);
     try {
-      const records = gradeStudents.map(student => {
+      const toUpsert: any[] = [];
+      const toDeleteIds: string[] = [];
+      const recordsToProcess: any[] = [];
+
+      gradeStudents.forEach(student => {
         const scoreStr = marks[student.id];
         const score = scoreStr && scoreStr !== '' ? Math.round(parseFloat(scoreStr)) : null;
         const existingId = markIds[student.id];
-        
-        return {
-          id: existingId || undefined,
+
+        const record = {
+          id: existingId || crypto.randomUUID(),
           studentid: student.id,
           assessmentid: selectedAssessment.id,
           score,
           assessmentdate: selectedAssessment.date,
           updated_at: new Date().toISOString()
         };
-      }).filter(r => r.score !== null);
+        recordsToProcess.push(record);
 
-      const { error } = await supabase.from('marks').upsert(records, { onConflict: 'id' });
-      if (error) throw error;
-      Alert.alert('Success', 'Marks saved successfully.');
+        if (score !== null) {
+          toUpsert.push(record);
+        } else if (existingId) {
+          toDeleteIds.push(existingId);
+        }
+      });
+
+      // Immediate local update for "persistence" feel
+      const newMarksData = [...marksData];
+      recordsToProcess.forEach(r => {
+        const idx = newMarksData.findIndex(exist => exist.studentid === r.studentid && exist.assessmentid === r.assessmentid);
+        if (r.score === null) {
+          if (idx !== -1) newMarksData.splice(idx, 1);
+        } else {
+          if (idx !== -1) newMarksData[idx] = r;
+          else newMarksData.push(r);
+        }
+      });
+      setMarksData(newMarksData);
+
+      if (toUpsert.length > 0) {
+        const { error } = await supabase.from('marks').upsert(toUpsert, { onConflict: 'id' });
+        if (error) throw error;
+      }
+      if (toDeleteIds.length > 0) {
+        const { error } = await supabase.from('marks').delete().in('id', toDeleteIds);
+        if (error) throw error;
+      }
+
+      showToast?.('✅ Marks saved successfully', 'success');
+      if (onRefresh) onRefresh();
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      showToast?.('❌ ' + err.message, 'error');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleFillConstantMark = () => {
+    if (!selectedAssessment) return;
+    const studentsWithoutMarks = gradeStudents.filter(st => marks[st.id] === undefined || marks[st.id] === '');
+    if (studentsWithoutMarks.length === 0) {
+      showToast?.('ℹ️ All students already have marks', 'info');
+      return;
+    }
+    setBulkVisible(true);
+  };
+
+  const applyBulkFill = () => {
+    const val = parseFloat(bulkScore);
+    if (isNaN(val) || val < 0 || val > selectedAssessment!.maxscore) {
+      showToast?.(`❌ Valid score: 0–${selectedAssessment!.maxscore}`, 'error');
+      return;
+    }
+    const studentsWithoutMarks = gradeStudents.filter(st => marks[st.id] === undefined || marks[st.id] === '');
+    const updates = { ...marks };
+    studentsWithoutMarks.forEach(s => updates[s.id] = val.toString());
+    setMarks(updates);
+    setBulkVisible(false);
+    setBulkScore('');
+    showToast?.(`✅ Filled ${val} for ${studentsWithoutMarks.length} students`, 'success');
+  };
+
+  const handlePredictMarks = () => {
+    if (!selectedAssessment) return;
+    const studentsWithoutMarks = gradeStudents.filter(st => marks[st.id] === undefined || marks[st.id] === '');
+    if (studentsWithoutMarks.length === 0) {
+      showToast?.('ℹ️ All students already have marks', 'info');
+      return;
+    }
+
+    const studentsWithHistory = [];
+    for (const student of studentsWithoutMarks) {
+      const historyCount = marksData.filter(m => m.studentid === student.id).filter(m => {
+        const a = assessments.find(ax => ax.id === m.assessmentid);
+        return a && a.subjectname === selectedAssessment.subjectname;
+      }).length;
+      if (historyCount > 0) studentsWithHistory.push(student);
+    }
+
+    if (studentsWithHistory.length === 0) {
+      showToast?.('⚠️ No history found for predictions', 'info');
+      return;
+    }
+
+    Alert.alert(
+      'Predict Marks',
+      `Predict marks for ${studentsWithHistory.length} students based on their performance history in ${selectedAssessment.subjectname}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Predict', 
+          onPress: () => {
+            const updates = { ...marks };
+            let count = 0;
+            for (const student of studentsWithHistory) {
+              const subjectMarks = marksData.filter(m => m.studentid === student.id).filter(m => {
+                const a = assessments.find(ax => ax.id === m.assessmentid);
+                return a && a.subjectname === selectedAssessment.subjectname;
+              });
+
+              if (subjectMarks.length > 0) {
+                let totalPercentage = 0;
+                let validCount = 0;
+                for (const m of subjectMarks) {
+                  const assessment = assessments.find(a => a.id === m.assessmentid);
+                  if (assessment && assessment.maxscore > 0) {
+                    totalPercentage += (Number(m.score) / assessment.maxscore);
+                    validCount++;
+                  }
+                }
+                if (validCount > 0) {
+                  const avgPercentage = totalPercentage / validCount;
+                  const predictedScore = Math.round(avgPercentage * selectedAssessment.maxscore * 10) / 10;
+                  updates[student.id] = predictedScore.toString();
+                  count++;
+                }
+              }
+            }
+            setMarks(updates);
+            showToast?.(`✅ Predicted marks for ${count} students`, 'success');
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -918,16 +1203,30 @@ function MarksTab({ teacher, students, assessments, marksData, onRefresh, C, s, 
             <TouchableOpacity
               key={g}
               style={[s.gradeChip, selectedGrade === g && s.gradeChipActive]}
-              onPress={() => { setSelectedGrade(g); setSelectedAssessment(null); }}
+              onPress={() => { setSelectedGrade(g); setSelectedSubject(''); setSelectedAssessment(null); }}
             >
               <Text style={[s.gradeChipText, selectedGrade === g && s.gradeChipTextActive]}>{fmtGrade(g)}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {gradeAssessments.length > 0 && (
+        {gradeSubjects.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            {gradeSubjects.map((subj) => (
+              <TouchableOpacity
+                key={subj as string}
+                style={[s.gradeChip, selectedSubject === subj && s.gradeChipActive]}
+                onPress={() => { setSelectedSubject(subj as string); setSelectedAssessment(null); }}
+              >
+                <Text style={[s.gradeChipText, selectedSubject === subj && s.gradeChipTextActive]}>{subj as string}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {filteredAssessments.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-            {gradeAssessments.map((a) => (
+            {filteredAssessments.map((a) => (
               <TouchableOpacity
                 key={a.id}
                 style={[s.gradeChip, { borderRadius: 12, paddingHorizontal: 12 }, selectedAssessment?.id === a.id && s.gradeChipActive]}
@@ -953,10 +1252,20 @@ function MarksTab({ teacher, students, assessments, marksData, onRefresh, C, s, 
         keyExtractor={item => item.id}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         ListHeaderComponent={selectedAssessment ? (
-          <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16 }]}>
-            <Text style={{ color: C.accent, fontWeight: '700', textAlign: 'center' }}>
+          <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16, padding: 16 }]}>
+            <Text style={{ color: C.accent, fontWeight: '800', textAlign: 'center', marginBottom: 12, fontSize: 16 }}>
               {selectedAssessment.name} - Max Score: {selectedAssessment.maxscore}
             </Text>
+            <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'center' }}>
+              <TouchableOpacity onPress={handlePredictMarks} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}>
+                <TrendingUp size={18} color={C.accent} style={{ marginBottom: 4 }} />
+                <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>Predict Missing</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleFillConstantMark} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}>
+                <Text style={{ fontSize: 16, marginBottom: 2 }}>📝</Text>
+                <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>Fill Constant</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : null}
         renderItem={({ item }) => (
@@ -974,7 +1283,7 @@ function MarksTab({ teacher, students, assessments, marksData, onRefresh, C, s, 
               onChangeText={(val) => {
                 const score = parseFloat(val);
                 if (val !== '' && !isNaN(score) && selectedAssessment && score > selectedAssessment.maxscore) {
-                  Alert.alert('Invalid Score', `Max score allowed is ${selectedAssessment.maxscore}`);
+                  showToast?.(`❌ Max score is ${selectedAssessment.maxscore}`, 'error');
                   return;
                 }
                 setMarks(prev => ({ ...prev, [item.id]: val }));
@@ -986,6 +1295,32 @@ function MarksTab({ teacher, students, assessments, marksData, onRefresh, C, s, 
         onEndReached={() => setPage(p => p + 1)}
         onEndReachedThreshold={0.5}
       />
+
+      <Modal visible={bulkVisible} transparent animationType="fade">
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Fill Constant Mark</Text>
+            <Text style={s.modalSub}>Enter a score to fill for all currently ungraded students (Max: {selectedAssessment?.maxscore})</Text>
+            <TextInput
+              style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]}
+              keyboardType="numeric"
+              placeholder={`0 - ${selectedAssessment?.maxscore || 10}`}
+              placeholderTextColor={C.muted}
+              value={bulkScore}
+              onChangeText={setBulkScore}
+              autoFocus
+            />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.border }]}>
+                <Text style={[s.modalBtnText, { color: C.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}>
+                <Text style={s.modalBtnText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {selectedAssessment && (
         <View style={{ position: 'absolute', bottom: 16, left: 16, right: 16 }}>
@@ -1005,24 +1340,54 @@ function MarksTab({ teacher, students, assessments, marksData, onRefresh, C, s, 
 // ═══════════════════════════════════════════════════════════════
 //  URGENT MATTERS TAB
 // ═══════════════════════════════════════════════════════════════
-function UrgentMattersTab({ teacher, students, assessments, marksData, C, s }: {
-  teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], C: any, s: any
+function UrgentMattersTab({ navigation, teacher, students: allStudents, assessments: allAssessments, marksData, subjects, settings, C, s, onRefresh }: {
+  navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, onRefresh?: () => Promise<void> | void
 }) {
   const { t } = useTranslation();
-  const missingMarksByAssessment = assessments.map(a => {
-    const studentsForGrade = students.filter(st => String(st.grade) === String(a.grade));
+
+  // Filter for THIS teacher (Memoized)
+  const myGrades = teacher.assignedgrades || [];
+  const mySubjects = teacher.assignedsubjects || [];
+
+  const students = useMemo(() => 
+    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, myGrades]
+  );
+  const assessments = useMemo(() => 
+    allAssessments.filter(a => {
+      const isGradeMatch = myGrades.length === 0 || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
+      const isSubjectMatch = mySubjects.length === 0 || mySubjects.includes(a.subjectname);
+      return isGradeMatch && isSubjectMatch && !isConduct(a);
+    }),
+    [allAssessments, myGrades, mySubjects]
+  );
+  
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
+
+  const currentSemester = settings.currentSemester || 'Semester I';
+
+  const myAssessments = assessments.filter(a => {
+    if (isConduct(a)) return false;
+    const subject = subjects.find(s => s.name === a.subjectname);
+    const assessmentSemester = subject?.semester || 'Semester I';
+    return assessmentSemester === currentSemester;
+  });
+
+  const missingMarksByAssessment = myAssessments.map(a => {
+    const studentsForGrade = students.filter(st => normG(st.grade) === normG(a.grade));
     const ungraded = studentsForGrade.filter(st => !marksData.some(m => m.studentid === st.id && m.assessmentid === a.id));
     return { assessment: a, count: ungraded.length, students: ungraded };
   }).filter(item => item.count > 0);
 
   const studentsWithNoMarks = students.filter(st => {
-    const assessmentsForGrade = assessments.filter(a => String(a.grade) === String(st.grade));
+    const assessmentsForGrade = myAssessments.filter(a => normG(a.grade) === normG(st.grade));
     if (assessmentsForGrade.length === 0) return false;
     return !marksData.some(m => m.studentid === st.id && assessmentsForGrade.some(a => a.id === m.assessmentid));
   });
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
       <View style={{ marginBottom: 24 }}>
         <Text style={s.sectionTitle}>⚠️ {t('teacher.urgent')}</Text>
         <Text style={{ color: C.muted, fontSize: 13 }}>Items requiring immediate attention</Text>
@@ -1047,20 +1412,27 @@ function UrgentMattersTab({ teacher, students, assessments, marksData, C, s }: {
       )}
 
       {missingMarksByAssessment.length > 0 && (
-        <View style={[s.issueCard, { borderRadius: 20, padding: 20 }]}>
+        <View style={[s.issueCard, { borderRadius: 20, padding: 20, marginTop: 16 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
             <BarChart3 size={20} color={C.amber} stroke={C.amber} />
             <Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>Incomplete Assessments</Text>
           </View>
           <Text style={s.issueSub}>Assessments with missing student scores.</Text>
           {missingMarksByAssessment.map(item => (
-            <View key={item.assessment.id} style={[s.issueRow, { borderTopColor: C.border }]}>
+            <TouchableOpacity 
+              key={item.assessment.id} 
+              style={[s.issueRow, { borderTopColor: C.border }]}
+              onPress={() => navigation.navigate('Marks', { assessmentId: item.assessment.id, grade: item.assessment.grade })}
+            >
               <View style={{ flex: 1 }}>
                 <Text style={s.issueText}>{item.assessment.name}</Text>
                 <Text style={s.issueSub}>{item.count} students missing</Text>
               </View>
-              <View style={s.badge}><Text style={s.badgeText}>{item.assessment.subjectname}</Text></View>
-            </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <View style={[s.badge, { marginBottom: 4 }]}><Text style={s.badgeText}>{item.assessment.subjectname}</Text></View>
+                <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700' }}>Fix now →</Text>
+              </View>
+            </TouchableOpacity>
           ))}
         </View>
       )}
@@ -1081,11 +1453,31 @@ function UrgentMattersTab({ teacher, students, assessments, marksData, C, s }: {
 // ═══════════════════════════════════════════════════════════════
 //  ANALYTICS TAB
 // ═══════════════════════════════════════════════════════════════
-function AnalyticsTab({ students, assessments, marks, C, s }: {
-  students: Student[], assessments: Assessment[], marks: any[], C: any, s: any
+function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessments, marks, C, s, onRefresh }: {
+  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], C: any, s: any, onRefresh?: () => Promise<void> | void
 }) {
   const { t } = useTranslation();
+  
+  // Filter for THIS teacher (Memoized)
+  const myGrades = teacher.assignedgrades || [];
+  const mySubjects = teacher.assignedsubjects || [];
+  
+  const students = useMemo(() => 
+    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, myGrades]
+  );
+  const assessments = useMemo(() => 
+    allAssessments.filter(a => {
+      const isGradeMatch = myGrades.length === 0 || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
+      const isSubjectMatch = (mySubjects.length === 0 || mySubjects.includes(a.subjectname)) && !isConduct(a);
+      return isGradeMatch && isSubjectMatch;
+    }),
+    [allAssessments, myGrades, mySubjects]
+  );
+
   const etYear = computeEthiopianYear();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
   const studentStats = students.map(st => {
     const sMarks = marks.filter(m => m.studentid === st.id);
@@ -1099,7 +1491,7 @@ function AnalyticsTab({ students, assessments, marks, C, s }: {
   }).filter(s => s.count > 0).sort((a, b) => b.perc - a.perc);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
       <View style={{ marginBottom: 24 }}>
         <Text style={s.sectionTitle}>{t('teacher.analytics')}</Text>
         <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600' }}>📅 Academic Year: {etYear} E.C.</Text>
@@ -1160,14 +1552,19 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
 
   if (!student) return null;
 
-  const studentMarks = marks.filter(m => m.studentid === student.id);
+  const studentMarks = marks.filter(m => {
+    const ass = assessments.find(a => a.id === m.assessmentid);
+    return m.studentid === student.id && ass && !isConduct(ass);
+  });
   
   // Rank Calculations
   const calculateRanks = () => {
     if (!student || !allStudents || !marks || !assessments) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
 
     const studentGradeNorm = String(student.grade);
-    const gradeAssesses = assessments.filter(a => String(a.grade) === studentGradeNorm);
+    const gradeAssesses = assessments.filter(a => 
+      String(a.grade) === studentGradeNorm && !isConduct(a)
+    );
     if (gradeAssesses.length === 0) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
     
     const assessIds = gradeAssesses.map(a => a.id);
@@ -1279,24 +1676,36 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
 
             {subTab === 'marks' && (
               <View style={{ gap: 12 }}>
-                {studentMarks.map((m, idx) => {
-                  const ass = assessments.find(a => a.id === m.assessmentid);
-                  const perc = ass ? (Number(m.score) / ass.maxscore) * 100 : 0;
+                {assessments.filter(a => 
+                  normG(a.grade) === normG(student.grade) && !isConduct(a)
+                ).map((ass, idx) => {
+                  const mark = studentMarks.find(m => m.assessmentid === ass.id);
+                  const perc = mark ? (Number(mark.score) / ass.maxscore) * 100 : 0;
                   return (
-                    <View key={idx} style={[s.dashboardCard, { borderRadius: 16, padding: 16 }]}>
+                    <View key={idx} style={[s.dashboardCard, { borderRadius: 16, padding: 16, borderStyle: mark ? 'solid' : 'dashed', borderColor: mark ? C.border : C.amber + '44' }]}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <View>
-                          <Text style={{ color: C.text, fontWeight: '800', fontSize: 15 }}>{ass?.name || 'Assessment'}</Text>
-                          <Text style={{ color: C.muted, fontSize: 12 }}>{ass?.subjectname}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: C.text, fontWeight: '800', fontSize: 15 }}>{ass.name}</Text>
+                          <Text style={{ color: C.muted, fontSize: 12 }}>{ass.subjectname}</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={{ color: C.accent, fontWeight: '900', fontSize: 18 }}>{m.score}</Text>
-                          <Text style={{ color: C.muted, fontSize: 11 }}>/ {ass?.maxscore}</Text>
+                          {mark ? (
+                            <>
+                              <Text style={{ color: C.accent, fontWeight: '900', fontSize: 18 }}>{mark.score}</Text>
+                              <Text style={{ color: C.muted, fontSize: 11 }}>/ {ass.maxscore}</Text>
+                            </>
+                          ) : (
+                            <View style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                              <Text style={{ color: C.amber, fontWeight: '900', fontSize: 12 }}>MISSING</Text>
+                            </View>
+                          )}
                         </View>
                       </View>
-                      <View style={{ height: 4, backgroundColor: C.border, borderRadius: 2 }}>
-                        <View style={{ height: 4, backgroundColor: perc > 50 ? C.green : C.amber, borderRadius: 2, width: `${perc}%` }} />
-                      </View>
+                      {mark ? (
+                        <View style={{ height: 4, backgroundColor: C.border, borderRadius: 2 }}>
+                          <View style={{ height: 4, backgroundColor: perc > 50 ? C.green : C.amber, borderRadius: 2, width: `${perc}%` }} />
+                        </View>
+                      ) : null}
                     </View>
                   );
                 })}
@@ -1349,7 +1758,7 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
                       <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: '#8c7361', textAlign: 'center' }}>አማካይ / Avg</Text>
                     </View>
                     
-                    {assessments.filter(a => String(a.grade) === String(student.grade) && !a.issystemconductassessment).slice(0, 7).map((a, i) => {
+                    {assessments.filter(a => String(a.grade) === String(student.grade) && !isConduct(a)).slice(0, 7).map((a, i) => {
                       const m = marks.find(mark => mark.studentid === student.id && mark.assessmentid === a.id);
                       const perc = m ? ((Number(m.score) / a.maxscore) * 100).toFixed(0) : null;
                       return (

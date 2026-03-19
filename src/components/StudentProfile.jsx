@@ -115,7 +115,17 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     const studentGradeNorm = useMemo(() => normalizeGrade(student?.grade), [student]);
     const gradeAssessments = useMemo(() => {
         if (!allAssessments || !studentGradeNorm) return [];
-        return allAssessments.filter(a => normalizeGrade(a.grade) === studentGradeNorm && !a.isSystemConductAssessment);
+        return allAssessments.filter(a => {
+            if (normalizeGrade(a.grade) !== studentGradeNorm) return false;
+            if (a.subjectName === '__CONDUCT__') return false;
+            
+            const n = (a.name || '').toLowerCase();
+            const s = (a.subjectName || '').toLowerCase();
+            if (n.includes('conduct') || n.includes('attitude')) return false;
+            if (s.includes('conduct') || s.includes('attitude')) return false;
+            
+            return true;
+        });
     }, [allAssessments, studentGradeNorm]);
 
     // Map marks to assessments

@@ -56,6 +56,36 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
     }
 }
 
+async function cleanupDeletedRecords(tableName, tableDb) {
+    // Only for tables where deletions are common and need propagation
+    if (!['marks', 'attendance'].includes(tableName)) return;
+
+    console.log(`Checking for deleted records in ${tableName}...`);
+    try {
+        // Fetch All current IDs from Supabase for this table
+        const { data: remoteIds, error: idError } = await supabase
+            .from(tableName)
+            .select('id');
+        
+        if (idError) throw idError;
+
+        const remoteIdSet = new Set(remoteIds.map(r => r.id));
+        
+        // Find local records that are marked as synced but missing from remote
+        const localSyncedRecords = await tableDb.where('synced').equals(1).toArray();
+        const idsToRemove = localSyncedRecords
+            .filter(r => !remoteIdSet.has(r.id))
+            .map(r => r.id);
+
+        if (idsToRemove.length > 0) {
+            console.log(`Sync: removing ${idsToRemove.length} deleted records from local ${tableName}`);
+            await tableDb.bulkDelete(idsToRemove);
+        }
+    } catch (e) {
+        console.warn(`Deletion cleanup failed for ${tableName}:`, e);
+    }
+}
+
 export async function syncData() {
     console.log("--- Starting synchronization session ---");
 
@@ -145,9 +175,7 @@ export async function syncData() {
                         // 2. Exclude non-Supabase columns
                         const { 
                             synced, 
-                            updated_at, 
-                            conductsemester, 
-                            issystemconductassessment,
+                            updated_at,
                             semester, // Local-only for some tables
                             ...rest 
                         } = lowercased;
@@ -202,6 +230,9 @@ export async function syncData() {
                 } else {
                     await processCloudData(tableName, cloudData, tableDb, tableStatus, pulledTotalRef);
                 }
+
+                // --- 2c. DELETION CLEANUP (Plan B) ---
+                await cleanupDeletedRecords(tableName, tableDb);
 
             } catch (err) {
                 console.error(`Fatal error syncing table ${tableName}:`, err);

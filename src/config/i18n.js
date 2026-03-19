@@ -135,6 +135,8 @@ const resources = {
             },
             "teacher": {
                 "menu": "Teacher Menu",
+                "grades": "Grades",
+                "subjects": "Subjects",
                 "markEntry": "Mark Entry",
                 "attendance": "Attendance",
                 "speedEntryMarks": "Speed-Entry Marks",
@@ -393,6 +395,8 @@ const resources = {
             },
             "teacher": {
                 "menu": "የመምህራን ምናሌ",
+                "grades": "ክፍሎች",
+                "subjects": "የትምህርት ዓይነቶች",
                 "markEntry": "ውጤት መመዝገቢያ",
                 "attendance": "ክትትል",
                 "speedEntryMarks": "ፈጣን ውጤት መመዝገቢያ",

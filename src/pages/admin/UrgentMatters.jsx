@@ -4,7 +4,7 @@ import { WarningOutlined, UserOutlined, ClockCircleOutlined, FormOutlined, Alert
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
-import { formatGrade } from '../../utils/gradeUtils';
+import { formatGrade, normalizeGrade } from '../../utils/gradeUtils';
 import StudentProfile from '../../components/StudentProfile';
 
 const { Title, Text, Paragraph } = Typography;
@@ -21,31 +21,81 @@ export default function UrgentMatters() {
     const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
     const currentSemester = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
 
-    // Students missing critical info
-    const missingInfoStudents = useMemo(() => students.filter(s =>
-        !s.name || !s.baptismalName || !s.grade || !s.parentContact || !s.portalCode
-    ), [students]);
+    // Grades that have at least one assessment configured (any semester)
+    const activeGrades = useMemo(() => {
+        const set = new Set();
+        assessments.forEach(a => {
+            if (a.grade) {
+                set.add(String(a.grade).trim());
+                set.add(normalizeGrade(a.grade));
+            }
+        });
+        return set;
+    }, [assessments]);
 
-    // Students with no marks recorded in ACTIVE SEMESTER assessments
-    const noMarksStudents = useMemo(() => {
+    // Students missing critical info - Scoped to active grades
+    const missingInfoStudents = useMemo(() => students.filter(s => {
+        if (!s.grade) return false; 
+        const isGradeActive = activeGrades.has(String(s.grade).trim()) || activeGrades.has(normalizeGrade(s.grade));
+        if (!isGradeActive) return false;
+        return !s.name || !s.baptismalName || !s.parentContact || !s.portalCode;
+    }), [students, activeGrades]);
+
+    const isConduct = (a) => {
+        const sName = (a.subjectName || '').toLowerCase();
+        const aName = (a.name || '').toLowerCase();
+        return sName.includes('conduct') || sName.includes('attitude') || aName.includes('conduct') || aName.includes('attitude');
+    };
+
+    // Students with INCOMPLETE marks in ACTIVE SEMESTER assessments
+    const incompleteMarksStudents = useMemo(() => {
         const activeAssessments = assessments.filter(a => {
-            const subject = subjects.find(s => s.name === a.subjectName);
+            if (isConduct(a)) return false;
+            const subject = subjects.find(sp => sp.name === a.subjectName);
             return (subject?.semester || 'Semester I') === currentSemester;
         });
         if (activeAssessments.length === 0) return [];
 
         const activeAssessmentIds = new Set(activeAssessments.map(a => a.id));
-        const studentsWithMarksInActiveSem = new Set(
-            marks.filter(m => activeAssessmentIds.has(m.assessmentId)).map(m => m.studentId)
-        );
+
+        // Count assessments per grade (normalized)
+        const gradeAssessmentCount = {};
+        activeAssessments.forEach(a => {
+            const g = normalizeGrade(a.grade);
+            gradeAssessmentCount[g] = (gradeAssessmentCount[g] || 0) + 1;
+        });
+
+        // Count marks per student in those active assessments
+        const studentMarkCount = {};
+        marks.forEach(m => {
+            if (activeAssessmentIds.has(m.assessmentId)) {
+                studentMarkCount[m.studentId] = (studentMarkCount[m.studentId] || 0) + 1;
+            }
+        });
         
-        return students.filter(s => !studentsWithMarksInActiveSem.has(s.id));
-    }, [students, marks, assessments, subjects, currentSemester]);
+        return students.filter(s => {
+            if (!s.grade) return false;
+            const gn = normalizeGrade(s.grade);
+            const isGradeActive = activeGrades.has(String(s.grade).trim()) || activeGrades.has(gn);
+            if (!isGradeActive) return false;
 
-    // Students missing portal codes
-    const missingPortalCode = useMemo(() => students.filter(s => !s.portalCode || s.portalCode.trim() === ''), [students]);
+            const expectedCount = gradeAssessmentCount[gn] || 0;
+            if (expectedCount === 0) return false;
 
-    const totalIssues = missingInfoStudents.length + missingPortalCode.length + noMarksStudents.length;
+            const actualCount = studentMarkCount[s.id] || 0;
+            return actualCount < expectedCount;
+        });
+    }, [students, marks, assessments, subjects, currentSemester, activeGrades]);
+
+    // Students missing portal codes - Scoped to active grades
+    const missingPortalCode = useMemo(() => students.filter(s => {
+        if (!s.grade) return false;
+        const isGradeActive = activeGrades.has(String(s.grade).trim()) || activeGrades.has(normalizeGrade(s.grade));
+        if (!isGradeActive) return false;
+        return !s.portalCode || s.portalCode.trim() === '';
+    }), [students, activeGrades]);
+
+    const totalIssues = missingInfoStudents.length + missingPortalCode.length + incompleteMarksStudents.length;
 
     const usedPortalCodes = useMemo(() => {
         const set = new Set();
@@ -163,10 +213,10 @@ export default function UrgentMatters() {
                     </Card>
                 </Col>
                 <Col xs={24} sm={8}>
-                    <Card className="rounded-2xl border-none shadow-sm bg-yellow-50 dark:bg-yellow-900/20 text-center">
+                    <Card className="rounded-2xl border-none shadow-sm bg-yellow-50 dark:bg-yellow-900/20 text-center cursor-pointer hover:bg-yellow-100 transition-colors" onClick={() => navigate('/assessments')}>
                         <Statistic
-                            title={<span className="text-yellow-700 font-bold">No Marks Recorded</span>}
-                            value={noMarksStudents.length}
+                            title={<span className="text-yellow-700 font-bold">Incomplete Marks</span>}
+                            value={incompleteMarksStudents.length}
                             valueStyle={{ color: '#ca8a04', fontWeight: 'bold', fontSize: '2.5rem' }}
                             prefix={<ClockCircleOutlined />}
                         />
@@ -201,44 +251,47 @@ export default function UrgentMatters() {
                                 <List.Item 
                                     className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg"
                                     actions={[
-                                        <Tooltip key="gen" title="Generate portal code">
-                                            <Button
-                                                size="small"
-                                                icon={<KeyOutlined />}
-                                                disabled={!!student.portalCode}
-                                                onClick={async (e) => {
-                                                    e.stopPropagation();
-                                                    const code = await generatePortalCode(student.id);
-                                                    message.success(`Portal code created: ${code}`);
-                                                }}
-                                            >
-                                                Generate code
-                                            </Button>
-                                        </Tooltip>,
-                                        <Tooltip key="call" title="Call parent">
-                                            <Button
-                                                size="small"
-                                                icon={<PhoneOutlined />}
-                                                disabled={!student.parentContact}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (student.parentContact) window.open(`tel:${student.parentContact}`, '_self');
-                                                }}
-                                            >
-                                                Call
-                                            </Button>
-                                        </Tooltip>,
-                                        <Tooltip key="copy" title="Copy parent contact">
-                                            <Button
-                                                size="small"
-                                                icon={<CopyOutlined />}
-                                                disabled={!student.parentContact}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (student.parentContact) void copyToClipboard(student.parentContact, 'Contact copied');
-                                                }}
-                                            />
-                                        </Tooltip>,
+                                        !student.portalCode && (
+                                            <Tooltip key="gen" title="Generate portal code">
+                                                <Button
+                                                    size="small"
+                                                    icon={<KeyOutlined />}
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        const code = await generatePortalCode(student.id);
+                                                        message.success(`Portal code created: ${code}`);
+                                                    }}
+                                                >
+                                                    Generate code
+                                                </Button>
+                                            </Tooltip>
+                                        ),
+                                        student.parentContact && (
+                                            <Tooltip key="call" title="Call parent">
+                                                <Button
+                                                    size="small"
+                                                    icon={<PhoneOutlined />}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (student.parentContact) window.open(`tel:${student.parentContact}`, '_self');
+                                                    }}
+                                                >
+                                                    Call
+                                                </Button>
+                                            </Tooltip>
+                                        ),
+                                        student.parentContact && (
+                                            <Tooltip key="copy" title="Copy parent contact">
+                                                <Button
+                                                    size="small"
+                                                    icon={<CopyOutlined />}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (student.parentContact) void copyToClipboard(student.parentContact, 'Contact copied');
+                                                    }}
+                                                />
+                                            </Tooltip>
+                                        ),
                                         <Button
                                             key="fix"
                                             size="small"
@@ -260,7 +313,7 @@ export default function UrgentMatters() {
                                         >
                                             View
                                         </Button>
-                                    ]}
+                                    ].filter(Boolean)}
                                     onClick={() => setProfileStudentId(student.id)}
                                 >
                                     <List.Item.Meta
@@ -335,30 +388,32 @@ export default function UrgentMatters() {
                                             Generate
                                         </Button>
                                     </Tooltip>,
-                                    <Tooltip key="call" title="Call parent">
-                                        <Button
-                                            size="small"
-                                            icon={<PhoneOutlined />}
-                                            disabled={!student.parentContact}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (student.parentContact) window.open(`tel:${student.parentContact}`, '_self');
-                                            }}
-                                        >
-                                            Call
-                                        </Button>
-                                    </Tooltip>,
-                                    <Tooltip key="copy" title="Copy parent contact">
-                                        <Button
-                                            size="small"
-                                            icon={<CopyOutlined />}
-                                            disabled={!student.parentContact}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (student.parentContact) void copyToClipboard(student.parentContact, 'Contact copied');
-                                            }}
-                                        />
-                                    </Tooltip>,
+                                    student.parentContact && (
+                                        <Tooltip key="call" title="Call parent">
+                                            <Button
+                                                size="small"
+                                                icon={<PhoneOutlined />}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (student.parentContact) window.open(`tel:${student.parentContact}`, '_self');
+                                                }}
+                                            >
+                                                Call
+                                            </Button>
+                                        </Tooltip>
+                                    ),
+                                    student.parentContact && (
+                                        <Tooltip key="copy" title="Copy parent contact">
+                                            <Button
+                                                size="small"
+                                                icon={<CopyOutlined />}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (student.parentContact) void copyToClipboard(student.parentContact, 'Contact copied');
+                                                }}
+                                            />
+                                        </Tooltip>
+                                    ),
                                     <Button
                                         key="view"
                                         type="link"
@@ -391,24 +446,24 @@ export default function UrgentMatters() {
                 </Card>
             )}
 
-            {noMarksStudents.length > 0 && (
+            {incompleteMarksStudents.length > 0 && (
                 <Card
                     title={
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-yellow-100 rounded-xl flex items-center justify-center">
                                 <ClockCircleOutlined className="text-yellow-600" />
                             </div>
-                            <span className="font-bold">Students With No Marks Recorded</span>
-                            <Badge count={noMarksStudents.length} color="gold" />
+                            <span className="font-bold">Students with Incomplete Marks</span>
+                            <Badge count={incompleteMarksStudents.length} color="gold" />
                         </div>
                     }
                     className="rounded-2xl border-l-4 border-l-yellow-500 shadow-sm"
                 >
                     <Paragraph type="secondary" className="mb-4">
-                        These students have no assessment marks recorded for <Text strong>{currentSemester}</Text>. Use the Teacher Portal or Mark Entry to record their scores.
+                        These students have missing assessment marks for <Text strong>{currentSemester}</Text>. Use the Teacher Portal or Mark Entry to record their scores.
                     </Paragraph>
                     <List
-                        dataSource={noMarksStudents}
+                        dataSource={incompleteMarksStudents}
                         rowKey="id"
                         renderItem={student => (
                             <List.Item 
