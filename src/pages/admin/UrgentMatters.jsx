@@ -131,7 +131,11 @@ export default function UrgentMatters() {
 
     const generatePortalCode = async (studentId) => {
         const code = generateUniquePortalCode(usedPortalCodes);
-        await db.students.update(studentId, { portalCode: code, synced: 0 });
+        await db.students.update(studentId, { 
+            portalCode: code, 
+            synced: 0,
+            updated_at: new Date().toISOString()
+        });
         return code;
     };
 
@@ -143,7 +147,11 @@ export default function UrgentMatters() {
             for (const s of missingPortalCode) {
                 const code = generateUniquePortalCode(used);
                 used.add(code);
-                await db.students.update(s.id, { portalCode: code, synced: 0 });
+                await db.students.update(s.id, { 
+                    portalCode: code, 
+                    synced: 0,
+                    updated_at: new Date().toISOString()
+                });
                 updated++;
             }
             message.success(`Generated ${updated} portal code${updated !== 1 ? 's' : ''}`);

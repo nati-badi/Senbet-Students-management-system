@@ -340,7 +340,8 @@ export default function DocumentGenerator({ type }) {
         <div className="flex flex-col gap-6 w-full">
             <div className="max-w-[600px]">
                 <Title level={2}>{type === 'id-card' ? t('admin.idCardGenerator') : t('admin.finalCertificates')}</Title>
-                <Text type="secondary">{type === 'id-card' ? t('admin.idCardDesc') : t('admin.certificateTemplateDesc')}</Text>
+                <Text type="secondary">{type === 'id-card' ? t('admin.idCardDesc') : t('admin.generatorDesc')}</Text>
+
 
                 <Card className="mt-6 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                     <Space orientation="vertical" className="w-full" size="middle">

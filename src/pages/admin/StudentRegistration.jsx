@@ -84,6 +84,7 @@ export default function StudentRegistration() {
                 portalCode: values.portalCode || Math.floor(100000 + Math.random() * 900000).toString(),
                 academicYear,
                 synced: 0,
+                updated_at: new Date().toISOString()
             });
             form.resetFields();
             form.setFieldsValue({ dateOfEntry: dayjs() });
@@ -97,6 +98,7 @@ export default function StudentRegistration() {
     const handleDelete = async (id) => {
         try {
             await db.students.delete(id);
+            await db.deleted_records.add({ tableName: 'students', recordId: id });
             message.success('Student removed from database.');
         } catch (err) {
             message.error('Delete failed.');
@@ -120,7 +122,8 @@ export default function StudentRegistration() {
             await db.students.update(editingStudent.id, {
                 ...values,
                 academicYear,
-                synced: 0
+                synced: 0,
+                updated_at: new Date().toISOString()
             });
             setIsEditModalVisible(false);
             message.success('Student record updated.');

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Button, Typography, Statistic, Row, Col, List, Badge, notification, Empty, Space } from 'antd';
-import { CloudSyncOutlined, CloudUploadOutlined, CloudDownloadOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { CloudSyncOutlined, CloudUploadOutlined, CloudDownloadOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SyncOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { syncData } from '../../utils/sync';
 
@@ -62,15 +62,25 @@ export default function SyncCenter() {
                     <Title level={2}>{t('admin.syncCenter') || 'Cloud Sync Center'}</Title>
                     <Text type="secondary">Keep your Local Desktop and Teacher Mobile data in sync via Supabase Cloud.</Text>
                 </div>
-                <Button
-                    type="primary"
-                    size="large"
-                    icon={<CloudSyncOutlined />}
-                    loading={isSyncing}
-                    onClick={handleSync}
-                >
-                    {isSyncing ? 'Syncing...' : 'Start Sync Now'}
-                </Button>
+                <Space>
+                    <Button
+                        type="default"
+                        icon={<SyncOutlined />}
+                        loading={isSyncing}
+                        onClick={() => handleSync({ force: true })}
+                    >
+                        {isSyncing ? 'Processing...' : 'Force Full Re-sync'}
+                    </Button>
+                    <Button
+                        type="primary"
+                        size="large"
+                        icon={<CloudSyncOutlined />}
+                        loading={isSyncing}
+                        onClick={() => handleSync()}
+                    >
+                        {isSyncing ? 'Syncing...' : 'Start Sync Now'}
+                    </Button>
+                </Space>
             </div>
 
             <Row gutter={16}>

@@ -342,6 +342,14 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     });
     const selectedAssessment = allAssessments.find(a => a.id === selectedAssessmentId);
 
+    // Guard: clear stale sessionStorage ID if it no longer matches any available assessment
+    // This prevents the <Select> from showing a raw UUID before data loads
+    useEffect(() => {
+        if (selectedAssessmentId && !isLoading && filteredAssessments.length > 0 && !filteredAssessments.find(a => a.id === selectedAssessmentId)) {
+            setSelectedAssessmentId('');
+        }
+    }, [selectedAssessmentId, filteredAssessments, isLoading]);
+
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
     const dbGrades = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
     const extraGradeOptions = dbGrades
@@ -376,6 +384,13 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             const marks = await db.marks
                 .where('assessmentId').equals(selectedAssessmentId)
                 .toArray();
+
+            // Sort by updated_at ascending so the newest ones overwrite the older ones in the map
+            marks.sort((a, b) => {
+                const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                return timeA - timeB;
+            });
 
             const markMap = {};
             marks.forEach(m => {
@@ -419,11 +434,27 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 const value = marks[studentId];
                 const score = parseFloat(value);
 
+                const allExisting = await db.marks
+                    .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
+                    .toArray();
+
+                // Sort by updated_at ascending to identify the absolute newest record
+                allExisting.sort((a, b) => {
+                    const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                    const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                    return timeA - timeB;
+                });
+
+                const existingMark = allExisting.pop(); // The newest one
+
+                // Self-healing: queue any orphaned duplicates for deletion
+                for (const old of allExisting) {
+                    idsToDelete.push(old.id);
+                    await db.marks.delete(old.id);
+                }
+
                 if (value === '' || value === null || value === undefined || isNaN(score)) {
                     // If value is cleared, delete existing mark if any
-                    const existingMark = await db.marks
-                        .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
-                        .first();
                     if (existingMark) {
                         idsToDelete.push(existingMark.id);
                         await db.marks.delete(existingMark.id);
@@ -433,12 +464,13 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
                 if (score > selectedAssessment.maxScore) continue;
 
-                const existingMark = await db.marks
-                    .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
-                    .first();
-
                 if (existingMark) {
-                    await db.marks.update(existingMark.id, { score, synced: 0 });
+                    await db.marks.update(existingMark.id, { 
+                        score, 
+                        synced: 0,
+                        semester: currentSemesterSetting,
+                        updated_at: new Date().toISOString()
+                    });
                 } else {
                     await db.marks.add({
                         id: crypto.randomUUID(),
@@ -447,7 +479,9 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         subject: selectedAssessment.subjectName,
                         assessmentDate: selectedAssessment.date,
                         score,
-                        synced: 0
+                        synced: 0,
+                        semester: currentSemesterSetting,
+                        updated_at: new Date().toISOString()
                     });
                 }
             }
@@ -518,7 +552,8 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const handlePredictMarks = async () => {
         if (!selectedAssessment) return;
 
-        const studentsWithoutMarks = studentsInGrade.filter(s => marks[s.id] === undefined || marks[s.id] === '');
+        const allStudentsInGrade = allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
+        const studentsWithoutMarks = allStudentsInGrade.filter(s => marks[s.id] === undefined || marks[s.id] === '');
         if (studentsWithoutMarks.length === 0) {
             message.info(t('teacher.fullyGraded'));
             return;
@@ -527,11 +562,13 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         // Pre-filter: only include students who have AT LEAST ONE mark in this subject already
         const studentsWithHistory = [];
         for (const student of studentsWithoutMarks) {
-            const historyCount = await db.marks
-                .where('studentId').equals(student.id)
-                .filter(m => m.subject === selectedAssessment.subjectName)
-                .count();
-            if (historyCount > 0) {
+            const studentMarks = await db.marks.where('studentId').equals(student.id).toArray();
+            const hasSubjectHistory = studentMarks.some(m => {
+                const ass = allAssessments.find(a => a.id === m.assessmentId);
+                return ass && ass.subjectName === selectedAssessment.subjectName;
+            });
+            
+            if (hasSubjectHistory) {
                 studentsWithHistory.push(student);
             }
         }
@@ -548,23 +585,28 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 const predictions = [];
                 for (const student of studentsWithHistory) {
                     // Find all marks for this student in the same subject
-                    const subjectMarks = await db.marks
-                        .where('studentId').equals(student.id)
-                        .filter(m => m.subject === selectedAssessment.subjectName)
-                        .toArray();
+                    const studentMarks = await db.marks.where('studentId').equals(student.id).toArray();
+                    const subjectMarks = studentMarks.filter(m => {
+                        const ass = allAssessments.find(a => a.id === m.assessmentId);
+                        return ass && ass.subjectName === selectedAssessment.subjectName;
+                    });
 
                     if (subjectMarks.length > 0) {
                         // Calculate average percentage
                         let totalPercentage = 0;
+                        let validCount = 0;
                         for (const m of subjectMarks) {
                             const assessment = allAssessments.find(a => a.id === m.assessmentId);
                             if (assessment && assessment.maxScore > 0) {
                                 totalPercentage += (m.score / assessment.maxScore);
+                                validCount++;
                             }
                         }
-                        const avgPercentage = totalPercentage / subjectMarks.length;
-                        const predictedScore = Math.round(avgPercentage * selectedAssessment.maxScore * 10) / 10;
-                        predictions.push({ id: student.id, score: predictedScore });
+                        if (validCount > 0) {
+                            const avgPercentage = totalPercentage / validCount;
+                            const predictedScore = Math.round(avgPercentage * selectedAssessment.maxScore * 10) / 10;
+                            predictions.push({ id: student.id, score: predictedScore });
+                        }
                     }
                 }
 
@@ -573,7 +615,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     handleMarkChange(p.id, p.score.toString());
                     count++;
                 }
-                message.success(t('teacher.predictionSuccess', { count }));
+                message.success(t('teacher.predictSuccess', { count }));
             }
         });
     };
@@ -644,7 +686,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                             <Form.Item label={t('teacher.selectAssessment')} style={{ marginBottom: 0 }}>
                                 <Select
                                     placeholder={t('teacher.selectAssessment')}
-                                    value={selectedAssessmentId}
+                                    value={selectedAssessmentId && selectedAssessment ? selectedAssessmentId : undefined}
                                     onChange={setSelectedAssessmentId}
                                     options={Object.entries(
                                         filteredAssessments.reduce((acc, a) => {
@@ -814,6 +856,13 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                 .filter(a => a.date === attendanceDate)
                 .toArray();
 
+            // Sort by updated_at ascending
+            records.sort((a, b) => {
+                const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                return timeA - timeB;
+            });
+
             const attMap = {};
             records.forEach(r => {
                 attMap[r.studentId] = r.status;
@@ -847,12 +896,27 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             const idsToDelete = [];
             for (const studentId of modifiedAttendance) {
                 const status = attendance[studentId];
+                const allExisting = await db.attendance
+                    .where('[studentId+date]')
+                    .equals([studentId, attendanceDate])
+                    .toArray();
+
+                allExisting.sort((a, b) => {
+                    const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                    const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                    return timeA - timeB;
+                });
+
+                const existingRecord = allExisting.pop();
+                
+                // Self-healing: queue any orphaned duplicates for deletion
+                for (const old of allExisting) {
+                    idsToDelete.push(old.id);
+                    await db.attendance.delete(old.id);
+                }
+
                 // If status is undefined (e.g., cleared), delete the record
                 if (!status) {
-                    const existingRecord = await db.attendance
-                        .where('[studentId+date]')
-                        .equals([studentId, attendanceDate])
-                        .first();
                     if (existingRecord) {
                         idsToDelete.push(existingRecord.id);
                         await db.attendance.delete(existingRecord.id);
@@ -860,13 +924,13 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                     continue;
                 }
 
-                const existingRecord = await db.attendance
-                    .where('[studentId+date]')
-                    .equals([studentId, attendanceDate])
-                    .first();
-
                 if (existingRecord) {
-                    await db.attendance.update(existingRecord.id, { status, semester: currentSemesterSetting, synced: 0 });
+                    await db.attendance.update(existingRecord.id, { 
+                        status, 
+                        semester: currentSemesterSetting, 
+                        synced: 0,
+                        updated_at: new Date().toISOString()
+                    });
                 } else {
                     await db.attendance.add({
                         id: crypto.randomUUID(),
@@ -874,7 +938,8 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                         date: attendanceDate,
                         status,
                         semester: currentSemesterSetting,
-                        synced: 0
+                        synced: 0,
+                        updated_at: new Date().toISOString()
                     });
                 }
             }
@@ -1041,7 +1106,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                                     <Space orientation="vertical" className="w-full">
                                         <Text strong type="secondary">{t('teacher.selectAssessment')}</Text>
                                         <Select
-                                            value={selectedAssessmentId}
+                                            value={selectedAssessmentId && selectedAssessment ? selectedAssessmentId : undefined}
                                             onChange={setSelectedAssessmentId}
                                             style={{ width: '100%' }}
                                             size="large"

@@ -29,12 +29,16 @@ export default function AssessmentManagement() {
             };
 
             if (editingId) {
-                await db.assessments.update(editingId, data);
+                await db.assessments.update(editingId, {
+                    ...data,
+                    updated_at: new Date().toISOString()
+                });
                 message.success(t('common.save'));
             } else {
                 await db.assessments.add({
                     id: crypto.randomUUID(),
-                    ...data
+                    ...data,
+                    updated_at: new Date().toISOString()
                 });
                 message.success(t('admin.assessmentAdded'));
             }
@@ -54,8 +58,13 @@ export default function AssessmentManagement() {
     };
 
     const handleDelete = async (id) => {
-        await db.assessments.delete(id);
-        message.success(t('admin.assessmentDeleted'));
+        try {
+            await db.assessments.delete(id);
+            await db.deleted_records.add({ tableName: 'assessments', recordId: id });
+            message.success(t('admin.assessmentDeleted'));
+        } catch (err) {
+            message.error("Failed to delete assessment");
+        }
     };
 
     const columns = [

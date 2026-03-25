@@ -104,11 +104,11 @@ export default function App() {
     message.info('Logged out.');
   };
 
-  const handleSync = useCallback(async ({ silent = false } = {}) => {
+  const handleSync = useCallback(async ({ silent = false, force = false } = {}) => {
     if (!isOnline || isSyncing) return;
     setIsSyncing(true);
     const hide = silent ? message.loading('Syncing...', 0) : null;
-    const result = await syncData();
+    const result = await syncData({ force });
     setIsSyncing(false);
     if (hide) hide();
     if (result.success) {

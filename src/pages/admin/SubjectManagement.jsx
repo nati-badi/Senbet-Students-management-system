@@ -20,7 +20,8 @@ export default function SubjectManagement() {
                 await db.subjects.update(editingId, {
                     name: values.name,
                     semester: values.semester,
-                    synced: 0
+                    synced: 0,
+                    updated_at: new Date().toISOString()
                 });
                 message.success(t('common.save'));
             } else {
@@ -28,7 +29,8 @@ export default function SubjectManagement() {
                     id: crypto.randomUUID(),
                     name: values.name,
                     semester: values.semester,
-                    synced: 0
+                    synced: 0,
+                    updated_at: new Date().toISOString()
                 });
                 message.success(t('admin.subjectAdded'));
             }
@@ -48,8 +50,13 @@ export default function SubjectManagement() {
     };
 
     const handleDelete = async (id) => {
-        await db.subjects.delete(id);
-        message.success(t('admin.subjectDeleted'));
+        try {
+            await db.subjects.delete(id);
+            await db.deleted_records.add({ tableName: 'subjects', recordId: id });
+            message.success(t('admin.subjectDeleted'));
+        } catch (err) {
+            message.error("Failed to delete subject");
+        }
     };
 
     const columns = [

@@ -3,6 +3,7 @@ import { Typography, Card, Popconfirm, Button, notification } from 'antd';
 import { WarningOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { db } from '../../db/database';
+import { supabase } from '../../utils/supabaseClient';
 
 const { Title, Text: AntText } = Typography;
 
@@ -11,22 +12,40 @@ export default function SystemDataManagement() {
 
     const handleWipeDatabase = async () => {
         try {
+            // 1. Wipe cloud (Supabase) first — marks depend on students/assessments, so delete them first
+            const tables = ['marks', 'attendance', 'assessments', 'students', 'subjects'];
+            for (const table of tables) {
+                // neq('id', '') matches ALL rows (every id is not empty)
+                const { error } = await supabase.from(table).delete().neq('id', '');
+                if (error) {
+                    console.error(`Failed to wipe Supabase table "${table}":`, error);
+                    throw error;
+                }
+            }
+
+            // 2. Wipe local Dexie
             await db.students.clear();
             await db.attendance.clear();
             await db.marks.clear();
             await db.subjects.clear();
             await db.assessments.clear();
 
+            // 3. Clear the deleted_records queue so old deletions don't re-fire
+            if (db.deleted_records) {
+                await db.deleted_records.clear();
+            }
+
             notification.success({
                 message: 'Database Erased',
-                description: 'All local data has been completely erased.',
+                description: 'All data has been erased from both this device and the cloud server. Mobile devices will be cleared on next sync.',
                 placement: 'topRight',
                 duration: 5,
             });
         } catch (error) {
+            console.error('Wipe error:', error);
             notification.error({
                 message: 'Wipe Failed',
-                description: 'Failed to completely wipe the database.',
+                description: 'Failed to completely wipe the database. ' + (error?.message || ''),
                 placement: 'topRight',
             });
         }

@@ -27,7 +27,7 @@ import AcademicSetup from './AcademicSetup';
 import TeacherManagement from './TeacherManagement';
 import ReportsAndBackups from './ReportsAndBackups';
 import StudentAnalytics from './StudentAnalytics';
-import TemplateDesigner from './TemplateDesigner';
+
 
 const { Text } = Typography;
 const { Content, Sider } = Layout;
@@ -118,17 +118,7 @@ export default function AdminDashboard() {
                     ),
                     disabled: true
                 },
-                {
-                    key: '/admin/templates-soon',
-                    icon: <EditOutlined />,
-                    label: (
-                        <div className="flex items-center justify-between w-full menu-item-coming-soon opacity-50">
-                            <span>{t('admin.templateDesigner', 'Template Designer')}</span>
-                            <Tag color="orange" className="text-[8px] px-1 py-0 h-fit leading-none">{t('common.comingSoon', 'Soon')}</Tag>
-                        </div>
-                    ),
-                    disabled: true
-                },
+
             ]
         },
     ];
@@ -195,7 +185,7 @@ export default function AdminDashboard() {
                     <Route path="/reports" element={<ReportsAndBackups />} />
                     <Route path="/analytics" element={<StudentAnalytics />} />
                     <Route path="/sync" element={<SyncCenter />} />
-                    <Route path="/templates" element={<TemplateDesigner />} />
+
                     <Route path="/academic-setup" element={<AcademicSetup />} />
                 </Routes>
             </Content>

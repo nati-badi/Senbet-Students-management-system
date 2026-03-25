@@ -54,6 +54,14 @@ interface Teacher {
   assignedsubjects?: string[];
 }
 
+// ── Polyfills & Helpers ──────────────────────────────────────────
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 // ── Theme Management ──────────────────────────────────────────
 const THEMES = {
   dark: {
@@ -419,10 +427,10 @@ export default function App() {
                 }
               })}
             >
-              <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} showToast={showToast} />}</Tab.Screen>
+              <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} subjects={subjects} settings={settings} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} showToast={showToast} />}</Tab.Screen>
               <Tab.Screen name="Students">{(props: any) => <StudentsTab {...props} teacher={teacher!} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
-              <Tab.Screen name="Attendance">{(props: any) => <AttendanceTab {...props} teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={() => syncData()} C={C} s={s} showToast={showToast} />}</Tab.Screen>
-              <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} showToast={showToast} />}</Tab.Screen>
+              <Tab.Screen name="Attendance">{(props: any) => <AttendanceTab {...props} teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={() => syncData()} C={C} s={s} showToast={showToast} settings={settings} />}</Tab.Screen>
+              <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} showToast={showToast} settings={settings} />}</Tab.Screen>
               <Tab.Screen name="Analytics">{(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} />}</Tab.Screen>
               <Tab.Screen name="Urgent">{(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}</Tab.Screen>
             </Tab.Navigator>
@@ -548,8 +556,8 @@ function TeacherLogin({ onLogin, isDark, toggleTheme, toggleLanguage }: { onLogi
 // ═══════════════════════════════════════════════════════════════
 //  DASHBOARD TAB
 // ═══════════════════════════════════════════════════════════════
-function DashboardTab({ teacher, students: allStudents, assessments: allAssessments, marks, attendance, C, s, setTab, onSync, isSyncing, showToast }: {
-  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], attendance: any[], C: any, s: any, setTab: (t: any) => void, onSync: () => void, isSyncing: boolean, showToast?: (msg: string, type: 'success'|'error'|'info') => void
+function DashboardTab({ teacher, students: allStudents, assessments: allAssessments, marks, attendance, subjects, settings, C, s, setTab, onSync, isSyncing, showToast }: {
+  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], attendance: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, setTab: (t: any) => void, onSync: () => void, isSyncing: boolean, showToast?: (msg: string, type: 'success'|'error'|'info') => void
 }) {
   const { t } = useTranslation();
   const today = formatEthiopianDate(new Date());
@@ -571,9 +579,12 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
   // Dashboard missing marks: use same logic as Urgent Matters (all students * all assessments for their grade)
   const missingCount = students.reduce((acc, st) => {
     const stGrade = normG(st.grade);
-    const stAsses = assessments.filter(a => 
-      normG(a.grade) === stGrade && !isConduct(a)
-    );
+    const stAsses = assessments.filter(a => {
+      if (normG(a.grade) !== stGrade || isConduct(a)) return false;
+      const subject = subjects.find(s => s.name === a.subjectname);
+      const assessmentSemester = subject?.semester || 'Semester I';
+      return assessmentSemester === (settings.currentSemester || 'Semester I');
+    });
     const missing = stAsses.filter(a => !marks.some(m => m.studentid === st.id && m.assessmentid === a.id));
     return acc + missing.length;
   }, 0);
@@ -722,8 +733,8 @@ function StudentsTab({ route, navigation, teacher, students: allStudents, onRefr
 // ═══════════════════════════════════════════════════════════════
 //  ATTENDANCE TAB  (uses lowercase: studentid)
 // ═══════════════════════════════════════════════════════════════
-function AttendanceTab({ route, navigation, teacher, students: allStudents, attendanceData, setAttendanceData, onRefresh, C, s, showToast }: {
-  route: any, navigation: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void
+function AttendanceTab({ route, navigation, teacher, students: allStudents, attendanceData, setAttendanceData, onRefresh, C, s, showToast, settings }: {
+  route: any, navigation: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any
 }) {
   // Filter for THIS teacher (Memoized)
   const myGrades = teacher.assignedgrades || [];
@@ -809,6 +820,7 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
         date,
         status: attendance[st.id] || 'absent',
         markedby: teacher.id,
+        semester: settings.currentSemester || 'Semester I',
         updated_at: new Date().toISOString()
       }));
 
@@ -963,8 +975,8 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
 // ═══════════════════════════════════════════════════════════════
 //  MARKS TAB  (uses lowercase: studentid, assessmentid, etc.)
 // ═══════════════════════════════════════════════════════════════
-function MarksTab({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, showToast }: {
-  route: any, navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, showToast?: (msg: string, type: 'success'|'error'|'info') => void
+function MarksTab({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, showToast, settings }: {
+  route: any, navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any
 }) {
   // Filter for THIS teacher (Memoized)
   const myGrades = teacher.assignedgrades || [];
@@ -995,6 +1007,8 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const [search, setSearch] = useState('');
   const [bulkVisible, setBulkVisible] = useState(false);
   const [bulkScore, setBulkScore] = useState('');
+  const [predictVisible, setPredictVisible] = useState(false);
+  const [predictDetails, setPredictDetails] = useState<{count: number, subject: string, students: any[]}>({ count: 0, subject: '', students: [] });
   const [page, setPage] = useState(0);
 
   useEffect(() => {
@@ -1043,7 +1057,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const gradeStudents = students.filter((st) => String(st.grade) === selectedGrade);
   const filteredStudents = gradeStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
 
-  const saveMarks = async () => {
+  const saveMarksWithData = async (currentMarksData: Record<string, string>) => {
     if (!selectedAssessment) return;
     setSaving(true);
     try {
@@ -1052,16 +1066,17 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       const recordsToProcess: any[] = [];
 
       gradeStudents.forEach(student => {
-        const scoreStr = marks[student.id];
+        const scoreStr = currentMarksData[student.id];
         const score = scoreStr && scoreStr !== '' ? Math.round(parseFloat(scoreStr)) : null;
         const existingId = markIds[student.id];
 
         const record = {
-          id: existingId || crypto.randomUUID(),
+          id: existingId || generateUUID(),
           studentid: student.id,
           assessmentid: selectedAssessment.id,
           score,
           assessmentdate: selectedAssessment.date,
+          semester: settings.currentSemester || 'Semester I',
           updated_at: new Date().toISOString()
         };
         recordsToProcess.push(record);
@@ -1104,6 +1119,8 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     }
   };
 
+  const saveMarks = () => saveMarksWithData(marks);
+
   const handleFillConstantMark = () => {
     if (!selectedAssessment) return;
     const studentsWithoutMarks = gradeStudents.filter(st => marks[st.id] === undefined || marks[st.id] === '');
@@ -1126,7 +1143,9 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     setMarks(updates);
     setBulkVisible(false);
     setBulkScore('');
-    showToast?.(`✅ Filled ${val} for ${studentsWithoutMarks.length} students`, 'success');
+    
+    // Auto-save
+    saveMarksWithData(updates);
   };
 
   const handlePredictMarks = () => {
@@ -1151,46 +1170,46 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       return;
     }
 
-    Alert.alert(
-      'Predict Marks',
-      `Predict marks for ${studentsWithHistory.length} students based on their performance history in ${selectedAssessment.subjectname}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Predict', 
-          onPress: () => {
-            const updates = { ...marks };
-            let count = 0;
-            for (const student of studentsWithHistory) {
-              const subjectMarks = marksData.filter(m => m.studentid === student.id).filter(m => {
-                const a = assessments.find(ax => ax.id === m.assessmentid);
-                return a && a.subjectname === selectedAssessment.subjectname;
-              });
+    setPredictDetails({ 
+      count: studentsWithHistory.length, 
+      subject: selectedAssessment.subjectname, 
+      students: studentsWithHistory 
+    });
+    setPredictVisible(true);
+  };
 
-              if (subjectMarks.length > 0) {
-                let totalPercentage = 0;
-                let validCount = 0;
-                for (const m of subjectMarks) {
-                  const assessment = assessments.find(a => a.id === m.assessmentid);
-                  if (assessment && assessment.maxscore > 0) {
-                    totalPercentage += (Number(m.score) / assessment.maxscore);
-                    validCount++;
-                  }
-                }
-                if (validCount > 0) {
-                  const avgPercentage = totalPercentage / validCount;
-                  const predictedScore = Math.round(avgPercentage * selectedAssessment.maxscore * 10) / 10;
-                  updates[student.id] = predictedScore.toString();
-                  count++;
-                }
-              }
-            }
-            setMarks(updates);
-            showToast?.(`✅ Predicted marks for ${count} students`, 'success');
+  const applyPrediction = () => {
+    const updates = { ...marks };
+    let count = 0;
+    for (const student of predictDetails.students) {
+      const subjectMarks = marksData.filter(m => m.studentid === student.id).filter(m => {
+        const a = assessments.find(ax => ax.id === m.assessmentid);
+        return a && a.subjectname === predictDetails.subject;
+      });
+
+      if (subjectMarks.length > 0) {
+        let totalPercentage = 0;
+        let validCount = 0;
+        for (const m of subjectMarks) {
+          const assessment = assessments.find(a => a.id === m.assessmentid);
+          if (assessment && assessment.maxscore > 0) {
+            totalPercentage += (Number(m.score) / assessment.maxscore);
+            validCount++;
           }
         }
-      ]
-    );
+        if (validCount > 0) {
+          const avgPercentage = totalPercentage / validCount;
+          const predictedScore = Math.round(avgPercentage * selectedAssessment!.maxscore * 10) / 10;
+          updates[student.id] = predictedScore.toString();
+          count++;
+        }
+      }
+    }
+    setMarks(updates);
+    setPredictVisible(false);
+
+    // Auto-save
+    saveMarksWithData(updates);
   };
 
   return (
@@ -1316,6 +1335,25 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
               </TouchableOpacity>
               <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}>
                 <Text style={s.modalBtnText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={predictVisible} transparent animationType="fade">
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Predict Missing Marks</Text>
+            <Text style={[s.modalSub, { marginBottom: 20 }]}>
+              Predict missing marks for <Text style={{fontWeight: '800', color: C.accent}}>{predictDetails.count} students</Text> based on their past performance history in {predictDetails.subject}?
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={() => setPredictVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}>
+                <Text style={[s.modalBtnText, { color: C.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={applyPrediction} style={[s.modalBtn, { backgroundColor: C.accent }]}>
+                <Text style={[s.modalBtnText, { color: '#fff' }]}>Predict</Text>
               </TouchableOpacity>
             </View>
           </View>

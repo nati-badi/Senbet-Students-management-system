@@ -10,47 +10,72 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
     
     console.log(`Pulled ${cloudData.length} records from ${tableName}. Filtering local conflicts...`);
     
-    // Filter out records that are currently unsynced locally to prevent data loss
+    // Fetch local unsynced records to detect conflicts
     const currentUnsynced = await tableDb.where('synced').equals(0).toArray();
-    const unsyncedIds = new Set(currentUnsynced.map(r => r.id));
+    const unsyncedMap = new Map(currentUnsynced.map(r => [r.id, r]));
     
-    const localReadyData = cloudData
-        .filter(record => !unsyncedIds.has(record.id))
-        .map(record => {
-            const { updated_at, ...mapped } = record;
+    const localReadyData = [];
+    
+    for (const serverRecord of cloudData) {
+        let shouldApply = false;
+        const localRecord = unsyncedMap.get(serverRecord.id);
+        
+        if (!localRecord) {
+            // No local record exists, definitely apply it
+            shouldApply = true;
+        } else {
+            // Conflict! Check which one is newer. 
+            // Fallback to created_at if updated_at is missing (e.g. if SQL migration not yet run)
+            const serverTime = (serverRecord.updated_at || serverRecord.created_at) 
+                ? new Date(serverRecord.updated_at || serverRecord.created_at).getTime() 
+                : 1; // Default to old but non-zero to distinguish from "nothing"
+            
+            const localTime = localRecord.updated_at ? new Date(localRecord.updated_at).getTime() : 0;
+            
+            if (serverTime > localTime) {
+                console.log(`Conflict resolved: Server is newer for ${tableName}:${serverRecord.id}`);
+                shouldApply = true;
+            } else {
+                console.log(`Conflict resolved: Local is newer for ${tableName}:${serverRecord.id} (Keeping local)`);
+                shouldApply = false;
+            }
+        }
+        
+        if (shouldApply) {
+            const mapped = { ...serverRecord };
             mapped.synced = 1;
 
-            // Dynamic Field Mapping (Postgres lowercase -> JS camelCase)
+            // Explicit Mapping (Supabase lowercase -> Dexie camelCase)
             if (tableName === 'students') {
-                if (record.baptismalname !== undefined) { mapped.baptismalName = record.baptismalname; delete mapped.baptismalname; }
-                if (record.parentcontact !== undefined) { mapped.parentContact = record.parentcontact; delete mapped.parentcontact; }
-                if (record.academicyear !== undefined) { mapped.academicYear = record.academicyear; delete mapped.academicyear; }
-                if (record.dateofentry !== undefined) { mapped.dateOfEntry = record.dateofentry; delete mapped.dateofentry; }
-                if (record.portalcode !== undefined) { mapped.portalCode = record.portalcode; delete mapped.portalcode; }
+                if (serverRecord.baptismalname !== undefined) { mapped.baptismalName = serverRecord.baptismalname; delete mapped.baptismalname; }
+                if (serverRecord.parentcontact !== undefined) { mapped.parentContact = serverRecord.parentcontact; delete mapped.parentcontact; }
+                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete mapped.academicyear; }
+                if (serverRecord.dateofentry !== undefined) { mapped.dateOfEntry = serverRecord.dateofentry; delete mapped.dateofentry; }
+                if (serverRecord.portalcode !== undefined) { mapped.portalCode = serverRecord.portalcode; delete mapped.portalcode; }
             } else if (tableName === 'assessments') {
-                if (record.subjectname !== undefined) { mapped.subjectName = record.subjectname; delete mapped.subjectname; }
-                if (record.maxscore !== undefined) { mapped.maxScore = record.maxscore; delete mapped.maxscore; }
+                if (serverRecord.subjectname !== undefined) { mapped.subjectName = serverRecord.subjectname; delete mapped.subjectname; }
+                if (serverRecord.maxscore !== undefined) { mapped.maxScore = serverRecord.maxscore; delete mapped.maxscore; }
             } else if (tableName === 'marks') {
-                if (record.studentid !== undefined) { mapped.studentId = record.studentid; delete mapped.studentid; }
-                if (record.assessmentid !== undefined) { mapped.assessmentId = record.assessmentid; delete mapped.assessmentid; }
-                if (record.assessmentdate !== undefined) { mapped.assessmentDate = record.assessmentdate; delete mapped.assessmentdate; }
+                if (serverRecord.studentid !== undefined) { mapped.studentId = serverRecord.studentid; delete mapped.studentid; }
+                if (serverRecord.assessmentid !== undefined) { mapped.assessmentId = serverRecord.assessmentid; delete mapped.assessmentid; }
+                if (serverRecord.assessmentdate !== undefined) { mapped.assessmentDate = serverRecord.assessmentdate; delete mapped.assessmentdate; }
             } else if (tableName === 'attendance') {
-                if (record.studentid !== undefined) { mapped.studentId = record.studentid; delete mapped.studentid; }
+                if (serverRecord.studentid !== undefined) { mapped.studentId = serverRecord.studentid; delete mapped.studentid; }
             } else if (tableName === 'teachers') {
-                if (record.accesscode !== undefined) { mapped.accessCode = record.accesscode; delete mapped.accesscode; }
-                if (record.assignedgrades !== undefined) { mapped.assignedGrades = record.assignedgrades; delete mapped.assignedgrades; }
-                if (record.assignedsubjects !== undefined) { mapped.assignedSubjects = record.assignedsubjects; delete mapped.assignedsubjects; }
-            } else if (tableName === 'templates') {
-                if (record.isdefault !== undefined) { mapped.isDefault = record.isdefault; delete mapped.isdefault; }
+                if (serverRecord.accesscode !== undefined) { mapped.accessCode = serverRecord.accesscode; delete mapped.accesscode; }
+                if (serverRecord.assignedgrades !== undefined) { mapped.assignedGrades = serverRecord.assignedgrades; delete mapped.assignedgrades; }
+                if (serverRecord.assignedsubjects !== undefined) { mapped.assignedSubjects = serverRecord.assignedsubjects; delete mapped.assignedsubjects; }
             }
-            return mapped;
-        });
+
+            localReadyData.push(mapped);
+        }
+    }
 
     if (localReadyData.length > 0) {
         await tableDb.bulkPut(localReadyData);
         pulledTotalRef.count += localReadyData.length;
         tableStatus[tableName] = { ...tableStatus[tableName], pull: 'ok', pulled: localReadyData.length };
-        console.log(`Applied ${localReadyData.length} updates to ${tableName}`);
+        console.log(`Applied ${localReadyData.length} records to local ${tableName}`);
     } else {
         tableStatus[tableName] = { ...tableStatus[tableName], pull: 'idle' };
     }
@@ -86,8 +111,8 @@ async function cleanupDeletedRecords(tableName, tableDb) {
     }
 }
 
-export async function syncData() {
-    console.log("--- Starting synchronization session ---");
+export async function syncData({ force = false } = {}) {
+    console.log(`--- Starting synchronization session ${force ? '(FORCED)' : ''} ---`);
 
     if (!supabase) {
         const msg = "Cloud Sync is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.";
@@ -102,8 +127,7 @@ export async function syncData() {
             'assessments',
             'attendance',
             'marks',
-            'teachers',
-            'templates'
+            'teachers'
         ];
 
         let pushedTotal = 0;
@@ -111,12 +135,30 @@ export async function syncData() {
         let tableStatus = {}; 
 
         const lastSyncRes = await db.settings.get('last_sync_timestamp');
-        const lastSyncTime = lastSyncRes 
-            ? new Date(new Date(lastSyncRes.value).getTime() - 60000).toISOString() 
-            : '1970-01-01T00:00:00Z';
+        let lastSyncTime = '1970-01-01T00:00:00Z';
+        
+        if (!force && lastSyncRes) {
+            // Buffer of 2 minutes to prevent edge-case race conditions
+            lastSyncTime = new Date(new Date(lastSyncRes.value).getTime() - 120000).toISOString();
+        }
         
         console.log(`Syncing changes since: ${lastSyncTime}`);
-        const currentSyncStartedAt = new Date().toISOString();
+        
+        // --- 0. OBTAIN SERVER TIME FOR CURSOR ---
+        // To prevent client/server clock-skew bugs, we ping the server to get ITS current time via trigger.
+        let serverSyncStart = new Date().toISOString(); 
+        try {
+            const { data: pingData } = await supabase
+                .from('settings')
+                .upsert({ key: 'sys_sync_ping', value: serverSyncStart })
+                .select('updated_at')
+                .single();
+            if (pingData?.updated_at) {
+                serverSyncStart = pingData.updated_at;
+            }
+        } catch(e) { console.warn("Could not get strict server time, falling back to local."); }
+        
+        const currentSyncStartedAt = serverSyncStart;
 
         // --- 1. SETTINGS SYNC (Special Case) ---
         try {
@@ -147,6 +189,33 @@ export async function syncData() {
             }
         } catch (e) { console.warn("Settings sync warning:", e); }
 
+        // --- 1.5 DELETED RECORDS SYNC ---
+        try {
+            if (db.deleted_records) {
+                const deletedRecords = await db.deleted_records.toArray();
+                if (deletedRecords.length > 0) {
+                    console.log(`Pushing ${deletedRecords.length} offline deletions...`);
+                    const deletionsByTable = {};
+                    for (const d of deletedRecords) {
+                        if (!deletionsByTable[d.tableName]) deletionsByTable[d.tableName] = [];
+                        deletionsByTable[d.tableName].push(d);
+                    }
+
+                    for (const [tName, dRecords] of Object.entries(deletionsByTable)) {
+                        const idsToDelete = dRecords.map(d => d.recordId);
+                        const { error } = await supabase.from(tName).delete().in('id', idsToDelete);
+                        if (error) {
+                            console.error(`Failed to push deletions for ${tName}:`, error);
+                        } else {
+                            const dIds = dRecords.map(d => d.id);
+                            await db.deleted_records.bulkDelete(dIds);
+                            console.log(`Successfully pushed ${idsToDelete.length} deletions to ${tName}`);
+                        }
+                    }
+                }
+            }
+        } catch (e) { console.warn("Deleted records sync warning:", e); }
+
         // --- 2. MAIN SYNC LOOP ---
         for (const tableName of TABLES) {
             console.log(`\n--- Syncing Table: ${tableName} ---`);
@@ -158,43 +227,45 @@ export async function syncData() {
                 }
 
                 // --- 2a. PUSH PHASE ---
-                    let tablePushed = 0;
-                    const unsyncedRecords = await db.table(tableName).where('synced').equals(0).toArray();
-                    
-                    if (unsyncedRecords.length > 0) {
+                let tablePushed = 0;
+                const unsyncedRecords = await db.table(tableName).where('synced').equals(0).toArray();
+                
+                if (unsyncedRecords.length > 0) {
                     console.log(`Pushing ${unsyncedRecords.length} unsynced records for ${tableName}...`);
                     
-                    // Normalize for Postgres (lowercase keys) and exclude problematic columns
                     const cleanRecords = unsyncedRecords.map(record => {
-                        // 1. First, create a lowercased version of the record
-                        const lowercased = {};
-                        Object.keys(record).forEach(k => {
-                            lowercased[k.toLowerCase()] = record[k];
-                        });
+                        const toPush = { ...record };
+                        delete toPush.synced;
 
-                        // 2. Exclude non-Supabase columns
-                        const { 
-                            synced, 
-                            updated_at,
-                            semester, // Local-only for some tables
-                            ...rest 
-                        } = lowercased;
-
-                        // 3. Ensure ID exists
-                        if (!rest.id) rest.id = crypto.randomUUID();
-                        
-                        // 4. Special handling for types (like rounding score)
-                        if (tableName === 'marks' && rest.score !== undefined && rest.score !== null) {
-                            rest.score = Math.round(parseFloat(rest.score));
+                        // Explicit Mapping: CamelCase -> Supabase Columns
+                        if (tableName === 'students') {
+                            if (record.baptismalName !== undefined) { toPush.baptismalname = record.baptismalName; delete toPush.baptismalName; }
+                            if (record.parentContact !== undefined) { toPush.parentcontact = record.parentContact; delete toPush.parentContact; }
+                            if (record.academicYear !== undefined) { toPush.academicyear = record.academicYear; delete toPush.academicYear; }
+                            if (record.dateOfEntry !== undefined) { toPush.dateofentry = record.dateOfEntry; delete toPush.dateofentry; }
+                            if (record.portalCode !== undefined) { toPush.portalcode = record.portalCode; delete toPush.portalCode; }
+                        } else if (tableName === 'assessments') {
+                            if (record.subjectName !== undefined) { toPush.subjectname = record.subjectName; delete toPush.subjectName; }
+                            if (record.maxScore !== undefined) { toPush.maxscore = record.maxScore; delete toPush.maxScore; }
+                        } else if (tableName === 'marks') {
+                            if (record.studentId !== undefined) { toPush.studentid = record.studentId; delete toPush.studentId; }
+                            if (record.assessmentId !== undefined) { toPush.assessmentid = record.assessmentId; delete toPush.assessmentId; }
+                            if (record.assessmentDate !== undefined) { toPush.assessmentdate = record.assessmentDate; delete toPush.assessmentDate; }
+                            if (toPush.score !== undefined && toPush.score !== null) toPush.score = Math.round(parseFloat(toPush.score));
+                        } else if (tableName === 'attendance') {
+                            if (record.studentId !== undefined) { toPush.studentid = record.studentId; delete toPush.studentId; }
+                        } else if (tableName === 'teachers') {
+                            if (record.accessCode !== undefined) { toPush.accesscode = record.accessCode; delete toPush.accessCode; }
+                            if (record.assignedGrades !== undefined) { toPush.assignedgrades = record.assignedGrades; delete toPush.assignedGrades; }
+                            if (record.assignedSubjects !== undefined) { toPush.assignedsubjects = record.assignedSubjects; delete toPush.assignedSubjects; }
                         }
-                        
-                        return rest;
+
+                        return toPush;
                     });
 
-                    let conflictKeys = 'id';
                     const { error: pushError } = await supabase
                         .from(tableName)
-                        .upsert(cleanRecords, { onConflict: conflictKeys });
+                        .upsert(cleanRecords, { onConflict: 'id' });
 
                     if (pushError) {
                         console.error(`Push failed for ${tableName}:`, pushError);

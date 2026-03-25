@@ -59,13 +59,18 @@ export default function TeacherManagement() {
     const handleSave = async (values) => {
         try {
             if (editingTeacher) {
-                await db.teachers.update(editingTeacher.id, { ...values, synced: 0 });
+                await db.teachers.update(editingTeacher.id, { 
+                    ...values, 
+                    synced: 0,
+                    updated_at: new Date().toISOString()
+                });
                 message.success('Teacher updated successfully');
             } else {
                 await db.teachers.add({
                     id: crypto.randomUUID(),
                     ...values,
-                    synced: 0
+                    synced: 0,
+                    updated_at: new Date().toISOString()
                 });
                 message.success('Teacher added successfully');
             }
@@ -91,6 +96,7 @@ export default function TeacherManagement() {
     const handleDelete = async (id) => {
         try {
             await db.teachers.delete(id);
+            await db.deleted_records.add({ tableName: 'teachers', recordId: id });
             message.success('Teacher deleted successfully');
             syncData().catch(console.error);
         } catch (error) {

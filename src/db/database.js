@@ -106,3 +106,34 @@ db.version(14).stores({
 db.version(15).stores({
   assessments: "++id, name, subjectName, grade, maxScore, date, synced",
 });
+
+db.version(16).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, parentContact, portalCode, synced",
+  attendance: "++id, studentId, date, status, semester, synced",
+  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, synced",
+  subjects: "++id, name, semester, synced",
+  assessments: "++id, name, subjectName, grade, maxScore, date, synced",
+  teachers: "++id, name, phone, accessCode, assignedGrades, assignedSubjects, synced",
+  settings: "key, value"
+});
+
+db.version(18).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, parentContact, portalCode, synced, updated_at",
+  attendance: "++id, studentId, date, status, semester, synced, updated_at, [studentId+date]",
+  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, semester, synced, updated_at, [studentId+assessmentId]",
+  subjects: "++id, name, semester, synced, updated_at",
+  assessments: "++id, name, subjectName, grade, maxScore, date, semester, synced, updated_at",
+  teachers: "++id, name, phone, accessCode, assignedGrades, assignedSubjects, synced, updated_at",
+  settings: "key, value, updated_at"
+});
+
+db.version(19).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, parentContact, portalCode, synced, updated_at",
+  attendance: "++id, studentId, date, status, semester, synced, updated_at, [studentId+date]",
+  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, semester, synced, updated_at, [studentId+assessmentId]",
+  subjects: "++id, name, semester, synced, updated_at",
+  assessments: "++id, name, subjectName, grade, maxScore, date, semester, synced, updated_at",
+  teachers: "++id, name, phone, accessCode, assignedGrades, assignedSubjects, synced, updated_at",
+  settings: "key, value, updated_at",
+  deleted_records: "++id, tableName, recordId"
+});

@@ -162,12 +162,20 @@ export default function AcademicSetup() {
                     await db.transaction('rw', db.students, async () => {
                         for (const student of studentsToReview) {
                             if (student.action === 'promote') {
-                                await db.students.update(student.id, { grade: student.nextGradeResult, synced: 0 });
+                                await db.students.update(student.id, { 
+                                    grade: student.nextGradeResult, 
+                                    synced: 0,
+                                    updated_at: new Date().toISOString()
+                                });
                             }
                             // If action is 'hold_back', we do nothing to the grade.
                             // If action is 'graduate', we could potentially set a status flag, but for now we might map them to '13' (Other/Graduate)
                             if (student.action === 'graduate') {
-                                await db.students.update(student.id, { grade: '13', synced: 0 });
+                                await db.students.update(student.id, { 
+                                    grade: '13', 
+                                    synced: 0,
+                                    updated_at: new Date().toISOString()
+                                });
                             }
                         }
                     });
