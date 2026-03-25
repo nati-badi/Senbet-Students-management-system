@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { syncData } from '../../utils/sync';
 import { useTranslation } from 'react-i18next';
-import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
+import { GRADE_OPTIONS, formatGrade, normalizeGrade, normalizeSubject } from '../../utils/gradeUtils';
 
 const { Title } = Typography;
 
@@ -29,12 +29,17 @@ export default function TeacherManagement() {
             .map(g => ({ value: String(g), label: formatGrade(g) }))
     ];
 
-    const subjectOptions = subjects
-        .filter(s => (s.semester || 'Semester I') === currentSemester)
-        .map(s => ({
-            label: s.name,
-            value: s.name
-        }));
+    // Helper to filter and group subjects by grade
+    const watchedGrades = Form.useWatch('assignedGrades', form) || [];
+    const availableSubjects = subjects.filter(s => 
+        (s.semester || 'Semester I') === currentSemester &&
+        watchedGrades.some(g => normalizeGrade(g) === normalizeGrade(s.grade))
+    );
+
+    const subjectOptions = availableSubjects.map(s => ({
+        label: `[${formatGrade(s.grade)}] ${s.name}`,
+        value: s.name // Storing just the name for simplicity, as per current schema
+    }));
 
     const showModal = (teacher = null) => {
         setEditingTeacher(teacher);
@@ -58,6 +63,31 @@ export default function TeacherManagement() {
 
     const handleSave = async (values) => {
         try {
+            const myGrades = values.assignedGrades || [];
+            const mySubjects = values.assignedSubjects || [];
+
+            // Check for conflicts with other teachers
+            for (const t of teachers) {
+                if (editingTeacher && t.id === editingTeacher.id) continue;
+                
+                const otherGrades = t.assignedGrades || [];
+                const otherSubjects = t.assignedSubjects || [];
+
+                const overlapGrades = otherGrades.filter(og => 
+                    myGrades.some(mg => normalizeGrade(mg) === normalizeGrade(og))
+                );
+                const overlapSubjects = otherSubjects.filter(os => 
+                    mySubjects.some(ms => normalizeSubject(ms) === normalizeSubject(os))
+                );
+
+                if (overlapGrades.length > 0 && overlapSubjects.length > 0) {
+                    const gradeList = overlapGrades.map(g => formatGrade(g)).join(', ');
+                    const subjectList = overlapSubjects.join(', ');
+                    message.error(`Conflict: ${t.name} is already assigned to ${subjectList} in ${gradeList}`);
+                    return; // Block save
+                }
+            }
+
             if (editingTeacher) {
                 await db.teachers.update(editingTeacher.id, { 
                     ...values, 
@@ -260,7 +290,8 @@ export default function TeacherManagement() {
                         <Select 
                             mode="multiple" 
                             options={subjectOptions} 
-                            placeholder="Select subjects they teach"
+                            placeholder={watchedGrades.length === 0 ? "Select grades first" : "Select subjects they teach"}
+                            disabled={watchedGrades.length === 0}
                         />
                     </Form.Item>
                 </Form>

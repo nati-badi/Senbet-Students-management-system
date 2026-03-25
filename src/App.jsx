@@ -113,6 +113,7 @@ export default function App() {
     if (hide) hide();
     if (result.success) {
       if (!silent) message.success(`Sync successful! Pushed: ${result.pushed}, Pulled: ${result.pulled}`);
+      window.dispatchEvent(new Event('syncComplete'));
     } else {
       message.error("Sync disabled: " + (result.error || "Check your internet connection and .env keys"));
     }

@@ -103,6 +103,12 @@ const normG = (g: any) => {
   return m ? m[0] : String(g).trim();
 };
 
+// ── Subject helpers ────────────────────────────────────────────
+const normS = (s: any) => {
+  if (!s) return '';
+  return String(s).trim().toLowerCase();
+};
+
 const isConduct = (a: any) => {
   const sName = (a.subjectname || '').toLowerCase();
   const aName = (a.name || '').toLowerCase();
@@ -430,8 +436,8 @@ export default function App() {
               <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} subjects={subjects} settings={settings} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} showToast={showToast} />}</Tab.Screen>
               <Tab.Screen name="Students">{(props: any) => <StudentsTab {...props} teacher={teacher!} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
               <Tab.Screen name="Attendance">{(props: any) => <AttendanceTab {...props} teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={() => syncData()} C={C} s={s} showToast={showToast} settings={settings} />}</Tab.Screen>
-              <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} showToast={showToast} settings={settings} />}</Tab.Screen>
-              <Tab.Screen name="Analytics">{(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} />}</Tab.Screen>
+              <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} showToast={showToast} settings={settings} subjects={subjects} />}</Tab.Screen>
+              <Tab.Screen name="Analytics">{(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} settings={settings} subjects={subjects} />}</Tab.Screen>
               <Tab.Screen name="Urgent">{(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}</Tab.Screen>
             </Tab.Navigator>
           )}
@@ -564,14 +570,28 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
   const [refreshing, setRefreshing] = useState(false);
 
   // Filter data for THIS teacher's dashboard (Memoized to prevent infinite loops)
-  const myGrades = teacher.assignedgrades || [];
+  const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
+  const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
+  const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
+  const assignedSubjectsRaw = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects;
+  const hasTeacherAssignedSubjects = Array.isArray(assignedSubjectsRaw) && assignedSubjectsRaw.length > 0;
+  const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
   const students = useMemo(() => 
-    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
-    [allStudents, myGrades]
+    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, hasTeacherAssignedGrades, myGrades]
   );
   const assessments = useMemo(() => 
-    allAssessments.filter(a => myGrades.length === 0 || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade)),
-    [allAssessments, myGrades]
+    allAssessments.filter(a => {
+      const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
+      const isSubjectMatch = !hasTeacherAssignedSubjects || mySubjects.includes(a.subjectname);
+      
+      const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
+      const assessmentSemester = subject?.semester || 'Semester I';
+      const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
+      
+      return isGradeMatch && isSubjectMatch && isSemesterMatch;
+    }),
+    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, mySubjects, subjects, settings.currentSemester]
   );
 
   const handleRefresh = async () => { setRefreshing(true); await onSync(); setRefreshing(false); };
@@ -579,12 +599,7 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
   // Dashboard missing marks: use same logic as Urgent Matters (all students * all assessments for their grade)
   const missingCount = students.reduce((acc, st) => {
     const stGrade = normG(st.grade);
-    const stAsses = assessments.filter(a => {
-      if (normG(a.grade) !== stGrade || isConduct(a)) return false;
-      const subject = subjects.find(s => s.name === a.subjectname);
-      const assessmentSemester = subject?.semester || 'Semester I';
-      return assessmentSemester === (settings.currentSemester || 'Semester I');
-    });
+    const stAsses = assessments.filter(a => normG(a.grade) === stGrade);
     const missing = stAsses.filter(a => !marks.some(m => m.studentid === st.id && m.assessmentid === a.id));
     return acc + missing.length;
   }, 0);
@@ -656,18 +671,31 @@ function StudentsTab({ route, navigation, teacher, students: allStudents, onRefr
   const { t } = useTranslation();
   
   // Filter for THIS teacher (Memoized)
-  const myGrades = teacher.assignedgrades || [];
+  const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
+  const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
+  const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
   const students = useMemo(() => 
-    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
-    [allStudents, myGrades]
+    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, hasTeacherAssignedGrades, myGrades]
   );
 
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const [grades, setGrades] = useState<string[]>([]);
+  const [selectedGrade, setSelectedGrade] = useState('');
+
+  useEffect(() => {
+    const uniqueGrades = [...new Set(students.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
+    setGrades(uniqueGrades);
+    if (!selectedGrade && uniqueGrades.length > 0) setSelectedGrade(uniqueGrades[0]);
+  }, [students, selectedGrade]);
 
   useEffect(() => {
     if (route.params?.search) {
       setSearch(route.params.search);
+    }
+    if (route.params?.grade) {
+      setSelectedGrade(String(route.params.grade));
     }
   }, [route.params]);
 
@@ -680,15 +708,28 @@ function StudentsTab({ route, navigation, teacher, students: allStudents, onRefr
     setRefreshing(false);
   };
 
-  const filtered = students.filter((st) => {
+  const gradeFiltered = students.filter(st => !selectedGrade || normG(st.grade) === normG(selectedGrade));
+  const filtered = gradeFiltered.filter((st) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return st.name?.toLowerCase().includes(q) || st.id?.toLowerCase().includes(q);
-  });
+  }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ padding: 16, paddingBottom: 0 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+          {grades.map((g) => (
+            <TouchableOpacity
+              key={g}
+              style={[s.gradeChip, selectedGrade === g && s.gradeChipActive]}
+              onPress={() => setSelectedGrade(g)}
+            >
+              <Text style={[s.gradeChipText, selectedGrade === g && s.gradeChipTextActive]}>{fmtGrade(g)}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         <TextInput
           style={[s.searchInput, { margin: 0 }]}
           placeholder="Search students…"
@@ -737,10 +778,12 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
   route: any, navigation: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any
 }) {
   // Filter for THIS teacher (Memoized)
-  const myGrades = teacher.assignedgrades || [];
+  const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
+  const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
+  const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
   const students = useMemo(() => 
-    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
-    [allStudents, myGrades]
+    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, hasTeacherAssignedGrades, myGrades]
   );
 
   const { t } = useTranslation();
@@ -782,8 +825,14 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
   useEffect(() => {
     const uniqueGrades = [...new Set(students.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
     setGrades(uniqueGrades);
-    if (!selectedGrade && uniqueGrades.length > 0) setSelectedGrade(uniqueGrades[0]);
-  }, [students]);
+    // If assignments are present, make sure selection stays within allowed grades.
+    if (hasTeacherAssignedGrades) {
+      const isSelectedAllowed = selectedGrade && uniqueGrades.some(g => normG(g) === normG(selectedGrade));
+      if (!isSelectedAllowed) setSelectedGrade(uniqueGrades[0] || '');
+    } else {
+      if (!selectedGrade && uniqueGrades.length > 0) setSelectedGrade(uniqueGrades[0]);
+    }
+  }, [students, hasTeacherAssignedGrades, selectedGrade]);
 
   useEffect(() => {
     if (!selectedGrade) return;
@@ -804,7 +853,7 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
     })();
   }, [selectedGrade, date]);
 
-  const gradeStudents = students.filter((st) => String(st.grade) === selectedGrade);
+  const gradeStudents = students.filter((st) => normG(st.grade) === normG(selectedGrade));
   const filteredStudents = gradeStudents.filter(st => {
     if (!search) return true;
     return st.name.toLowerCase().includes(search.toLowerCase()) || st.id.toLowerCase().includes(search.toLowerCase());
@@ -975,24 +1024,35 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
 // ═══════════════════════════════════════════════════════════════
 //  MARKS TAB  (uses lowercase: studentid, assessmentid, etc.)
 // ═══════════════════════════════════════════════════════════════
-function MarksTab({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, showToast, settings }: {
-  route: any, navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any
+function MarksTab({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, showToast, settings, subjects }: {
+  route: any, navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any, subjects: any[]
 }) {
   // Filter for THIS teacher (Memoized)
-  const myGrades = teacher.assignedgrades || [];
-  const mySubjects = teacher.assignedsubjects || [];
+  const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
+  const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
+  const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
+
+  const assignedSubjectsRaw = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects;
+  const hasTeacherAssignedSubjects = Array.isArray(assignedSubjectsRaw) && assignedSubjectsRaw.length > 0;
+  const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
+  const normalizedMySubjects = mySubjects.map(normS).filter(Boolean);
   
   const students = useMemo(() => 
-    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
-    [allStudents, myGrades]
+    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, hasTeacherAssignedGrades, myGrades]
   );
   const assessments = useMemo(() => 
     allAssessments.filter(a => {
-      const isGradeMatch = myGrades.length === 0 || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
-      const isSubjectMatch = mySubjects.length === 0 || mySubjects.includes(a.subjectname);
-      return isGradeMatch && isSubjectMatch && !isConduct(a);
+      const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
+      const isSubjectMatch = !hasTeacherAssignedSubjects || normalizedMySubjects.includes(normS(a.subjectname));
+
+      const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
+      const assessmentSemester = subject?.semester || 'Semester I';
+      const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
+      
+      return isGradeMatch && isSubjectMatch && !isConduct(a) && isSemesterMatch;
     }),
-    [allAssessments, myGrades, mySubjects]
+    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, normalizedMySubjects, subjects, settings.currentSemester]
   );
 
   const { t } = useTranslation();
@@ -1016,7 +1076,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       const ass = assessments.find(a => a.id === route.params.assessmentId);
       if (ass) {
         setSelectedGrade(String(ass.grade));
-        setSelectedSubject(ass.subjectname);
+        setSelectedSubject(normS(ass.subjectname));
         setSelectedAssessment(ass);
       }
     } else if (route.params?.grade) {
@@ -1027,8 +1087,29 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   useEffect(() => {
     const uniqueGrades = [...new Set(students.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
     setGrades(uniqueGrades);
-    if (!selectedGrade && uniqueGrades.length > 0) setSelectedGrade(uniqueGrades[0]);
-  }, [students]);
+    if (hasTeacherAssignedGrades) {
+      const isSelectedAllowed = selectedGrade && uniqueGrades.some(g => normG(g) === normG(selectedGrade));
+      if (!isSelectedAllowed) {
+        setSelectedGrade(uniqueGrades[0] || '');
+        setSelectedSubject('');
+        setSelectedAssessment(null);
+      }
+    } else if (!selectedGrade && uniqueGrades.length > 0) {
+      setSelectedGrade(uniqueGrades[0]);
+    }
+  }, [students, hasTeacherAssignedGrades, selectedGrade]);
+
+  // Keep subject/assessment selection consistent when grade changes via navigation.
+  useEffect(() => {
+    if (selectedAssessment && normG(selectedAssessment.grade) !== normG(selectedGrade)) {
+      setSelectedSubject('');
+      setSelectedAssessment(null);
+      return;
+    }
+    if (!selectedAssessment) {
+      setSelectedSubject('');
+    }
+  }, [selectedGrade]); 
 
   useEffect(() => {
     if (!selectedAssessment) {
@@ -1048,13 +1129,26 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     setMarkIds(idMap);
   }, [selectedAssessment, marksData]);
 
-  const gradeAssessments = assessments.filter((a) => String(a.grade) === selectedGrade);
-  const gradeSubjects = teacher?.assignedsubjects?.length 
-    ? [...teacher.assignedsubjects].sort()
-    : [...new Set(gradeAssessments.map(a => a.subjectname))].filter(Boolean).sort();
-  const filteredAssessments = selectedSubject ? gradeAssessments.filter(a => a.subjectname === selectedSubject) : [];
+  const gradeAssessments = assessments.filter((a) => normG(a.grade) === normG(selectedGrade));
+  // Subject chips come from the teacher-assigned subjects list (like desktop "Subjects:" block),
+  // without extra filtering (assessments list is filtered separately by grade/semester/subject).
+  const allowedSubjectKeyToLabel = new Map<string, string>();
+  (mySubjects || []).forEach((subj) => {
+    const key = normS(subj);
+    if (!key) return;
+    if (!allowedSubjectKeyToLabel.has(key)) allowedSubjectKeyToLabel.set(key, subj);
+  });
+
+  const gradeSubjects = [...allowedSubjectKeyToLabel.entries()]
+    .map(([key, label]) => ({ key, label }));
+
+  const selectedSubjectKey = normS(selectedSubject);
+  // If no subject is selected yet, show all assessments for the selected grade.
+  const filteredAssessments = selectedSubject
+    ? gradeAssessments.filter(a => normS(a.subjectname) === selectedSubjectKey)
+    : gradeAssessments;
   
-  const gradeStudents = students.filter((st) => String(st.grade) === selectedGrade);
+  const gradeStudents = students.filter((st) => normG(st.grade) === normG(selectedGrade));
   const filteredStudents = gradeStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
 
   const saveMarksWithData = async (currentMarksData: Record<string, string>) => {
@@ -1160,7 +1254,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     for (const student of studentsWithoutMarks) {
       const historyCount = marksData.filter(m => m.studentid === student.id).filter(m => {
         const a = assessments.find(ax => ax.id === m.assessmentid);
-        return a && a.subjectname === selectedAssessment.subjectname;
+        return a && normS(a.subjectname) === normS(selectedAssessment.subjectname);
       }).length;
       if (historyCount > 0) studentsWithHistory.push(student);
     }
@@ -1184,7 +1278,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     for (const student of predictDetails.students) {
       const subjectMarks = marksData.filter(m => m.studentid === student.id).filter(m => {
         const a = assessments.find(ax => ax.id === m.assessmentid);
-        return a && a.subjectname === predictDetails.subject;
+        return a && normS(a.subjectname) === normS(predictDetails.subject);
       });
 
       if (subjectMarks.length > 0) {
@@ -1233,11 +1327,11 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
             {gradeSubjects.map((subj) => (
               <TouchableOpacity
-                key={subj as string}
-                style={[s.gradeChip, selectedSubject === subj && s.gradeChipActive]}
-                onPress={() => { setSelectedSubject(subj as string); setSelectedAssessment(null); }}
+                key={subj.key}
+                style={[s.gradeChip, selectedSubjectKey === subj.key && s.gradeChipActive]}
+                onPress={() => { setSelectedSubject(subj.key); setSelectedAssessment(null); }}
               >
-                <Text style={[s.gradeChipText, selectedSubject === subj && s.gradeChipTextActive]}>{subj as string}</Text>
+                <Text style={[s.gradeChipText, selectedSubjectKey === subj.key && s.gradeChipTextActive]}>{subj.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -1249,7 +1343,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
               <TouchableOpacity
                 key={a.id}
                 style={[s.gradeChip, { borderRadius: 12, paddingHorizontal: 12 }, selectedAssessment?.id === a.id && s.gradeChipActive]}
-                onPress={() => setSelectedAssessment(a)}
+                onPress={() => { setSelectedAssessment(a); setSelectedSubject(normS(a.subjectname)); }}
               >
                 <Text style={[s.gradeChipText, selectedAssessment?.id === a.id && s.gradeChipTextActive]}>{a.name}</Text>
               </TouchableOpacity>
@@ -1384,33 +1478,40 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
   const { t } = useTranslation();
 
   // Filter for THIS teacher (Memoized)
-  const myGrades = teacher.assignedgrades || [];
-  const mySubjects = teacher.assignedsubjects || [];
+  const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
+  const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
+  const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
+
+  const assignedSubjectsRaw = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects;
+  const hasTeacherAssignedSubjects = Array.isArray(assignedSubjectsRaw) && assignedSubjectsRaw.length > 0;
+  const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
 
   const students = useMemo(() => 
-    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
-    [allStudents, myGrades]
+    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, hasTeacherAssignedGrades, myGrades]
   );
   const assessments = useMemo(() => 
     allAssessments.filter(a => {
-      const isGradeMatch = myGrades.length === 0 || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
-      const isSubjectMatch = mySubjects.length === 0 || mySubjects.includes(a.subjectname);
-      return isGradeMatch && isSubjectMatch && !isConduct(a);
+      const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
+      const isSubjectMatch = !hasTeacherAssignedSubjects || mySubjects.includes(a.subjectname);
+      
+      const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
+      const assessmentSemester = subject?.semester || 'Semester I';
+      const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
+
+      return isGradeMatch && isSubjectMatch && !isConduct(a) && isSemesterMatch;
     }),
-    [allAssessments, myGrades, mySubjects]
+    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, mySubjects, subjects, settings.currentSemester]
   );
   
   const [refreshing, setRefreshing] = useState(false);
+  const [showAllStudents, setShowAllStudents] = useState(false);
+  const [showAllAssessments, setShowAllAssessments] = useState(false);
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
   const currentSemester = settings.currentSemester || 'Semester I';
 
-  const myAssessments = assessments.filter(a => {
-    if (isConduct(a)) return false;
-    const subject = subjects.find(s => s.name === a.subjectname);
-    const assessmentSemester = subject?.semester || 'Semester I';
-    return assessmentSemester === currentSemester;
-  });
+  const myAssessments = assessments;
 
   const missingMarksByAssessment = myAssessments.map(a => {
     const studentsForGrade = students.filter(st => normG(st.grade) === normG(a.grade));
@@ -1424,6 +1525,10 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
     return !marksData.some(m => m.studentid === st.id && assessmentsForGrade.some(a => a.id === m.assessmentid));
   });
 
+  const PAGE_SIZE = 5;
+  const displayedStudents = showAllStudents ? studentsWithNoMarks : studentsWithNoMarks.slice(0, PAGE_SIZE);
+  const displayedAssessments = showAllAssessments ? missingMarksByAssessment : missingMarksByAssessment.slice(0, PAGE_SIZE);
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
       <View style={{ marginBottom: 24 }}>
@@ -1436,9 +1541,13 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
             <AlertTriangle size={20} color={C.red} stroke={C.red} />
             <Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>Students with NO Marks</Text>
+            <View style={{ flex: 1 }} />
+            <View style={{ backgroundColor: C.red + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}>
+              <Text style={{ color: C.red, fontSize: 12, fontWeight: '800' }}>{studentsWithNoMarks.length}</Text>
+            </View>
           </View>
           <Text style={s.issueSub}>These students have no recorded assessments.</Text>
-          {studentsWithNoMarks.map(st => (
+          {displayedStudents.map(st => (
             <View key={st.id} style={[s.issueRow, { borderTopColor: C.border }]}>
               <Users size={14} color={C.muted} stroke={C.muted} />
               <Text style={[s.issueText, { marginLeft: 8 }]}>{st.name}</Text>
@@ -1446,6 +1555,16 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
               <View style={s.badge}><Text style={s.badgeText}>{fmtGrade(st.grade)}</Text></View>
             </View>
           ))}
+          {studentsWithNoMarks.length > PAGE_SIZE && (
+            <TouchableOpacity
+              onPress={() => setShowAllStudents(!showAllStudents)}
+              style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.red + '12' }}
+            >
+              <Text style={{ color: C.red, fontWeight: '700', fontSize: 13 }}>
+                {showAllStudents ? 'Show Less' : `Show All ${studentsWithNoMarks.length} Students`}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -1454,9 +1573,13 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
             <BarChart3 size={20} color={C.amber} stroke={C.amber} />
             <Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>Incomplete Assessments</Text>
+            <View style={{ flex: 1 }} />
+            <View style={{ backgroundColor: C.amber + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}>
+              <Text style={{ color: C.amber, fontSize: 12, fontWeight: '800' }}>{missingMarksByAssessment.length}</Text>
+            </View>
           </View>
           <Text style={s.issueSub}>Assessments with missing student scores.</Text>
-          {missingMarksByAssessment.map(item => (
+          {displayedAssessments.map(item => (
             <TouchableOpacity 
               key={item.assessment.id} 
               style={[s.issueRow, { borderTopColor: C.border }]}
@@ -1464,14 +1587,26 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
             >
               <View style={{ flex: 1 }}>
                 <Text style={s.issueText}>{item.assessment.name}</Text>
-                <Text style={s.issueSub}>{item.count} students missing</Text>
+                <Text style={s.issueSub}>{item.assessment.subjectname} • {fmtGrade(item.assessment.grade)} • {item.count} missing</Text>
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <View style={[s.badge, { marginBottom: 4 }]}><Text style={s.badgeText}>{item.assessment.subjectname}</Text></View>
-                <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700' }}>Fix now →</Text>
-              </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Marks', { assessmentId: item.assessment.id, grade: item.assessment.grade })}
+                style={{ backgroundColor: C.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Fix Now</Text>
+              </TouchableOpacity>
             </TouchableOpacity>
           ))}
+          {missingMarksByAssessment.length > PAGE_SIZE && (
+            <TouchableOpacity
+              onPress={() => setShowAllAssessments(!showAllAssessments)}
+              style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.amber + '12' }}
+            >
+              <Text style={{ color: C.amber, fontWeight: '700', fontSize: 13 }}>
+                {showAllAssessments ? 'Show Less' : `Show All ${missingMarksByAssessment.length} Assessments`}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -1488,29 +1623,40 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
   );
 }
 
+
 // ═══════════════════════════════════════════════════════════════
 //  ANALYTICS TAB
 // ═══════════════════════════════════════════════════════════════
-function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessments, marks, C, s, onRefresh }: {
-  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], C: any, s: any, onRefresh?: () => Promise<void> | void
+function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessments, marks, C, s, onRefresh, settings, subjects }: {
+  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], C: any, s: any, onRefresh?: () => Promise<void> | void, settings: any, subjects: any[]
 }) {
   const { t } = useTranslation();
   
   // Filter for THIS teacher (Memoized)
-  const myGrades = teacher.assignedgrades || [];
-  const mySubjects = teacher.assignedsubjects || [];
+  const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
+  const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
+  const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
+
+  const assignedSubjectsRaw = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects;
+  const hasTeacherAssignedSubjects = Array.isArray(assignedSubjectsRaw) && assignedSubjectsRaw.length > 0;
+  const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
   
   const students = useMemo(() => 
-    allStudents.filter(st => myGrades.length === 0 || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
-    [allStudents, myGrades]
+    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    [allStudents, hasTeacherAssignedGrades, myGrades]
   );
   const assessments = useMemo(() => 
     allAssessments.filter(a => {
-      const isGradeMatch = myGrades.length === 0 || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
-      const isSubjectMatch = (mySubjects.length === 0 || mySubjects.includes(a.subjectname)) && !isConduct(a);
-      return isGradeMatch && isSubjectMatch;
+      const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
+      const isSubjectMatch = (!hasTeacherAssignedSubjects || mySubjects.includes(a.subjectname)) && !isConduct(a);
+      
+      const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
+      const assessmentSemester = subject?.semester || 'Semester I';
+      const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
+
+      return isGradeMatch && isSubjectMatch && isSemesterMatch;
     }),
-    [allAssessments, myGrades, mySubjects]
+    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, mySubjects, subjects, settings.currentSemester]
   );
 
   const etYear = computeEthiopianYear();
@@ -1532,7 +1678,7 @@ function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessme
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
       <View style={{ marginBottom: 24 }}>
         <Text style={s.sectionTitle}>{t('teacher.analytics')}</Text>
-        <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600' }}>📅 Academic Year: {etYear} E.C.</Text>
+        <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600' }}>📅 {etYear} E.C. • {settings.currentSemester || 'Semester I'}</Text>
       </View>
 
       <View style={[s.dashboardCard, { borderRadius: 24, padding: 20 }]}>

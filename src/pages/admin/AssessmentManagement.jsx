@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import dayjs from 'dayjs';
 import { db } from '../../db/database';
-import { GRADE_OPTIONS, formatGrade } from '../../utils/gradeUtils';
+import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
 
 const { Title, Text } = Typography;
 
@@ -13,8 +13,11 @@ export default function AssessmentManagement() {
     const { t } = useTranslation();
     const [form] = Form.useForm();
     const [editingId, setEditingId] = useState(null);
+    const selectedGrade = Form.useWatch('grade', form);
+    const selectedSubject = Form.useWatch('subjectName', form);
 
-    const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
+    const allSubjects = useLiveQuery(() => db.subjects.toArray()) || [];
+    const subjects = allSubjects.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
     const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
 
     const handleSave = async (values) => {
@@ -120,11 +123,17 @@ export default function AssessmentManagement() {
                     <Row gutter={16}>
                         <Col xs={24} md={8}>
                             <Form.Item
-                                name="name"
-                                label={t('admin.assessmentName')}
+                                name="grade"
+                                label={t('admin.grade')}
                                 rules={[{ required: true }]}
                             >
-                                <Input placeholder={t('admin.assessmentNamePlaceholder')} />
+                                <Select 
+                                    options={GRADE_OPTIONS} 
+                                    showSearch 
+                                    onChange={() => {
+                                        form.setFieldsValue({ subjectName: undefined });
+                                    }}
+                                />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={8}>
@@ -135,6 +144,8 @@ export default function AssessmentManagement() {
                             >
                                 <Select 
                                     showSearch
+                                    disabled={!selectedGrade}
+                                    placeholder={!selectedGrade ? "Select Grade first" : t('admin.subjects')}
                                 >
                                     {subjects.map(s => (
                                         <Select.Option key={s.id} value={s.name}>{s.name}</Select.Option>
@@ -144,20 +155,24 @@ export default function AssessmentManagement() {
                         </Col>
                         <Col xs={24} md={8}>
                             <Form.Item
-                                name="grade"
-                                label={t('admin.grade')}
+                                name="name"
+                                label={t('admin.assessmentName')}
                                 rules={[{ required: true }]}
                             >
-                                <Select options={GRADE_OPTIONS} showSearch />
+                                <Input 
+                                    placeholder={!selectedSubject ? "Select Subject first" : t('admin.assessmentNamePlaceholder')} 
+                                    disabled={!selectedSubject} 
+                                />
                             </Form.Item>
                         </Col>
+
                         <Col xs={24} md={8}>
                             <Form.Item
                                 name="maxScore"
                                 label={t('admin.maxScore')}
                                 rules={[{ required: true }]}
                             >
-                                <Input type="number" />
+                                <Input type="number" disabled={!selectedSubject} />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={8}>
@@ -165,7 +180,7 @@ export default function AssessmentManagement() {
                                 name="date"
                                 label={t('teacher.date')}
                             >
-                                <DatePicker style={{ width: '100%' }} />
+                                <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={16} className="flex justify-end items-end">

@@ -48,6 +48,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { syncData } from '../../utils/sync';
 import { supabase } from '../../utils/supabaseClient';
+import { formatEthiopianDate } from '../../utils/dateUtils';
 import dayjs from 'dayjs';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import StudentProfile from '../../components/StudentProfile';
@@ -74,9 +75,16 @@ export default function TeacherDashboard() {
         }
     });
 
+    const [syncKey, setSyncKey] = useState(0);
+    useEffect(() => {
+        const handleSync = () => setSyncKey(k => k + 1);
+        window.addEventListener('syncComplete', handleSync);
+        return () => window.removeEventListener('syncComplete', handleSync);
+    }, []);
+
     const liveTeacher = useLiveQuery(
         () => teacherSession?.id ? db.teachers.get(teacherSession.id) : null,
-        [teacherSession?.id]
+        [teacherSession?.id, syncKey]
     );
 
     const activeTeacher = liveTeacher || teacherSession;
@@ -306,6 +314,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     // Persist selection state in sessionStorage so navigation between sidebar items doesn't reset it
     const [selectedGrade, setSelectedGrade] = useState(() => sessionStorage.getItem('sem_mark_grade') || '');
     const [selectedAssessmentId, setSelectedAssessmentId] = useState(() => sessionStorage.getItem('sem_mark_assessment') || '');
+    const [selectedSubject, setSelectedSubject] = useState(() => sessionStorage.getItem('sem_mark_subject') || '');
     const [marks, setMarks] = useState({});
     const [modifiedMarks, setModifiedMarks] = useState(new Set());
     const [searchQuery, setSearchQuery] = useState('');
@@ -315,11 +324,19 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     // Keep sessionStorage in sync
     useEffect(() => { sessionStorage.setItem('sem_mark_grade', selectedGrade); }, [selectedGrade]);
     useEffect(() => { sessionStorage.setItem('sem_mark_assessment', selectedAssessmentId); }, [selectedAssessmentId]);
+    useEffect(() => { sessionStorage.setItem('sem_mark_subject', selectedSubject); }, [selectedSubject]);
 
-    const allStudentsData = useLiveQuery(() => db.students.toArray());
-    const assessmentsData = useLiveQuery(() => db.assessments.toArray());
-    const subjectsData = useLiveQuery(() => db.subjects.toArray());
-    const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
+    const [syncKey, setSyncKey] = useState(0);
+    useEffect(() => {
+        const handleSync = () => setSyncKey(k => k + 1);
+        window.addEventListener('syncComplete', handleSync);
+        return () => window.removeEventListener('syncComplete', handleSync);
+    }, []);
+
+    const allStudentsData = useLiveQuery(() => db.students.toArray(), [syncKey]);
+    const assessmentsData = useLiveQuery(() => db.assessments.toArray(), [syncKey]);
+    const subjectsData = useLiveQuery(() => db.subjects.toArray(), [syncKey]);
+    const settingsRows = useLiveQuery(() => db.settings?.toArray(), [syncKey]) || [];
 
     const allStudents = allStudentsData || [];
     const allAssessments = assessmentsData || [];
@@ -330,16 +347,58 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
     const allowedGrades = Array.isArray(teacher?.assignedGrades) ? teacher.assignedGrades : [];
     const allowedSubjects = Array.isArray(teacher?.assignedSubjects) ? teacher.assignedSubjects : [];
+    const normalizeSubject = (raw) => {
+        if (!raw) return '';
+        return String(raw).toLowerCase().trim();
+    };
 
-    // Only allow teachers to grade assessments that match their assigned subjects/grades + current semester
-    const filteredAssessments = allAssessments.filter(a => {
-        const subject = allSubjects.find(s => s.name === a.subjectName);
+    const hasTeacherAssignedGrades = Array.isArray(teacher?.assignedGrades);
+    const normalizedAllowedGrades = allowedGrades.map(g => normalizeGrade(g));
+    const normalizedAllowedSubjects = allowedSubjects.map(s => normalizeSubject(s)).filter(Boolean);
+    const teacherStudents = hasTeacherAssignedGrades
+        ? (normalizedAllowedGrades.length > 0
+            ? allStudents.filter(s => normalizedAllowedGrades.includes(normalizeGrade(s.grade)))
+            : [])
+        : allStudents;
+
+    // Guard: if sessionStorage has a grade that this teacher isn't assigned to, clear it.
+    useEffect(() => {
+        if (!selectedGrade) return;
+        if (!hasTeacherAssignedGrades) return;
+        const isAllowed = normalizedAllowedGrades.includes(normalizeGrade(selectedGrade));
+        if (!isAllowed) {
+            setSelectedGrade('');
+            setSelectedSubject('');
+            setSelectedAssessmentId('');
+            setSearchQuery('');
+        }
+    }, [hasTeacherAssignedGrades, allowedGrades, selectedGrade]);
+
+    // Only allow teachers to grade assessments that match their assigned subjects/grades + current semester.
+    // Subject selection (selectedSubject) is applied after this base filter.
+    const assessmentsForGrade = allAssessments.filter(a => {
+        const subject = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(a.subjectName));
         const assessmentSemester = subject?.semester || 'Semester I';
         return normalizeGrade(a.grade) === normalizeGrade(selectedGrade) &&
             assessmentSemester === currentSemesterSetting &&
             (allowedGrades.length === 0 || allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(a.grade))) &&
-            (allowedSubjects.length === 0 || allowedSubjects.includes(a.subjectName));
+            (allowedSubjects.length === 0 || normalizedAllowedSubjects.includes(normalizeSubject(a.subjectName)));
     });
+
+    // Build subject dropdown options directly from the teacher-assigned subject list
+    // (like the desktop "SUBJECTS:" box). Assessments will be filtered separately by grade/semester.
+    const allowedSubjectKeyToLabel = new Map();
+    (allowedSubjects || []).forEach((s) => {
+        const key = normalizeSubject(s);
+        if (!key) return;
+        if (!allowedSubjectKeyToLabel.has(key)) allowedSubjectKeyToLabel.set(key, s);
+    });
+    const subjectOptions = [...allowedSubjectKeyToLabel.entries()]
+        .map(([key, label]) => ({ value: key, label }));
+
+    const filteredAssessments = selectedSubject
+        ? assessmentsForGrade.filter(a => normalizeSubject(a.subjectName) === selectedSubject)
+        : assessmentsForGrade;
     const selectedAssessment = allAssessments.find(a => a.id === selectedAssessmentId);
 
     // Guard: clear stale sessionStorage ID if it no longer matches any available assessment
@@ -350,6 +409,16 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         }
     }, [selectedAssessmentId, filteredAssessments, isLoading]);
 
+    // Guard: if selectedSubject no longer exists in teacher's assigned subjects, clear it (and assessment too).
+    useEffect(() => {
+        if (!selectedSubject) return;
+        if (isLoading) return;
+        if (!normalizedAllowedSubjects.includes(selectedSubject)) {
+            setSelectedSubject('');
+            setSelectedAssessmentId('');
+        }
+    }, [selectedSubject, normalizedAllowedSubjects, isLoading]);
+
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
     const dbGrades = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
     const extraGradeOptions = dbGrades
@@ -357,16 +426,17 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         .map(g => ({ value: String(g), label: formatGrade(g) }));
 
     const gradeOptionsUnrestricted = [...GRADE_OPTIONS, ...extraGradeOptions];
-    const gradeOptions = allowedGrades.length > 0
+    const gradeOptions = hasTeacherAssignedGrades && allowedGrades.length > 0
         ? gradeOptionsUnrestricted.filter(o => allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(o.value)))
-        : gradeOptionsUnrestricted;
-    const studentsInGrade = allStudents
+        : [];
+    const studentsInGrade = teacherStudents
         .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
         .filter(s => {
             if (!searchQuery) return true;
             const q = searchQuery.toLowerCase();
             return s.name?.toLowerCase().includes(q);
-        });
+        })
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     useEffect(() => {
         if (location.state?.assessmentId) {
@@ -374,6 +444,12 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         }
         if (location.state?.grade) {
             setSelectedGrade(location.state.grade);
+            // If navigation targets only a grade, reset dependent selections.
+            if (!location.state?.assessmentId) {
+                setSelectedSubject('');
+                setSelectedAssessmentId('');
+                setSearchQuery('');
+            }
         }
     }, [location.state]);
 
@@ -400,7 +476,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             setModifiedMarks(new Set()); // Clear modified marks on assessment change
         }
         loadMarks();
-    }, [selectedAssessmentId]);
+    }, [selectedAssessmentId, syncKey]);
 
     const [isSaving, setIsSaving] = useState(false);
 
@@ -552,7 +628,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const handlePredictMarks = async () => {
         if (!selectedAssessment) return;
 
-        const allStudentsInGrade = allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
+        const allStudentsInGrade = teacherStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
         const studentsWithoutMarks = allStudentsInGrade.filter(s => marks[s.id] === undefined || marks[s.id] === '');
         if (studentsWithoutMarks.length === 0) {
             message.info(t('teacher.fullyGraded'));
@@ -667,14 +743,16 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Form layout="vertical">
                     <Row gutter={16} align="bottom">
-                        <Col xs={24} md={8}>
+                        <Col xs={24} md={6}>
                             <Form.Item label={t('teacher.selectGrade')} style={{ marginBottom: 0 }}>
                                 <Select
                                     placeholder={t('teacher.selectGrade')}
                                     value={selectedGrade}
                                     onChange={(val) => {
                                         setSelectedGrade(val);
+                                        setSelectedSubject('');
                                         setSelectedAssessmentId('');
+                                        setSearchQuery('');
                                     }}
                                     options={gradeOptions}
                                     allowClear
@@ -682,7 +760,23 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                 />
                             </Form.Item>
                         </Col>
-                        <Col xs={24} md={8}>
+                        <Col xs={24} md={6}>
+                            <Form.Item label={t('teacher.selectSubject')} style={{ marginBottom: 0 }}>
+                                <Select
+                                    placeholder={t('teacher.selectSubject')}
+                                    value={selectedSubject || undefined}
+                                    onChange={(val) => {
+                                        setSelectedSubject(val || '');
+                                        setSelectedAssessmentId('');
+                                    }}
+                                    options={subjectOptions}
+                                    allowClear
+                                    showSearch
+                                    disabled={!selectedGrade || subjectOptions.length === 0}
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
                             <Form.Item label={t('teacher.selectAssessment')} style={{ marginBottom: 0 }}>
                                 <Select
                                     placeholder={t('teacher.selectAssessment')}
@@ -690,7 +784,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                     onChange={setSelectedAssessmentId}
                                     options={Object.entries(
                                         filteredAssessments.reduce((acc, a) => {
-                                            const subject = allSubjects.find(s => s.name === a.subjectName);
+                                            const subject = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(a.subjectName));
                                             const sem = subject?.semester || 'Semester I';
                                             const semText = t(`admin.${sem === 'Semester I' ? 'semester1' : 'semester2'}`, sem);
                                             const groupLabel = `${a.subjectName} • ${semText}`;
@@ -705,20 +799,22 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                     ).map(([label, opts]) => ({ label, options: opts }))}
                                     allowClear
                                     showSearch
-                                    disabled={!selectedGrade}
+                                    disabled={!selectedSubject}
                                 />
                             </Form.Item>
                         </Col>
                         {selectedAssessment && (
-                            <Col xs={24} md={8}>
-                                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded flex justify-between items-center h-[32px]">
-                                    <Text strong className="text-blue-700 dark:text-blue-300">
-                                        {t('admin.maxScore')}: {selectedAssessment.maxScore}
-                                    </Text>
-                                    <Text type="secondary" size="small">
-                                        {selectedAssessment.date}
-                                    </Text>
-                                </div>
+                            <Col xs={24} md={6}>
+                                <Form.Item label="&nbsp;" style={{ marginBottom: 0 }}>
+                                    <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded flex flex-col gap-1">
+                                        <Text strong className="text-blue-700 dark:text-blue-300">
+                                            {t('admin.maxScore')}: {selectedAssessment.maxScore}
+                                        </Text>
+                                        <Text type="secondary" className="text-xs">
+                                            {formatEthiopianDate(selectedAssessment.date)}
+                                        </Text>
+                                    </div>
+                                </Form.Item>
                             </Col>
                         )}
                     </Row>
@@ -731,7 +827,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     <Tag color="blue" style={{ marginLeft: '12px' }}>
                         {selectedAssessmentId
                             ? (searchQuery
-                                ? `${studentsInGrade.length} / ${allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade)).length}`
+                                ? `${studentsInGrade.length} / ${teacherStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade)).length}`
                                 : studentsInGrade.length)
                             : '—'}
                     </Tag>
@@ -813,6 +909,8 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
 
     // Persist selection state in sessionStorage so navigation between sidebar items doesn't reset it
     const [selectedGrade, setSelectedGrade] = useState(() => sessionStorage.getItem('sem_att_grade') || '');
+    const [selectedSubject, setSelectedSubject] = useState(() => sessionStorage.getItem('sem_att_subject') || '');
+    const [selectedAssessmentId, setSelectedAssessmentId] = useState(() => sessionStorage.getItem('sem_att_assessment') || '');
     const [attendanceDate, setAttendanceDate] = useState(() => sessionStorage.getItem('sem_att_date') || dayjs().format('YYYY-MM-DD'));
     const [attendance, setAttendance] = useState({});
     const [modifiedAttendance, setModifiedAttendance] = useState(new Set());
@@ -822,12 +920,26 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
 
     // Keep sessionStorage in sync
     useEffect(() => { sessionStorage.setItem('sem_att_grade', selectedGrade); }, [selectedGrade]);
+    useEffect(() => { sessionStorage.setItem('sem_att_subject', selectedSubject); }, [selectedSubject]);
+    useEffect(() => { sessionStorage.setItem('sem_att_assessment', selectedAssessmentId); }, [selectedAssessmentId]);
     useEffect(() => { sessionStorage.setItem('sem_att_date', attendanceDate); }, [attendanceDate]);
 
-    const allStudentsData = useLiveQuery(() => db.students.toArray());
-    const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
+    const [syncKey, setSyncKey] = useState(0);
+    useEffect(() => {
+        const handleSync = () => setSyncKey(k => k + 1);
+        window.addEventListener('syncComplete', handleSync);
+        return () => window.removeEventListener('syncComplete', handleSync);
+    }, []);
+
+    const allStudentsData = useLiveQuery(() => db.students.toArray(), [syncKey]);
+    const assessmentsData = useLiveQuery(() => db.assessments.toArray(), [syncKey]);
+    const subjectsData = useLiveQuery(() => db.subjects.toArray(), [syncKey]);
+    const settingsRows = useLiveQuery(() => db.settings?.toArray(), [syncKey]) || [];
+
     const allStudents = allStudentsData || [];
-    const isLoading = allStudentsData === undefined;
+    const allAssessments = assessmentsData || [];
+    const allSubjects = subjectsData || [];
+    const isLoading = allStudentsData === undefined || assessmentsData === undefined || subjectsData === undefined;
     const currentSemesterSetting = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
     const dbGrades2 = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
@@ -835,12 +947,66 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
         .filter(g => !GRADE_OPTIONS.some(o => o.value === String(g)))
         .map(g => ({ value: String(g), label: formatGrade(g) }));
 
+    const normalizeSubject = (raw) => {
+        if (!raw) return '';
+        return String(raw).toLowerCase().trim();
+    };
+
     const allowedGrades = Array.isArray(teacher?.assignedGrades) ? teacher.assignedGrades : [];
+    const allowedSubjects = Array.isArray(teacher?.assignedSubjects) ? teacher.assignedSubjects : [];
+    const normalizedAllowedSubjects = allowedSubjects.map(s => normalizeSubject(s)).filter(Boolean);
+
+    const assessmentsForGrade = allAssessments.filter(a => {
+        const subject = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(a.subjectName));
+        const assessmentSemester = subject?.semester || 'Semester I';
+        return normalizeGrade(a.grade) === normalizeGrade(selectedGrade) &&
+            assessmentSemester === currentSemesterSetting &&
+            (allowedGrades.length === 0 || allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(a.grade))) &&
+            (normalizedAllowedSubjects.length === 0 || normalizedAllowedSubjects.includes(normalizeSubject(a.subjectName)));
+    });
+
+    const subjectOptionsMap = new Map();
+    assessmentsForGrade.forEach(a => {
+        const key = normalizeSubject(a.subjectName);
+        if (!subjectOptionsMap.has(key)) {
+            subjectOptionsMap.set(key, a.subjectName);
+        }
+    });
+    const subjectOptions2 = Array.from(subjectOptionsMap.entries()).map(([value, label]) => ({ value, label }));
+
+    const filteredAssessments = selectedSubject
+        ? assessmentsForGrade.filter(a => normalizeSubject(a.subjectName) === selectedSubject)
+        : [];
+
+    const selectedAssessment = allAssessments.find(a => a.id === selectedAssessmentId);
+
+    const normalizedAllowedGrades2 = allowedGrades.map(g => normalizeGrade(g));
+    const hasTeacherAssignedGrades2 = Array.isArray(teacher?.assignedGrades);
+    const teacherStudents = hasTeacherAssignedGrades2
+        ? (normalizedAllowedGrades2.length > 0
+            ? allStudents.filter(s => normalizedAllowedGrades2.includes(normalizeGrade(s.grade)))
+            : [])
+        : allStudents;
+
     const gradeOptions2Unrestricted = [...GRADE_OPTIONS, ...extraGradeOptions2];
-    const gradeOptions2 = allowedGrades.length > 0
+    const gradeOptions2 = Array.isArray(teacher?.assignedGrades) && allowedGrades.length > 0
         ? gradeOptions2Unrestricted.filter(o => allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(o.value)))
-        : gradeOptions2Unrestricted;
-    const studentsInGrade = allStudents
+        : [];
+
+    // Guard: if sessionStorage has a grade that this teacher isn't assigned to, clear it.
+    useEffect(() => {
+        if (!selectedGrade) return;
+        if (!hasTeacherAssignedGrades2) return;
+        const isAllowed = normalizedAllowedGrades2.includes(normalizeGrade(selectedGrade));
+        if (!isAllowed) {
+            setSelectedGrade('');
+            setSelectedSubject('');
+            setSelectedAssessmentId('');
+            setSearchQuery('');
+        }
+    }, [hasTeacherAssignedGrades2, allowedGrades, selectedGrade]);
+
+    const studentsInGrade = teacherStudents
         .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
         .filter(s => {
             if (!searchQuery) return true;
@@ -871,7 +1037,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             setModifiedAttendance(new Set()); // Clear modified attendance on date/grade change
         }
         loadAttendance();
-    }, [selectedGrade, attendanceDate]);
+    }, [selectedGrade, attendanceDate, syncKey]);
 
     const [isSaving, setIsSaving] = useState(false);
 
@@ -988,9 +1154,9 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
 
     const handleScanSuccess = async (decodedText) => {
         // decodedText is the studentId
-        const student = allStudents.find(s => s.id === decodedText);
+        const student = teacherStudents.find(s => s.id === decodedText);
         if (!student) {
-            message.error(t('teacher.studentNotFound'));
+            message.warning(t('teacher.studentNotFound'));
             return;
         }
 
@@ -1081,28 +1247,51 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Form layout="vertical">
                     <Row gutter={[16, 16]}>
-                        <Col xs={24} sm={12}>
+                        <Col xs={24} sm={8}>
                             <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm h-full">
                                 <Space orientation="vertical" className="w-full">
                                     <Text strong type="secondary">{t('teacher.selectGrade')}</Text>
                                     <Select
-                                        value={selectedGrade}
+                                        value={selectedGrade || undefined}
                                         onChange={(value) => {
                                             setSelectedGrade(value);
+                                            setSelectedSubject('');
                                             setSelectedAssessmentId('');
                                         }}
                                         style={{ width: '100%' }}
                                         size="large"
                                         options={gradeOptions2}
                                         placeholder="Choose a grade"
+                                        allowClear
                                     />
                                 </Space>
                             </Card>
                         </Col>
 
-                        <Col xs={24} sm={12}>
+                        <Col xs={24} sm={8}>
+                            <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm h-full">
+                                <Space orientation="vertical" className="w-full">
+                                    <Text strong type="secondary">{t('teacher.selectSubject')}</Text>
+                                    <Select
+                                        value={selectedSubject || undefined}
+                                        onChange={(value) => {
+                                            setSelectedSubject(value);
+                                            setSelectedAssessmentId('');
+                                        }}
+                                        style={{ width: '100%' }}
+                                        size="large"
+                                        options={subjectOptions2}
+                                        placeholder="Choose a subject"
+                                        disabled={!selectedGrade}
+                                        allowClear
+                                    />
+                                </Space>
+                            </Card>
+                        </Col>
+
+                        <Col xs={24} sm={8}>
                             <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm h-full flex flex-col justify-center">
-                                {selectedGrade && currentSemesterSetting && allowedSubjects.length > 0 && allowedGrades.length > 0 ? (
+                                {selectedGrade && currentSemesterSetting && allowedGrades.length > 0 ? (
                                     <Space orientation="vertical" className="w-full">
                                         <Text strong type="secondary">{t('teacher.selectAssessment')}</Text>
                                         <Select
@@ -1110,15 +1299,17 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                                             onChange={setSelectedAssessmentId}
                                             style={{ width: '100%' }}
                                             size="large"
-                                            placeholder="Choose an assessment to grade"
+                                            placeholder="Choose an assessment"
+                                            disabled={!selectedSubject}
+                                            allowClear
                                         >
                                             {filteredAssessments.map(a => (
-                                                <Option key={a.id} value={a.id}>
+                                                <Select.Option key={a.id} value={a.id}>
                                                     <div className="flex justify-between items-center w-full">
-                                                        <span>{a.subjectName} - {a.name}</span>
+                                                        <span>{a.name}</span>
                                                         <Badge count={`${a.maxScore} pts`} style={{ backgroundColor: '#52c41a' }} />
                                                     </div>
-                                                </Option>
+                                                </Select.Option>
                                             ))}
                                         </Select>
                                     </Space>
@@ -1182,7 +1373,9 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                 <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
                     {t('teacher.studentsList', 'Students List')}
                     <Tag color="blue" style={{ marginLeft: '12px' }}>
-                        {searchQuery ? `${studentsInGrade.length} / ${allStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade)).length}` : studentsInGrade.length}
+                        {searchQuery
+                            ? `${studentsInGrade.length} / ${teacherStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade)).length}`
+                            : studentsInGrade.length}
                     </Tag>
                 </Title>
                 <div className="hidden sm:block flex-grow border-t border-slate-200 dark:border-slate-700 mx-2"></div>

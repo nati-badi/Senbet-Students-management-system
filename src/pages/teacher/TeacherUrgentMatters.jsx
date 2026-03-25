@@ -16,11 +16,18 @@ export default function TeacherUrgentMatters({ teacher }) {
     const allowedGrades = useMemo(() => teacher?.assignedGrades || [], [teacher]);
     const allowedSubjects = useMemo(() => teacher?.assignedSubjects || [], [teacher]);
 
-    const allStudents = useLiveQuery(() => db.students.toArray(), []) || [];
-    const marks = useLiveQuery(() => db.marks.toArray(), []) || [];
-    const allAssessments = useLiveQuery(() => db.assessments.toArray(), []) || [];
-    const allSubjects = useLiveQuery(() => db.subjects.toArray(), []) || [];
-    const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
+    const [syncKey, setSyncKey] = React.useState(0);
+    React.useEffect(() => {
+        const handleSync = () => setSyncKey(k => k + 1);
+        window.addEventListener('syncComplete', handleSync);
+        return () => window.removeEventListener('syncComplete', handleSync);
+    }, []);
+
+    const allStudents = useLiveQuery(() => db.students.toArray(), [syncKey]) || [];
+    const marks = useLiveQuery(() => db.marks.toArray(), [syncKey]) || [];
+    const allAssessments = useLiveQuery(() => db.assessments.toArray(), [syncKey]) || [];
+    const allSubjects = useLiveQuery(() => db.subjects.toArray(), [syncKey]) || [];
+    const settingsRows = useLiveQuery(() => db.settings?.toArray(), [syncKey]) || [];
 
     const currentSemester = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
 

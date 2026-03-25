@@ -49,3 +49,8 @@ export const getNextGrade = (rawGrade) => {
     if (num >= 12) return '13'; // Graduate / Other
     return String(num + 1);
 };
+
+export const normalizeSubject = (raw) => {
+    if (!raw) return '';
+    return String(raw).toLowerCase().trim();
+};

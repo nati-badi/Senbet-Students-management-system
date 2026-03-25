@@ -4,6 +4,7 @@ import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
+import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
 
 const { Title, Text } = Typography;
 
@@ -20,6 +21,7 @@ export default function SubjectManagement() {
                 await db.subjects.update(editingId, {
                     name: values.name,
                     semester: values.semester,
+                    grade: values.grade,
                     synced: 0,
                     updated_at: new Date().toISOString()
                 });
@@ -29,6 +31,7 @@ export default function SubjectManagement() {
                     id: crypto.randomUUID(),
                     name: values.name,
                     semester: values.semester,
+                    grade: values.grade,
                     synced: 0,
                     updated_at: new Date().toISOString()
                 });
@@ -45,7 +48,8 @@ export default function SubjectManagement() {
         setEditingId(subject.id);
         form.setFieldsValue({ 
             name: subject.name,
-            semester: subject.semester || 'Semester I'
+            semester: subject.semester || 'Semester I',
+            grade: subject.grade
         });
     };
 
@@ -60,6 +64,7 @@ export default function SubjectManagement() {
     };
 
     const columns = [
+        { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (g) => <Tag color="orange">{formatGrade(g)}</Tag> },
         { title: t('admin.subjectName'), dataIndex: 'name', key: 'name' },
         { 
             title: t('admin.semester', 'Semester'), 
@@ -102,7 +107,15 @@ export default function SubjectManagement() {
 
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Form form={form} onFinish={handleSave} layout="vertical">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <Form.Item
+                            name="grade"
+                            label={t('admin.grade')}
+                            rules={[{ required: true }]}
+                            className="md:col-span-1"
+                        >
+                            <Select options={GRADE_OPTIONS} showSearch placeholder="Select Grade" />
+                        </Form.Item>
                         <Form.Item
                             name="name"
                             label={t('admin.subjectName')}

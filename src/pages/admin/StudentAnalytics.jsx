@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Typography, Card, Space, Row, Col, Select, Table, Divider, Tag, Empty } from 'antd';
 import { TrophyOutlined, StarOutlined, BarChartOutlined, LineChartOutlined, TeamOutlined } from '@ant-design/icons';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -11,12 +11,19 @@ const { Option } = Select;
 
 export default function StudentAnalytics({ isTeacherView = false, teacher = null }) {
     const { t } = useTranslation();
-    const students = useLiveQuery(() => db.students.toArray()) || [];
-    const marks = useLiveQuery(() => db.marks.toArray()) || [];
-    const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
-    const attendance = useLiveQuery(() => db.attendance.toArray()) || [];
-    const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
+    const [syncKey, setSyncKey] = useState(0);
 
+    useEffect(() => {
+        const handleSync = () => setSyncKey(k => k + 1);
+        window.addEventListener('syncComplete', handleSync);
+        return () => window.removeEventListener('syncComplete', handleSync);
+    }, []);
+
+    const students = useLiveQuery(() => db.students.toArray(), [syncKey]) || [];
+    const marks = useLiveQuery(() => db.marks.toArray(), [syncKey]) || [];
+    const assessments = useLiveQuery(() => db.assessments.toArray(), [syncKey]) || [];
+    const attendance = useLiveQuery(() => db.attendance.toArray(), [syncKey]) || [];
+    const subjects = useLiveQuery(() => db.subjects.toArray(), [syncKey]) || [];
     const dbGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
     const allGradeOptions = [
         ...GRADE_OPTIONS,
@@ -37,6 +44,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
         return 'All';
     });
     const [selectedSemester, setSelectedSemester] = useState('Semester I');
+    const [selectedSubject, setSelectedSubject] = useState('All');
 
     // Calculate Top Students
     const studentRankings = useMemo(() => {
@@ -44,7 +52,9 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
 
         const semesterAssessments = assessments.filter(a => {
             const subject = subjects.find(s => s.name === a.subjectName);
-            return (subject?.semester || 'Semester I') === selectedSemester;
+            const isMatchSem = (subject?.semester || 'Semester I') === selectedSemester;
+            const isMatchSub = selectedSubject === 'All' || a.subjectName === selectedSubject;
+            return isMatchSem && isMatchSub;
         });
         if (semesterAssessments.length === 0) return [];
 
@@ -159,6 +169,19 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                     >
                         <Option value="Semester I">Semester I</Option>
                         <Option value="Semester II">Semester II</Option>
+                    </Select>
+                    <Divider type="vertical" className="h-6" />
+                    <Select 
+                        value={selectedSubject} 
+                        onChange={setSelectedSubject} 
+                        className="w-40" 
+                        bordered={false}
+                        showSearch
+                    >
+                        <Option value="All">All Subjects</Option>
+                        {[...new Set(subjects.filter(s => s.semester === selectedSemester).map(s => s.name))].map(sub => (
+                            <Option key={sub} value={sub}>{sub}</Option>
+                        ))}
                     </Select>
                     <Divider type="vertical" className="h-6" />
                     <Select 
