@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Row, Col, Card, Form, Input, Select, DatePicker, Button, Table, Tag, Space, Tooltip, Popconfirm, Modal, notification, Upload, message, Skeleton, Empty } from 'antd';
-import { SearchOutlined, FilterOutlined, DownloadOutlined, UploadOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
+import { SearchOutlined, FilterOutlined, DownloadOutlined, UploadOutlined, EditOutlined, DeleteOutlined, UserOutlined, CopyOutlined, KeyOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { db } from '../../db/database';
+import { syncData } from '../../utils/sync';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade, disabledDate } from '../../utils/gradeUtils';
 import { validateAmharic, validateEthiopianPhone } from '../../utils/validators';
 import { formatEthiopianDate } from '../../utils/dateUtils';
@@ -32,7 +33,7 @@ export default function StudentRegistration() {
     const [isFormValid, setIsFormValid] = useState(false);
     const [profileStudentId, setProfileStudentId] = useState(null);
 
-    const studentsData = useLiveQuery(() => db.students.toArray());
+    const studentsData = useLiveQuery(() => db.students.orderBy('name').toArray());
     const students = studentsData || [];
     const isLoadingStudents = studentsData === undefined;
 
@@ -132,6 +133,40 @@ export default function StudentRegistration() {
         }
     };
 
+    const copyToClipboard = async (text) => {
+        const val = String(text || '').trim();
+        if (!val || val === 'null' || val === 'undefined') {
+            message.warning(t('common.noDataToCopy', 'No valid data to copy'));
+            return;
+        }
+
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(val);
+                message.success(t('common.copied', 'Copied to clipboard!'));
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = val;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                if (successful) {
+                    message.success(t('common.copied', 'Copied to clipboard!'));
+                } else {
+                    throw new Error('Copy command failed');
+                }
+            }
+        } catch (err) {
+            console.error('Clipboard error:', err);
+            message.error(t('common.copyFailed', 'Failed to copy. Please copy manually.'));
+        }
+    };
+
     const downloadTemplate = () => {
         const headers = [['ሙሉ ስም', 'የክርስትና ስም', 'ፆታ', 'ክፍል', 'የወላጅ ስልክ ቁጥር']];
         const ws = XLSX.utils.aoa_to_sheet(headers);
@@ -212,11 +247,69 @@ export default function StudentRegistration() {
             .map(g => ({ value: g, label: g })),
     ];
 
+    const handleGenerateAllCodes = async () => {
+        try {
+            const missing = students.filter(s => {
+                const code = s.portalCode || s.portalcode;
+                return !code || String(code).trim() === '';
+            });
+            
+            if (missing.length === 0) {
+                message.info('All students already have portal codes.');
+                return;
+            }
+
+            const usedCodes = new Set(students.map(s => s.portalCode || s.portalcode).filter(Boolean));
+            const generateUniqueCode = () => {
+                let code;
+                do {
+                    code = Math.floor(100000 + Math.random() * 900000).toString();
+                } while (usedCodes.has(code));
+                usedCodes.add(code);
+                return code;
+            };
+
+            for (const s of missing) {
+                await db.students.update(s.id, { 
+                    portalCode: generateUniqueCode(),
+                    synced: 0,
+                    updated_at: new Date().toISOString()
+                });
+            }
+            
+            message.success(`Generated codes for ${missing.length} students.`);
+            syncData().catch(console.error);
+        } catch (error) {
+            console.error('Error generating codes:', error);
+            message.error('Failed to generate codes');
+        }
+    };
+
+    const handleSingleGenerate = async (id) => {
+        try {
+            const usedCodes = new Set(students.map(s => s.portalCode || s.portalcode).filter(Boolean));
+            let code;
+            do {
+                code = Math.floor(100000 + Math.random() * 900000).toString();
+            } while (usedCodes.has(code));
+
+            await db.students.update(id, { 
+                portalCode: code,
+                synced: 0,
+                updated_at: new Date().toISOString()
+            });
+            message.success('Code generated');
+            syncData().catch(console.error);
+        } catch (error) {
+            message.error('Failed to generate code');
+        }
+    };
+
     const filteredStudents = students.filter(s => {
         const query = (searchQuery || "").toLowerCase();
         const matchesSearch = (s.name || "").toLowerCase().includes(query) ||
-            (s.baptismalName || "").toLowerCase().includes(query) ||
-            (s.parentContact || "").includes(searchQuery);
+            (s.baptismalName || s.baptismalname || "").toLowerCase().includes(query) ||
+            (s.parentContact || s.parentcontact || "").includes(searchQuery);
         const matchesGrade = !filterGrade || String(s.grade) === String(filterGrade);
         return matchesSearch && matchesGrade;
     });
@@ -230,13 +323,76 @@ export default function StudentRegistration() {
     }, []);
 
     const columns = [
-        { title: t('admin.name'), dataIndex: 'name', key: 'name', sorter: (a, b) => (a.name || '').localeCompare(b.name || '') },
-        { title: t('admin.baptismalName'), dataIndex: 'baptismalName', key: 'baptismalName', sorter: (a, b) => (a.baptismalName || '').localeCompare(b.baptismalName || '') },
-        { title: t('admin.gender'), dataIndex: 'gender', render: (t) => <Tag color={t === 'Male' ? 'blue' : 'magenta'}>{t || '—'}</Tag>, sorter: (a, b) => (a.gender || '').localeCompare(b.gender || '') },
-        { title: t('admin.grade'), dataIndex: 'grade', render: (t) => <Tag color="green">{formatGrade(t)}</Tag>, sorter: (a, b) => normalizeGrade(a.grade) - normalizeGrade(b.grade) },
-        { title: t('admin.portalCode', 'Portal Code'), dataIndex: 'portalCode', render: (code) => <Text copyable style={{ fontFamily: 'monospace' }}>{code}</Text> },
-        { title: t('admin.contact'), dataIndex: 'parentContact' },
-        { title: t('admin.dateOfEntry'), dataIndex: 'academicYear', render: (t) => <span className="text-xs text-slate-500">{formatEthiopianDate(t)}</span>, sorter: (a, b) => new Date(a.academicYear || 0) - new Date(b.academicYear || 0) },
+        { 
+            title: t('admin.name'), 
+            dataIndex: 'name', 
+            key: 'name', 
+            sorter: (a, b) => (a.name || '').localeCompare(b.name || '') 
+        },
+        { 
+            title: t('admin.baptismalName'), 
+            dataIndex: 'baptismalName', 
+            key: 'baptismalName', 
+            render: (v, r) => v || r.baptismalname || '—',
+            sorter: (a, b) => (a.baptismalName || a.baptismalname || '').localeCompare(b.baptismalName || b.baptismalname || '') 
+        },
+        { 
+            title: t('admin.gender'), 
+            dataIndex: 'gender', 
+            render: (t) => <Tag color={t === 'Male' ? 'blue' : 'magenta'}>{t || '—'}</Tag>, 
+            sorter: (a, b) => (a.gender || '').localeCompare(b.gender || '') 
+        },
+        { 
+            title: t('admin.grade'), 
+            dataIndex: 'grade', 
+            render: (t) => <Tag color="green">{formatGrade(t)}</Tag>, 
+            sorter: (a, b) => normalizeGrade(a.grade) - normalizeGrade(b.grade) 
+        },
+        { 
+            title: t('admin.portalCode', 'Portal Code'), 
+            dataIndex: 'portalCode', 
+            render: (code, record) => {
+                const actualCode = code || record.portalCode || record.portalcode;
+                if (!actualCode || String(actualCode).trim() === '') {
+                    return (
+                        <Button 
+                            type="link" 
+                            size="small" 
+                            onClick={() => handleSingleGenerate(record.id)}
+                            className="p-0 h-auto text-xs"
+                        >
+                            Generate
+                        </Button>
+                    );
+                }
+                
+                return (
+                    <Space size="middle">
+                        <Text style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{actualCode}</Text>
+                        <Tooltip title={t('common.copy', 'Copy')}>
+                            <Button 
+                                type="text" 
+                                size="small" 
+                                icon={<CopyOutlined />} 
+                                onClick={() => copyToClipboard(actualCode)}
+                                className="text-slate-400 hover:text-blue-500"
+                            />
+                        </Tooltip>
+                    </Space>
+                );
+            }
+        },
+        { 
+            title: t('admin.contact'), 
+            dataIndex: 'parentContact',
+            render: (v, r) => v || r.parentcontact || '—'
+        },
+        { 
+            title: t('admin.dateOfEntry'), 
+            dataIndex: 'academicYear', 
+            render: (t) => <span className="text-xs text-slate-500">{formatEthiopianDate(t)}</span>, 
+            sorter: (a, b) => new Date(a.academicYear || 0) - new Date(b.academicYear || 0) 
+        },
         {
             title: t('common.actions'), key: 'actions', align: 'right', render: (_, r) => (
                 <Space>
@@ -292,6 +448,14 @@ export default function StudentRegistration() {
                         options={allGradeOptions}
                         popupMatchSelectWidth={false}
                     />
+                    <div className="flex-1" />
+                    <Button 
+                        icon={<KeyOutlined className="text-amber-500" />} 
+                        onClick={handleGenerateAllCodes}
+                        className="bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 rounded-xl"
+                    >
+                        {t('admin.fixMissingCodes', 'Fix Missing Codes')}
+                    </Button>
                 </div>
             </div>
 

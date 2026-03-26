@@ -9,6 +9,21 @@ const resources = {
         "title": "በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት",
         "welcome": "ወደ አርሴማ ሰንበት ትምህርት ቤት እንኳን በደህና መጡ",
         "description": "Offline-first student management.",
+        "welcomeMessage": "Welcome! Please select your portal",
+        "teacherPortal": "Teacher Portal"
+      },
+      "parent": {
+        "title": "Parent Portal",
+        "searchTitle": "Find Student Results",
+        "searchDesc": "Enter the student full name or their ID/Portal code to view academic records.",
+        "studentNameOrId": "Student Name or ID",
+        "searchPlaceholder": "e.g. Abebe or S001...",
+        "notFound": "Student Not Found",
+        "notFoundDesc": "We couldn't find a student with that name or ID.",
+        "results": "Academic Results",
+        "noAssessments": "No assessments recorded yet.",
+        "attendanceSoon": "Detailed attendance history integration coming soon.",
+        "searchAnother": "Search Another Student"
       },
       "common": {
         "save": "Save",
@@ -43,6 +58,9 @@ const resources = {
         "missingMarks": "Missing Marks",
         "scanID": "Scan ID Card",
         "selectGrade": "Select Grade",
+        "clearAll": "Clear All",
+        "clearAllMarks": "Clear All Marks?",
+        "confirmClearAll": "This will remove all marks for the current assessment. This cannot be undone once saved.",
       },
       "profile": {
         "title": "Student Profile",
@@ -70,6 +88,21 @@ const resources = {
         "title": "በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት",
         "welcome": "ወደ አርሴማ ሰንበት ትምህርት ቤት እንኳን በደህና መጡ",
         "description": "ያለበይነመረብ የሚሰራ የተማሪዎች አስተዳደር።",
+        "welcomeMessage": "እንኳን ደህና መጡ! እባክዎ መግቢያዎን ይምረጡ",
+        "teacherPortal": "የመምህራን መግቢያ"
+      },
+      "parent": {
+        "title": "የወላጆች መግቢያ",
+        "searchTitle": "የተማሪ ውጤት ፈልግ",
+        "searchDesc": "የተማሪውን ሙሉ ስም ወይም የመለያ ቁጥር በማስገባት የትምህርት መረጃውን መመልከት ይችላሉ።",
+        "studentNameOrId": "የተማሪ ስም ወይም መለያ ቁጥር",
+        "searchPlaceholder": "ምሳሌ፡ አበበ ወይም S001...",
+        "notFound": "ተማሪው አልተገኘም",
+        "notFoundDesc": "በዚህ ስም ወይም መለያ ቁጥር የተመዘገበ ተማሪ አላገኘንም።",
+        "results": "የትምህርት ውጤቶች",
+        "noAssessments": "እስካሁን ምንም አይነት የምዘና ውጤት አልተመዘገበም።",
+        "attendanceSoon": "ዝርዝር የክትትል ታሪክ በቅርቡ ይካተታል።",
+        "searchAnother": "ሌላ ተማሪ ፈልግ"
       },
       "common": {
         "save": "አስቀምጥ",
@@ -104,6 +137,9 @@ const resources = {
         "missingMarks": "ያልተሞሉ ውጤቶች",
         "scanID": "መታወቂያ ይቃኙ",
         "selectGrade": "ክፍል ይምረጡ",
+        "clearAll": "ሁሉንም አጥፋ",
+        "clearAllMarks": "ሁሉንም ውጤቶች አጥፋ?",
+        "confirmClearAll": "ይህ ለዚህ ምዘና የተመዘገቡትን ውጤቶች በሙሉ ያጠፋል። አንዴ ከተቀመጠ በኋላ መመለስ አይቻልም።",
       },
       "profile": {
         "title": "የተማሪ መገለጫ",

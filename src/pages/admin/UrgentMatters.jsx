@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Typography, Card, List, Avatar, Tag, Empty, Badge, Alert, Row, Col, Statistic, Button, Space, Tooltip, message } from 'antd';
+import { Typography, Card, List, Avatar, Tag, Empty, Badge, Alert, Row, Col, Statistic, Button, Space, Tooltip, message, Modal, Input } from 'antd';
 import { WarningOutlined, UserOutlined, ClockCircleOutlined, FormOutlined, AlertOutlined, KeyOutlined, CopyOutlined, PhoneOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { formatGrade, normalizeGrade } from '../../utils/gradeUtils';
 import StudentProfile from '../../components/StudentProfile';
+import { supabase } from '../../utils/supabaseClient';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -38,7 +39,7 @@ export default function UrgentMatters() {
         if (!s.grade) return false; 
         const isGradeActive = activeGrades.has(String(s.grade).trim()) || activeGrades.has(normalizeGrade(s.grade));
         if (!isGradeActive) return false;
-        return !s.name || !s.baptismalName || !s.parentContact || !s.portalCode;
+        return !s.name || (!s.baptismalName && !s.baptismalname) || (!s.parentContact && !s.parentcontact) || (!s.portalCode && !s.portalcode);
     }), [students, activeGrades]);
 
     const isConduct = (a) => {
@@ -87,20 +88,19 @@ export default function UrgentMatters() {
         });
     }, [students, marks, assessments, subjects, currentSemester, activeGrades]);
 
-    // Students missing portal codes - Scoped to active grades
+    // Students missing portal codes - Show ALL students missing codes regardless of grade activity
     const missingPortalCode = useMemo(() => students.filter(s => {
-        if (!s.grade) return false;
-        const isGradeActive = activeGrades.has(String(s.grade).trim()) || activeGrades.has(normalizeGrade(s.grade));
-        if (!isGradeActive) return false;
-        return !s.portalCode || s.portalCode.trim() === '';
-    }), [students, activeGrades]);
+        const code = s.portalCode || s.portalcode;
+        return !code || String(code).trim() === '';
+    }), [students]);
 
     const totalIssues = missingInfoStudents.length + missingPortalCode.length + incompleteMarksStudents.length;
 
     const usedPortalCodes = useMemo(() => {
         const set = new Set();
         for (const s of students) {
-            if (s.portalCode) set.add(String(s.portalCode).trim());
+            const code = s.portalCode || s.portalcode;
+            if (code) set.add(String(code).trim());
         }
         return set;
     }, [students]);
@@ -121,9 +121,28 @@ export default function UrgentMatters() {
     });
 
     const copyToClipboard = async (text, successMsg) => {
+        const val = String(text || '').trim();
+        if (!val || val === 'null' || val === 'undefined') {
+            message.warning('No valid data to copy');
+            return;
+        }
         try {
-            await navigator.clipboard.writeText(String(text ?? ''));
-            message.success(successMsg);
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(val);
+                message.success(successMsg);
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = val;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                message.success(successMsg);
+            }
         } catch (e) {
             message.error('Copy failed');
         }
@@ -158,6 +177,62 @@ export default function UrgentMatters() {
         } catch (e) {
             message.error('Failed to generate portal codes');
         }
+    };
+
+    const handleWipeAllMarks = () => {
+        Modal.confirm({
+            title: <span className="text-red-600 font-bold">DANGEROUS: Wipe All Assessment Marks?</span>,
+            icon: <WarningOutlined className="text-red-500" />,
+            content: (
+                <div className="py-4">
+                    <Paragraph type="danger" strong>
+                        This will permanently delete every single mark for every student across all subjects and assessments in the entire system.
+                    </Paragraph>
+                    <Paragraph type="secondary" className="text-sm">
+                        Type <Text code strong className="text-red-600">RESET</Text> below to confirm this action:
+                    </Paragraph>
+                    <Input 
+                        placeholder="Type RESET here" 
+                        onChange={(e) => window._wipeConfirm = e.target.value}
+                    />
+                </div>
+            ),
+            okText: 'Wipe Everything',
+            okType: 'danger',
+            onOk: async () => {
+                if (window._wipeConfirm !== 'RESET') {
+                    message.error("Incorrect confirmation text. Wipe cancelled.");
+                    return;
+                }
+                try {
+                    const allMarks = await db.marks.toArray();
+                    const allIds = allMarks.map(m => m.id);
+                    
+                    // Clear locally
+                    await db.marks.clear();
+                    
+                    // Queue for remote deletion
+                    if (allIds.length > 0) {
+                        for (const id of allIds) {
+                            await db.deleted_records.add({ tableName: 'marks', recordId: id });
+                        }
+                        
+                        // Chunked Supabase Wipe (500 records at a time)
+                        for (let i = 0; i < allIds.length; i += 500) {
+                            const chunk = allIds.slice(i, i + 500);
+                            const { error: delError } = await supabase.from('marks').delete().in('id', chunk);
+                            if (delError) console.error("Wipe chunk error:", delError);
+                        }
+                    }
+                    
+                    message.success(`Successfully wiped ${allIds.length} marks from the system.`);
+                } catch (e) {
+                    message.error("Wipe failed: " + e.message);
+                } finally {
+                    delete window._wipeConfirm;
+                }
+            }
+        });
     };
 
     const goToRegisterAndSearch = (name) => {
@@ -251,10 +326,10 @@ export default function UrgentMatters() {
                         renderItem={student => {
                             const missing = [];
                             if (!student.name) missing.push('Name');
-                            if (!student.baptismalName) missing.push('Baptismal Name');
+                            if (!student.baptismalName && !student.baptismalname) missing.push('Baptismal Name');
                             if (!student.grade) missing.push('Grade');
-                            if (!student.parentContact) missing.push('Contact');
-                            if (!student.portalCode) missing.push('Portal Code');
+                            if (!student.parentContact && !student.parentcontact) missing.push('Contact');
+                            if (!student.portalCode && !student.portalcode) missing.push('Portal Code');
                             return (
                                 <List.Item 
                                     className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg"
@@ -274,28 +349,30 @@ export default function UrgentMatters() {
                                                 </Button>
                                             </Tooltip>
                                         ),
-                                        student.parentContact && (
+                                        (student.parentContact || student.parentcontact) && (
                                             <Tooltip key="call" title="Call parent">
                                                 <Button
                                                     size="small"
                                                     icon={<PhoneOutlined />}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if (student.parentContact) window.open(`tel:${student.parentContact}`, '_self');
+                                                        const contact = student.parentContact || student.parentcontact;
+                                                        if (contact) window.open(`tel:${contact}`, '_self');
                                                     }}
                                                 >
                                                     Call
                                                 </Button>
                                             </Tooltip>
                                         ),
-                                        student.parentContact && (
+                                        (student.parentContact || student.parentcontact) && (
                                             <Tooltip key="copy" title="Copy parent contact">
                                                 <Button
                                                     size="small"
                                                     icon={<CopyOutlined />}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if (student.parentContact) void copyToClipboard(student.parentContact, 'Contact copied');
+                                                        const contact = student.parentContact || student.parentcontact;
+                                                        if (contact) void copyToClipboard(contact, 'Contact copied');
                                                     }}
                                                 />
                                             </Tooltip>
@@ -396,28 +473,30 @@ export default function UrgentMatters() {
                                             Generate
                                         </Button>
                                     </Tooltip>,
-                                    student.parentContact && (
+                                    (student.parentContact || student.parentcontact) && (
                                         <Tooltip key="call" title="Call parent">
                                             <Button
                                                 size="small"
                                                 icon={<PhoneOutlined />}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (student.parentContact) window.open(`tel:${student.parentContact}`, '_self');
+                                                    const contact = student.parentContact || student.parentcontact;
+                                                    if (contact) window.open(`tel:${contact}`, '_self');
                                                 }}
                                             >
                                                 Call
                                             </Button>
                                         </Tooltip>
                                     ),
-                                    student.parentContact && (
+                                    (student.parentContact || student.parentcontact) && (
                                         <Tooltip key="copy" title="Copy parent contact">
                                             <Button
                                                 size="small"
                                                 icon={<CopyOutlined />}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (student.parentContact) void copyToClipboard(student.parentContact, 'Contact copied');
+                                                    const contact = student.parentContact || student.parentcontact;
+                                                    if (contact) void copyToClipboard(contact, 'Contact copied');
                                                 }}
                                             />
                                         </Tooltip>
@@ -445,7 +524,7 @@ export default function UrgentMatters() {
                                         />
                                     }
                                     title={<span className="font-bold">{student.name}</span>}
-                                    description={<div><Tag color="green">{formatGrade(student.grade)}</Tag> <Text type="secondary">{student.parentContact}</Text></div>}
+                                    description={<div><Tag color="green">{formatGrade(student.grade)}</Tag> <Text type="secondary">{student.parentContact || student.parentcontact}</Text></div>}
                                 />
                             </List.Item>
                         )}
@@ -524,6 +603,26 @@ export default function UrgentMatters() {
                     <Empty description="No urgent matters found. All records are in order." />
                 </Card>
             )}
+
+            <Card className="rounded-2xl border-none shadow-sm bg-slate-50 dark:bg-slate-900/30 border-t-4 border-t-red-500">
+                <div className="flex justify-between items-center flex-wrap gap-4">
+                    <div>
+                        <Title level={4} style={{ margin: 0 }} className="text-red-600 flex items-center gap-2">
+                             <AlertOutlined /> Dangerous Data Actions
+                        </Title>
+                        <Text type="secondary">Powerful tools for bulk data cleanup and system resets</Text>
+                    </div>
+                    <Button 
+                        danger 
+                        type="primary" 
+                        icon={<DeleteOutlined />} 
+                        onClick={handleWipeAllMarks}
+                        className="rounded-lg shadow-sm"
+                    >
+                        Wipe All Assessment Marks
+                    </Button>
+                </div>
+            </Card>
 
             <StudentProfile 
                 studentId={profileStudentId} 

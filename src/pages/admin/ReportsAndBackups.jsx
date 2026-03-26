@@ -25,12 +25,12 @@ export default function ReportsAndBackups() {
 
         const data = students.map(s => ({
             'Full Name': s.name,
-            'Baptismal Name': s.baptismalName || '',
+            'Baptismal Name': s.baptismalName || s.baptismalname || '',
             'Gender': s.gender,
             'Grade': s.grade,
-            'Portal Code': s.portalCode || '',
-            'Parent Contact': s.parentContact,
-            'Date of Entry': formatEthiopianDate(s.academicYear, true)
+            'Portal Code': s.portalCode || s.portalcode || '',
+            'Parent Contact': s.parentContact || s.parentcontact,
+            'Date of Entry': formatEthiopianDate(s.academicYear || s.academicyear, true)
         }));
 
         const ws = XLSX.utils.json_to_sheet(data);

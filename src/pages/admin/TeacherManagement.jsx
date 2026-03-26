@@ -113,9 +113,28 @@ export default function TeacherManagement() {
     };
 
     const copyToClipboard = async (text) => {
+        const val = String(text || '').trim();
+        if (!val || val === 'null' || val === 'undefined') {
+            message.warning('No valid data to copy');
+            return;
+        }
         try {
-            await navigator.clipboard.writeText(String(text ?? ''));
-            message.success('Copied');
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(val);
+                message.success('Copied');
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = val;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                message.success('Copied');
+            }
         } catch {
             message.error('Copy failed');
         }
@@ -152,16 +171,24 @@ export default function TeacherManagement() {
             dataIndex: 'accessCode',
             key: 'accessCode',
             width: 140,
-            render: (code) => (
-                <Space size="small">
-                    <Tag color="gold" className="font-mono">{code || '—'}</Tag>
-                    {code && (
+            render: (code, record) => {
+                const actualCode = code || record.accessCode || record.accesscode;
+                if (!actualCode) return <Tag color="default">—</Tag>;
+                
+                return (
+                    <Space size="small">
+                        <Tag color="gold" className="font-mono">{actualCode}</Tag>
                         <Tooltip title="Copy code">
-                            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => copyToClipboard(code)} />
+                            <Button 
+                                type="text" 
+                                size="small" 
+                                icon={<CopyOutlined />} 
+                                onClick={() => copyToClipboard(actualCode)} 
+                            />
                         </Tooltip>
-                    )}
-                </Space>
-            )
+                    </Space>
+                );
+            }
         },
         {
             title: 'Assigned Grades',

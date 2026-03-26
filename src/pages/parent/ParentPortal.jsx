@@ -66,18 +66,26 @@ export default function ParentDashboard() {
     }, []);
 
     const handleLogin = async (values) => {
-        const { studentName, accessCode } = values;
+        const { studentName, accessCode } = values; // Destructure values from Form
+        if (!studentName?.trim() || !accessCode?.trim()) {
+            message.error(t('parent.loginFieldsRequired', 'Both Student Name and Access Code are required.'));
+            return;
+        }
+
         const student = await db.students
             .where('name')
             .equalsIgnoreCase(studentName.trim())
-            .filter(s => s.portalCode === accessCode.trim())
+            .filter(s => {
+                const code = s.portalCode || s.portalcode;
+                return code && String(code).trim() === accessCode.trim();
+            })
             .first();
 
         if (student) {
             setLoggedInStudent(student);
             sessionStorage.setItem('senbet_parent_auth', JSON.stringify(student));
             message.success(t('parent.loginSuccess', 'Welcome back!'));
-            setActiveTab('progress'); // Auto-navigate to progress after login
+            setActiveTab('home'); // Now that everything is locked, start at Home
         } else {
             message.error(t('parent.loginError', 'Invalid student name or access code. Please try again.'));
         }
@@ -98,14 +106,12 @@ export default function ParentDashboard() {
             case 'contact':
                 return <ContactSection />;
             case 'progress':
-                return loggedInStudent ? (
+                return (
                     <ProgressSection 
                         student={loggedInStudent} 
                         onLogout={handleLogout} 
                         onViewProfile={() => setViewingProfile(true)}
                     />
-                ) : (
-                    <LoginSection onLogin={handleLogin} />
                 );
             case 'gallery':
                 return <OurSchoolSection />;
@@ -117,48 +123,9 @@ export default function ParentDashboard() {
     return (
         <div className="max-w-7xl mx-auto w-full py-4 px-2 md:py-8 md:px-6">
             {/* Tablet/Mobile Nav (Sidebar is lg+) */}
-            <div className="lg:hidden mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden relative z-30">
-                <div className="flex flex-wrap gap-2 p-3 items-center">
-                    {[
-                        { key: 'home', icon: <HomeOutlined />, label: t('parent.home', 'Home') },
-                        { key: 'progress', icon: <DashboardOutlined />, label: t('parent.studentProgress', 'Student Progress') },
-                        { key: 'about', icon: <InfoCircleOutlined />, label: t('parent.aboutSchool', 'About Our School') },
-                        { key: 'gallery', icon: <PictureOutlined />, label: t('parent.gallery', 'Our School Gallery') },
-                        { key: 'contact', icon: <PhoneOutlined />, label: t('parent.contactUs', 'Contact & Support') },
-                    ].map(item => (
-                        <Button
-                            key={item.key}
-                            type={activeTab === item.key ? 'primary' : 'default'}
-                            icon={item.icon}
-                            onClick={() => setActiveTab(item.key)}
-                            className="rounded-xl"
-                        >
-                            {item.label}
-                        </Button>
-                    ))}
-                    {loggedInStudent && (
-                        <div className="flex-1 flex justify-end items-center gap-2 min-w-[220px]">
-                            <Tag color="green" className="truncate max-w-[160px]">{loggedInStudent.name}</Tag>
-                            <Button danger size="small" onClick={handleLogout}>
-                                {t('common.logout', 'Logout')}
-                            </Button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="flex gap-6 min-h-[80vh]">
-                {/* Sidebar */}
-                <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
-                    {/* Logo and school name */}
-                    <div className="p-5 text-center border-b border-slate-50 dark:border-slate-800 bg-gradient-to-b from-forest-600 to-forest-700">
-                        <img src="/Logo.jpg" alt="School Logo" className="w-16 h-16 rounded-full object-cover mx-auto shadow-lg border-4 border-white/30 mb-3" />
-                        <p className="text-white font-bold text-sm leading-snug">{t('app.title', 'Senbet School')}</p>
-                        <Tag color="green" className="mt-2 text-xs">{t('parent.portalSuffix', 'Parent & Student Portal')}</Tag>
-                    </div>
-
-                    {/* Navigation */}
-                    <nav className="flex-1 py-4">
+            {loggedInStudent && (
+                <div className="lg:hidden mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden relative z-30">
+                    <div className="flex flex-wrap gap-2 p-3 items-center">
                         {[
                             { key: 'home', icon: <HomeOutlined />, label: t('parent.home', 'Home') },
                             { key: 'progress', icon: <DashboardOutlined />, label: t('parent.studentProgress', 'Student Progress') },
@@ -169,20 +136,64 @@ export default function ParentDashboard() {
                             <button
                                 key={item.key}
                                 onClick={() => setActiveTab(item.key)}
-                                className={`w-full flex items-center gap-3 px-5 py-3.5 text-left transition-all ${
-                                    activeTab === item.key
-                                        ? 'bg-forest-50 text-forest-700 dark:bg-forest-900/30 dark:text-forest-400 font-bold border-r-4 border-forest-500'
-                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
+                                    activeTab === item.key 
+                                        ? 'bg-forest-600 text-white shadow-lg' 
+                                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                                 }`}
                             >
-                                <span className={`text-base ${activeTab === item.key ? 'text-forest-600' : 'text-slate-400'}`}>{item.icon}</span>
-                                <span className="text-sm">{item.label}</span>
+                                {item.icon}
+                                <span className="text-sm font-medium">{item.label}</span>
                             </button>
                         ))}
-                    </nav>
+                        <div className="flex-1 flex justify-end items-center gap-2">
+                            <Tag color="green" className="truncate max-w-[100px] border-none bg-forest-50 text-forest-700">{loggedInStudent.name}</Tag>
+                            <Button danger size="small" type="text" icon={<LogoutOutlined />} onClick={handleLogout} />
+                        </div>
+                    </div>
+                </div>
+            )}
 
-                    {/* Logout button */}
-                    {loggedInStudent && (
+            {!loggedInStudent ? (
+                <div className="min-h-[80vh] flex items-center justify-center p-4">
+                    <LoginSection onLogin={handleLogin} />
+                </div>
+            ) : (
+                <div className="flex gap-6 min-h-[80vh]">
+                    {/* Sidebar */}
+                    <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+                        {/* Logo and school name */}
+                        <div className="p-5 text-center border-b border-slate-50 dark:border-slate-800 bg-gradient-to-b from-forest-600 to-forest-700">
+                            <img src="/Logo.jpg" alt="School Logo" className="w-16 h-16 rounded-full object-cover mx-auto shadow-lg border-4 border-white/30 mb-3" />
+                            <p className="text-white font-bold text-sm leading-snug">{t('app.title', 'Senbet School')}</p>
+                            <Tag color="green" className="mt-2 text-xs">{t('parent.portalSuffix', 'Parent & Student Portal')}</Tag>
+                        </div>
+
+                        {/* Navigation */}
+                        <nav className="flex-1 py-4">
+                            {[
+                                { key: 'home', icon: <HomeOutlined />, label: t('parent.home', 'Home') },
+                                { key: 'progress', icon: <DashboardOutlined />, label: t('parent.studentProgress', 'Student Progress') },
+                                { key: 'about', icon: <InfoCircleOutlined />, label: t('parent.aboutSchool', 'About Our School') },
+                                { key: 'gallery', icon: <PictureOutlined />, label: t('parent.gallery', 'Our School Gallery') },
+                                { key: 'contact', icon: <PhoneOutlined />, label: t('parent.contactUs', 'Contact & Support') },
+                            ].map(item => (
+                                <button
+                                    key={item.key}
+                                    onClick={() => setActiveTab(item.key)}
+                                    className={`w-full flex items-center gap-3 px-5 py-3.5 text-left transition-all ${
+                                        activeTab === item.key
+                                            ? 'bg-forest-50 text-forest-700 dark:bg-forest-900/30 dark:text-forest-400 font-bold border-r-4 border-forest-500'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <span className={`text-base ${activeTab === item.key ? 'text-forest-600' : 'text-slate-400'}`}>{item.icon}</span>
+                                    <span className="text-sm">{item.label}</span>
+                                </button>
+                            ))}
+                        </nav>
+
+                        {/* Logout button */}
                         <div className="p-4 border-t border-slate-50 dark:border-slate-800 bg-red-50/50 dark:bg-red-900/10">
                             <Button 
                                 type="primary" 
@@ -195,16 +206,16 @@ export default function ParentDashboard() {
                                 {t('common.logout', 'Sign Out')}
                             </Button>
                         </div>
-                    )}
-                </aside>
+                    </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 min-w-0">
-                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                        {renderContent()}
-                    </div>
-                </main>
-            </div>
+                    {/* Main Content */}
+                    <main className="flex-1 min-w-0">
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                            {renderContent()}
+                        </div>
+                    </main>
+                </div>
+            )}
 
             {loggedInStudent && viewingProfile && (
                 <StudentProfile
@@ -286,7 +297,7 @@ function HomeSection({ onNavigate }) {
                         title={<Space><div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center"><InfoCircleOutlined className="text-blue-600" /></div> <span className="font-bold">{t('parent.quickLinks')}</span></Space>} 
                         className="shadow-xl border-none rounded-[2rem] h-full"
                     >
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
                             {[
                                 { key: 'calendar', emoji: '📅' },
                                 { key: 'uniform', emoji: '👔' },
@@ -507,7 +518,7 @@ function ProgressSection({ student, onLogout, onViewProfile }) {
                             <Card size="small" className="bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl p-2">
                                 <Descriptions column={1} title={<span className="text-forest-600"><CalendarOutlined /> Quick Info</span>}>
                                     <Descriptions.Item label="Academic Year">{student.academicYear ? (String(student.academicYear).includes('E.C.') ? student.academicYear : `${dayjs(student.academicYear).format('YYYY')} E.C.`) : '—'}</Descriptions.Item>
-                                    <Descriptions.Item label="Contact">{student.parentContact}</Descriptions.Item>
+                                    <Descriptions.Item label="Contact">{student.parentContact || student.parentcontact || '—'}</Descriptions.Item>
                                     <Descriptions.Item label="Status"><Tag color="processing">Active</Tag></Descriptions.Item>
                                 </Descriptions>
                             </Card>

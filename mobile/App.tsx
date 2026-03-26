@@ -16,7 +16,8 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import {
-  Home, Users, CalendarCheck, BarChart3, AlertTriangle, Settings, LogOut, Moon, Sun, Languages, RefreshCw, TrendingUp, Info, BookOpen, Key, Phone
+  Home, Users, CalendarCheck, BarChart3, AlertTriangle, Settings, LogOut, Moon, Sun, Languages, RefreshCw, TrendingUp, Info, BookOpen, Key, Phone,
+  Search, User, ArrowLeft, Eye, EyeOff, Trash2
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 
@@ -157,6 +158,7 @@ const paginate = (data: any[], page: number) => data.slice(0, (page + 1) * PAGE_
 export default function App() {
   const { t, i18n } = useTranslation();
   const [teacher, setTeacher] = useState<Teacher | null>(null);
+  const [authMode, setAuthMode] = useState<'landing' | 'teacher_login' | 'parent_portal'>('landing');
   const [authLoading, setAuthLoading] = useState(true);
   const [isDark, setIsDark] = useState(true);
 
@@ -223,12 +225,14 @@ export default function App() {
 
   const toggleTheme = async () => {
     const next = !isDark;
+    console.log('Mobile: Toggling theme to', next ? 'dark' : 'light');
     setIsDark(next);
     await AsyncStorage.setItem('senbet_theme', next ? 'dark' : 'light');
   };
 
   const toggleLanguage = async () => {
     const next = i18n.language === 'en' ? 'am' : 'en';
+    console.log('Mobile: Toggling language to', next);
     await i18n.changeLanguage(next);
     await AsyncStorage.setItem('app_language', next);
   };
@@ -343,7 +347,16 @@ export default function App() {
   };
 
   if (authLoading) return <View style={[s.center, { backgroundColor: C.bg }]}><ActivityIndicator size="large" color={C.accent} /></View>;
-  if (!teacher) return <TeacherLogin onLogin={handleLogin} isDark={isDark} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} />;
+  
+  if (!teacher) {
+    if (authMode === 'parent_portal') {
+      return <ParentPortal isDark={isDark} onBack={() => setAuthMode('landing')} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} />;
+    }
+    if (authMode === 'teacher_login') {
+      return <TeacherLogin onLogin={handleLogin} onBack={() => setAuthMode('landing')} isDark={isDark} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} />;
+    }
+    return <LandingPage onSelectMode={(m: 'teacher' | 'parent') => setAuthMode(m === 'teacher' ? 'teacher_login' : 'parent_portal')} isDark={isDark} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} />;
+  }
 
   return (
     <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
@@ -487,12 +500,283 @@ export default function App() {
   );
 }
 
-function TeacherLogin({ onLogin, isDark, toggleTheme, toggleLanguage }: { onLogin: (t: Teacher) => void, isDark: boolean, toggleTheme: () => void, toggleLanguage: () => void }) {
+function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { onSelectMode: (mode: 'teacher' | 'parent') => void, isDark: boolean, toggleTheme: () => void, toggleLanguage: () => void }) {
+  const { t, i18n } = useTranslation();
+  const C = isDark ? THEMES.dark : THEMES.light;
+  const s = makeStyles(C);
+
+  return (
+    <View style={s.loginRoot}>
+      <View style={{ position: 'absolute', top: 60, right: 24, flexDirection: 'row', alignItems: 'center', gap: 12, zIndex: 100 }}>
+        <TouchableOpacity onPress={toggleLanguage} style={{ backgroundColor: C.card, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.border, elevation: 2 }}>
+          <Text style={{ color: C.text, fontWeight: '800', fontSize: 13 }}>{i18n.language === 'en' ? 'አማ' : 'EN'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={toggleTheme} style={{ padding: 8 }}><Text style={{ fontSize: 28 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
+      </View>
+      
+      <View style={{ alignItems: 'center', marginBottom: 48 }}>
+        <View style={{ width: 120, height: 120, borderRadius: 30, padding: 6, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, marginBottom: 24 }}>
+          {/* @ts-ignore */}
+          <RNImage source={require('./assets/logo.jpg')} style={{ width: '100%', height: '100%', borderRadius: 24 }} resizeMode="contain" />
+        </View>
+        <Text style={[s.loginTitle, { fontSize: 28 }]}>በግ/ደ/አ/ቅ/አርሴማ</Text>
+        <Text style={[s.loginSub, { fontSize: 16, marginTop: 4 }]}>ፍኖተ ብርሃን ሰ/ቤት</Text>
+      </View>
+
+      <Text style={{ color: C.muted, textAlign: 'center', marginBottom: 32, fontWeight: '700', fontSize: 15 }}>{t('app.welcomeMessage', 'Welcome! Please select your portal')}</Text>
+
+      <TouchableOpacity 
+        style={[s.loginBtn, { backgroundColor: C.accent, marginBottom: 20, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]} 
+        onPress={() => onSelectMode('teacher')}
+      >
+        <Key size={22} color="#fff" />
+        <Text style={[s.loginBtnText, { fontSize: 18 }]}>{t('app.teacherPortal', 'Teacher Portal')}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={[s.loginBtn, { backgroundColor: 'transparent', borderWidth: 2, borderColor: C.accent, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]} 
+        onPress={() => onSelectMode('parent')}
+      >
+        <Users size={22} color={C.accent} />
+        <Text style={[s.loginBtnText, { color: C.accent, fontSize: 18 }]}>{t('parent.title', 'Parent Portal')}</Text>
+      </TouchableOpacity>
+
+      <Text style={{ color: C.muted, textAlign: 'center', marginTop: 'auto', fontSize: 12 }}>v2.4.0 • ©{new Date().getFullYear()}</Text>
+    </View>
+  );
+}
+
+function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage }: { isDark: boolean, onBack: () => void, toggleTheme: () => void, toggleLanguage: () => void }) {
+  const { t, i18n } = useTranslation();
+  const C = isDark ? THEMES.dark : THEMES.light;
+  const s = makeStyles(C);
+  
+  const [studentName, setStudentName] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  const [showCode, setShowCode] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [student, setStudent] = useState<Student | null>(null);
+  const [marks, setMarks] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [attendance, setAttendance] = useState<any[]>([]);
+
+  const doSearch = async () => {
+    if (!studentName.trim() || !accessCode.trim()) {
+      return Alert.alert(t('common.error', 'Error'), t('parent.loginFieldsRequired', 'Both Student Name and Access Code are required.'));
+    }
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .ilike('name', studentName.trim())
+        .eq('portalcode', accessCode.trim())
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return Alert.alert(t('parent.notFound', 'Student Not Found'), t('parent.loginFailed', 'Incorrect name or portal access code. Please try again.'));
+
+      setStudent(data);
+      
+      const [mRes, aRes, attRes] = await Promise.all([
+        supabase.from('marks').select('*').eq('studentid', data.id),
+        supabase.from('assessments').select('*').eq('grade', data.grade),
+        supabase.from('attendance').select('*').eq('studentid', data.id).order('date', { ascending: false })
+      ]);
+      
+      setMarks(mRes.data || []);
+      setAssessments(aRes.data || []);
+      setAttendance(attRes.data || []);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={[s.root, { padding: 0 }]}>
+       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingTop: 60, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
+         <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border }}>
+           <ArrowLeft size={20} color={C.text} />
+         </TouchableOpacity>
+         <Text style={{ color: C.text, fontSize: 18, fontWeight: '900' }}>{t('parent.title', 'Parent Portal')}</Text>
+         <View style={{ width: 40 }} />
+       </View>
+
+       {!student ? (
+         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
+            <View style={{ alignItems: 'center', marginBottom: 40 }}>
+              <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}>
+                <Search size={48} color={C.accent} />
+              </View>
+              <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', marginTop: 20, textAlign: 'center' }}>{t('parent.searchTitle', 'Find Student Results')}</Text>
+              <Text style={{ color: C.muted, textAlign: 'center', marginTop: 10, fontSize: 15, lineHeight: 22 }}>{t('parent.searchDesc', 'Enter the student full name or their ID/Portal code to view academic records.')}</Text>
+            </View>
+
+            <View style={[s.loginCard, { padding: 24 }]}>
+               <Text style={s.inputLabel}>{t('parent.studentFullName', 'Student Full Name')}</Text>
+               <TextInput 
+                 style={[s.loginInput, { height: 56, marginBottom: 16 }]}
+                 placeholder={t('parent.namePlaceholder', 'e.g. Abebe Kebede')}
+                 placeholderTextColor={C.muted}
+                 value={studentName}
+                 onChangeText={setStudentName}
+                 autoCorrect={false}
+               />
+               
+               <Text style={s.inputLabel}>{t('parent.portalAccessCode', 'Portal Access Code')}</Text>
+               <View style={{ position: 'relative' }}>
+                 <TextInput 
+                   style={[s.loginInput, { height: 56, paddingRight: 50 }]}
+                   placeholder="------"
+                   keyboardType="numeric"
+                   maxLength={6}
+                   placeholderTextColor={C.muted}
+                   value={accessCode}
+                   onChangeText={setAccessCode}
+                   secureTextEntry={!showCode}
+                 />
+                 <TouchableOpacity 
+                   onPress={() => setShowCode(!showCode)} 
+                   style={{ position: 'absolute', right: 15, top: 15 }}
+                 >
+                   {showCode ? <EyeOff size={24} color={C.muted} /> : <Eye size={24} color={C.muted} />}
+                 </TouchableOpacity>
+               </View>
+
+               <TouchableOpacity style={[s.loginBtn, { marginTop: 24, height: 56, borderRadius: 12 }]} onPress={doSearch} disabled={loading}>
+                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('parent.viewResults', 'View Student Results')}</Text>}
+               </TouchableOpacity>
+            </View>
+         </ScrollView>
+       ) : (
+         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
+            <View style={[s.dashboardCard, { marginBottom: 24, alignItems: 'center', padding: 24 }]}>
+               <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: C.accent + '33' }}>
+                 <User size={40} color={C.accent} />
+               </View>
+               <Text style={{ color: C.text, fontSize: 22, fontWeight: '900', textAlign: 'center' }}>{student.name}</Text>
+               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 }}>
+                 <View style={{ backgroundColor: C.border, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 }}>
+                   <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>{fmtGrade(student.grade)}</Text>
+                 </View>
+                 <Text style={{ color: C.muted }}>•</Text>
+                 <Text style={{ color: C.muted, fontWeight: '600' }}>ID: {student.portalcode || student.id.slice(0, 8)}</Text>
+               </View>
+               
+               <TouchableOpacity 
+                 style={{ marginTop: 24, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: C.accent + '10', borderWidth: 1, borderColor: C.accent + '20' }} 
+                 onPress={() => setStudent(null)}
+               >
+                 <Text style={{ color: C.accent, fontWeight: '800', fontSize: 13 }}>{t('parent.searchAnother', 'Search Another Student')}</Text>
+               </TouchableOpacity>
+            </View>
+            
+            {/* Attendance Summary */}
+            <View style={{ marginBottom: 32 }}>
+               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
+                 <CalendarCheck size={20} color={C.accent} />
+                 <Text style={[s.sectionTitle, { marginBottom: 0 }]}>{t('profile.attendance', 'Attendance')}</Text>
+               </View>
+
+               <View style={[s.dashboardCard, { padding: 16 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                     <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={{ color: C.accent, fontSize: 24, fontWeight: '900' }}>
+                           {attendance.length > 0 ? Math.round(((attendance.filter(a => a.status !== 'absent').length) / attendance.length) * 100) : 100}%
+                        </Text>
+                        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Attendance Rate</Text>
+                     </View>
+                     <View style={{ width: 1, height: '80%', backgroundColor: C.border, alignSelf: 'center' }} />
+                     <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={{ color: C.red, fontSize: 24, fontWeight: '900' }}>{attendance.filter(a => a.status === 'absent').length}</Text>
+                        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Absences</Text>
+                     </View>
+                     <View style={{ width: 1, height: '80%', backgroundColor: C.border, alignSelf: 'center' }} />
+                     <View style={{ alignItems: 'center', flex: 1 }}>
+                        <Text style={{ color: C.amber, fontSize: 24, fontWeight: '900' }}>{attendance.filter(a => a.status === 'late').length}</Text>
+                        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Lates</Text>
+                     </View>
+                  </View>
+
+                  {attendance.filter(a => a.status !== 'present').length > 0 ? (
+                     <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingTop: 16 }}>
+                        <Text style={{ color: C.muted, fontSize: 11, fontWeight: '800', marginBottom: 12, textTransform: 'uppercase' }}>Recent History</Text>
+                        {attendance.filter(a => a.status !== 'present').slice(0, 3).map((a, i) => (
+                           <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, backgroundColor: C.bg, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: C.border }}>
+                              <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }}>{formatEthiopianDate(a.date)}</Text>
+                              <View style={{ backgroundColor: a.status === 'absent' ? C.red + '15' : C.amber + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                                 <Text style={{ color: a.status === 'absent' ? C.red : C.amber, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>{t(`teacher.${a.status}`, a.status) as string}</Text>
+                              </View>
+                           </View>
+                        ))}
+                     </View>
+                  ) : (
+                     <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingTop: 16, alignItems: 'center' }}>
+                        <Text style={{ color: C.green, fontSize: 13, fontWeight: '700' }}>✨ Perfect attendance so far!</Text>
+                     </View>
+                  )}
+               </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
+              <BarChart3 size={20} color={C.accent} />
+              <Text style={[s.sectionTitle, { marginBottom: 0 }]}>{t('parent.results', 'Academic Results')}</Text>
+            </View>
+            
+            {assessments.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <Info size={40} color={C.muted} opacity={0.5} />
+                <Text style={[s.empty, { marginTop: 12 }]}>{t('parent.noAssessments', 'No assessments recorded yet.')}</Text>
+              </View>
+            ) : (
+              Object.entries(
+                assessments.reduce((acc, a) => {
+                  if (!acc[a.subjectname]) acc[a.subjectname] = [];
+                  acc[a.subjectname].push(a);
+                  return acc;
+                }, {} as Record<string, Assessment[]>)
+              ).map(([subject, subjectAssessments]) => (
+                <View key={subject} style={{ marginBottom: 20 }}>
+                  <Text style={{ color: C.muted, fontSize: 13, fontWeight: '800', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>{subject}</Text>
+                  {subjectAssessments.map(a => {
+                    const mark = marks.find(m => m.assessmentid === a.id);
+                    return (
+                      <View key={a.id} style={[s.studentCard, { justifyContent: 'space-between', padding: 18, marginBottom: 8 }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[s.studentName, { fontSize: 15 }]}>{a.name}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end', backgroundColor: C.bg, padding: 10, borderRadius: 12, minWidth: 60, borderWidth: 1, borderColor: C.border }}>
+                          <Text style={{ color: mark ? C.accent : C.muted, fontSize: 20, fontWeight: '900' }}>{mark ? mark.score : '-'}</Text>
+                          <Text style={{ color: C.muted, fontSize: 10, fontWeight: '600' }}>/ {a.maxscore}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))
+            )}
+
+            <View style={{ marginTop: 24, padding: 24, backgroundColor: C.card, borderRadius: 20, borderStyle: 'dashed', borderWidth: 2, borderColor: C.border, alignItems: 'center' }}>
+               <CalendarCheck size={32} color={C.muted} opacity={0.4} />
+               <Text style={{ color: C.muted, textAlign: 'center', marginTop: 12, fontWeight: '600', fontSize: 13 }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
+            </View>
+            <View style={{ height: 40 }} />
+         </ScrollView>
+       )}
+    </View>
+  );
+}
+
+function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage }: { onLogin: (t: Teacher) => void, onBack: () => void, isDark: boolean, toggleTheme: () => void, toggleLanguage: () => void }) {
   const { t, i18n } = useTranslation();
   const C = isDark ? THEMES.dark : THEMES.light;
   const s = makeStyles(C);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [showCode, setShowCode] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const doLogin = async () => {
@@ -519,8 +803,13 @@ function TeacherLogin({ onLogin, isDark, toggleTheme, toggleLanguage }: { onLogi
 
   return (
     <View style={s.loginRoot}>
-      <View style={{ position: 'absolute', top: 60, right: 24 }}>
-        <TouchableOpacity onPress={toggleTheme}><Text style={{ fontSize: 24 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
+      <View style={{ position: 'absolute', top: 60, right: 24, zIndex: 100 }}>
+        <TouchableOpacity onPress={toggleTheme} style={{ padding: 8 }}><Text style={{ fontSize: 24 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
+      </View>
+      <View style={{ position: 'absolute', top: 60, left: 24, zIndex: 100 }}>
+         <TouchableOpacity onPress={onBack} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, elevation: 2 }}>
+           <ArrowLeft size={22} color={C.text} />
+         </TouchableOpacity>
       </View>
       <View style={{ alignItems: 'center', marginBottom: 32 }}>
         <View style={{ width: 100, height: 100, borderRadius: 24, padding: 4, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginBottom: 20 }}>
@@ -542,14 +831,24 @@ function TeacherLogin({ onLogin, isDark, toggleTheme, toggleLanguage }: { onLogi
         />
 
         <Text style={s.inputLabel}>Access Code</Text>
-        <TextInput
-          style={s.loginInput}
-          value={code}
-          onChangeText={setCode}
-          secureTextEntry
-          placeholder="6-digit code"
-          placeholderTextColor={C.muted}
-        />
+        <View style={{ position: 'relative' }}>
+          <TextInput
+            style={[s.loginInput, { paddingRight: 50 }]}
+            value={code}
+            onChangeText={setCode}
+            secureTextEntry={!showCode}
+            placeholder="6-digit code"
+            placeholderTextColor={C.muted}
+            keyboardType="numeric"
+            maxLength={6}
+          />
+          <TouchableOpacity 
+            onPress={() => setShowCode(!showCode)} 
+            style={{ position: 'absolute', right: 15, top: 12 }}
+          >
+            {showCode ? <EyeOff size={24} color={C.muted} /> : <Eye size={24} color={C.muted} />}
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity style={s.loginBtn} onPress={doLogin} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>Login</Text>}
@@ -1037,11 +1336,11 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
   const normalizedMySubjects = mySubjects.map(normS).filter(Boolean);
   
-  const students = useMemo(() => 
+  const myStudents = useMemo(() => 
     allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
-  const assessments = useMemo(() => 
+  const myAssessments = useMemo(() => 
     allAssessments.filter(a => {
       const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
       const isSubjectMatch = !hasTeacherAssignedSubjects || normalizedMySubjects.includes(normS(a.subjectname));
@@ -1068,12 +1367,13 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const [bulkVisible, setBulkVisible] = useState(false);
   const [bulkScore, setBulkScore] = useState('');
   const [predictVisible, setPredictVisible] = useState(false);
+  const [clearAllVisible, setClearAllVisible] = useState(false);
   const [predictDetails, setPredictDetails] = useState<{count: number, subject: string, students: any[]}>({ count: 0, subject: '', students: [] });
   const [page, setPage] = useState(0);
 
   useEffect(() => {
     if (route.params?.assessmentId) {
-      const ass = assessments.find(a => a.id === route.params.assessmentId);
+      const ass = myAssessments.find(a => a.id === route.params.assessmentId);
       if (ass) {
         setSelectedGrade(String(ass.grade));
         setSelectedSubject(normS(ass.subjectname));
@@ -1082,10 +1382,10 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     } else if (route.params?.grade) {
       setSelectedGrade(String(route.params.grade));
     }
-  }, [route.params, assessments]);
+  }, [route.params, myAssessments]);
 
   useEffect(() => {
-    const uniqueGrades = [...new Set(students.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
+    const uniqueGrades = [...new Set(myStudents.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
     setGrades(uniqueGrades);
     if (hasTeacherAssignedGrades) {
       const isSelectedAllowed = selectedGrade && uniqueGrades.some(g => normG(g) === normG(selectedGrade));
@@ -1097,7 +1397,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     } else if (!selectedGrade && uniqueGrades.length > 0) {
       setSelectedGrade(uniqueGrades[0]);
     }
-  }, [students, hasTeacherAssignedGrades, selectedGrade]);
+  }, [myStudents, hasTeacherAssignedGrades, selectedGrade]);
 
   // Keep subject/assessment selection consistent when grade changes via navigation.
   useEffect(() => {
@@ -1129,7 +1429,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     setMarkIds(idMap);
   }, [selectedAssessment, marksData]);
 
-  const gradeAssessments = assessments.filter((a) => normG(a.grade) === normG(selectedGrade));
+  const gradeAssessments = myAssessments.filter((a) => normG(a.grade) === normG(selectedGrade));
   // Subject chips come from the teacher-assigned subjects list (like desktop "Subjects:" block),
   // without extra filtering (assessments list is filtered separately by grade/semester/subject).
   const allowedSubjectKeyToLabel = new Map<string, string>();
@@ -1148,7 +1448,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     ? gradeAssessments.filter(a => normS(a.subjectname) === selectedSubjectKey)
     : gradeAssessments;
   
-  const gradeStudents = students.filter((st) => normG(st.grade) === normG(selectedGrade));
+  const gradeStudents = myStudents.filter((st) => normG(st.grade) === normG(selectedGrade));
   const filteredStudents = gradeStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
 
   const saveMarksWithData = async (currentMarksData: Record<string, string>) => {
@@ -1242,6 +1542,36 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     saveMarksWithData(updates);
   };
 
+  const handleClearMarks = () => {
+    if (!selectedAssessment) return;
+
+    // If everything is already cleared for the current assessment, don't show confirmation.
+    const studentsWithMarks = gradeStudents.filter((s) => {
+      const v = marks[s.id];
+      if (v === undefined || v === '') return false;
+      // Guard against nullable scores mapping to strings like "null".
+      const n = parseFloat(v);
+      return v !== 'null' && !Number.isNaN(n);
+    });
+
+    if (studentsWithMarks.length === 0) {
+      showToast?.('ℹ️ Marks are already cleared for this assessment', 'info');
+      return;
+    }
+
+    setClearAllVisible(true);
+  };
+
+  const applyClearAllMarks = () => {
+    if (!selectedAssessment) return;
+    const updates = { ...marks };
+    gradeStudents.forEach(s => updates[s.id] = '');
+    setMarks(updates);
+    setClearAllVisible(false);
+    saveMarksWithData(updates);
+    showToast?.('🧹 Marks cleared for this assessment', 'success');
+  };
+
   const handlePredictMarks = () => {
     if (!selectedAssessment) return;
     const studentsWithoutMarks = gradeStudents.filter(st => marks[st.id] === undefined || marks[st.id] === '');
@@ -1250,11 +1580,16 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       return;
     }
 
+    const targetSubject = normS(selectedAssessment.subjectname);
     const studentsWithHistory = [];
     for (const student of studentsWithoutMarks) {
       const historyCount = marksData.filter(m => m.studentid === student.id).filter(m => {
-        const a = assessments.find(ax => ax.id === m.assessmentid);
-        return a && normS(a.subjectname) === normS(selectedAssessment.subjectname);
+        // Use m.subject directly for robustness if available, or look up assessment
+        const markSubject = m.subject ? normS(m.subject) : null;
+        if (markSubject) return markSubject === targetSubject;
+        
+        const a = myAssessments.find(ax => ax.id === m.assessmentid);
+        return a && normS(a.subjectname) === targetSubject;
       }).length;
       if (historyCount > 0) studentsWithHistory.push(student);
     }
@@ -1277,7 +1612,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     let count = 0;
     for (const student of predictDetails.students) {
       const subjectMarks = marksData.filter(m => m.studentid === student.id).filter(m => {
-        const a = assessments.find(ax => ax.id === m.assessmentid);
+        const a = myAssessments.find(ax => ax.id === m.assessmentid);
         return a && normS(a.subjectname) === normS(predictDetails.subject);
       });
 
@@ -1285,7 +1620,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
         let totalPercentage = 0;
         let validCount = 0;
         for (const m of subjectMarks) {
-          const assessment = assessments.find(a => a.id === m.assessmentid);
+          const assessment = myAssessments.find(a => a.id === m.assessmentid);
           if (assessment && assessment.maxscore > 0) {
             totalPercentage += (Number(m.score) / assessment.maxscore);
             validCount++;
@@ -1363,6 +1698,8 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       <FlatList
         data={paginate(filteredStudents, page)}
         keyExtractor={item => item.id}
+        // Force refresh when selected assessment changes (header buttons) or marks map changes (row inputs).
+        extraData={[selectedAssessment?.id, marks]}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         ListHeaderComponent={selectedAssessment ? (
           <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16, padding: 16 }]}>
@@ -1372,11 +1709,15 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
             <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'center' }}>
               <TouchableOpacity onPress={handlePredictMarks} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}>
                 <TrendingUp size={18} color={C.accent} style={{ marginBottom: 4 }} />
-                <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>Predict Missing</Text>
+                <Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>Predict</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleFillConstantMark} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}>
                 <Text style={{ fontSize: 16, marginBottom: 2 }}>📝</Text>
-                <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>Fill Constant</Text>
+                <Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>Constant</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleClearMarks} style={{ flex: 1, backgroundColor: C.red + '11', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.red + '33' }}>
+                <Trash2 size={18} color={C.red} style={{ marginBottom: 4 }} />
+                <Text style={{ color: C.red, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.clearAll', 'Clear All')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1448,6 +1789,34 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
               </TouchableOpacity>
               <TouchableOpacity onPress={applyPrediction} style={[s.modalBtn, { backgroundColor: C.accent }]}>
                 <Text style={[s.modalBtnText, { color: '#fff' }]}>Predict</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={clearAllVisible} transparent animationType="fade">
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>{t('teacher.clearAllMarks', 'Clear All Marks?')}</Text>
+            <Text style={[s.modalSub, { marginBottom: 20 }]}>
+              {t(
+                'teacher.confirmClearAll',
+                'This will remove all marks for the current assessment. This cannot be undone once saved.'
+              )}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => setClearAllVisible(false)}
+                style={[s.modalBtn, { backgroundColor: C.border }]}
+              >
+                <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel', 'Cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={applyClearAllMarks}
+                style={[s.modalBtn, { backgroundColor: C.red + '33', borderColor: C.red + '66', borderWidth: 1 }]}
+              >
+                <Text style={[s.modalBtnText, { color: C.red, fontWeight: '800' }]}>{t('common.yes', 'Yes')}</Text>
               </TouchableOpacity>
             </View>
           </View>

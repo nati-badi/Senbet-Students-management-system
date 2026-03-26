@@ -285,17 +285,24 @@ function TeacherLogin({ onLogin }) {
                 <Form form={form} layout="vertical" onFinish={handleSubmit}>
                     <Form.Item
                         name="teacherName"
-                        label={t('admin.name', 'Name')}
+                        label={<span className="dark:text-white">{t('admin.name', 'Name')}</span>}
                         rules={[{ required: true, message: 'Please enter your name' }]}
                     >
-                        <Input placeholder="Full name" />
+                        <Input 
+                            placeholder="Full name" 
+                            className="dark:bg-slate-800 dark:text-white dark:border-slate-700 dark:placeholder:text-slate-500 h-12 rounded-xl"
+                        />
                     </Form.Item>
                     <Form.Item
                         name="accessCode"
-                        label={t('parent.accessCode', 'Access Code')}
+                        label={<span className="dark:text-white">{t('parent.accessCode', 'Access Code')}</span>}
                         rules={[{ required: true, message: 'Please enter your access code' }]}
                     >
-                        <Input.Password placeholder="6-digit code" maxLength={6} />
+                        <Input.Password 
+                            placeholder="6-digit code" 
+                            maxLength={6} 
+                            className="dark:bg-slate-800 dark:text-white dark:border-slate-700 dark:placeholder:text-slate-500 h-12 rounded-xl"
+                        />
                     </Form.Item>
                     <Button type="primary" htmlType="submit" block size="large">
                         {t('common.login', 'Login')}
@@ -494,9 +501,13 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         });
     };
 
-    const handleSaveMarks = async () => {
+    const handleSaveMarks = async (passedMarks = null, passedModified = null) => {
         if (!selectedAssessmentId) return;
-        if (modifiedMarks.size === 0) {
+        
+        const marksToUse = passedMarks || marks;
+        const modifiedToUse = passedModified || modifiedMarks;
+
+        if (modifiedToUse.size === 0) {
             message.info(t('teacher.noChanges', 'No changes to save.'));
             return;
         }
@@ -506,8 +517,8 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             const selectedAssessment = allAssessments.find(a => a.id === selectedAssessmentId);
             const idsToDelete = [];
 
-            for (const studentId of modifiedMarks) {
-                const value = marks[studentId];
+            for (const studentId of modifiedToUse) {
+                const value = marksToUse[studentId];
                 const score = parseFloat(value);
 
                 const allExisting = await db.marks
@@ -588,7 +599,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             return;
         }
 
-        modal.confirm({
+        Modal.confirm({
             title: t('teacher.fillConstant'),
             content: (
                 <div className="py-4">
@@ -614,13 +625,48 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     return;
                 }
 
+                const newMarks = { ...marks };
+                const newlyModified = new Set(modifiedMarks);
                 let count = 0;
                 for (const student of studentsWithoutMarks) {
-                    handleMarkChange(student.id, val.toString());
+                    newMarks[student.id] = val.toString();
+                    newlyModified.add(student.id);
                     count++;
                 }
+                
+                setMarks(newMarks);
+                setModifiedMarks(newlyModified);
+                
+                // Immediate Auto-save
+                await handleSaveMarks(newMarks, newlyModified);
+                
                 message.success(t('teacher.fillSuccess', { count }));
                 delete window._tempBulkValue;
+            }
+        });
+    };
+
+    const handleClearAssessmentMarks = () => {
+        if (!selectedAssessment) return;
+        Modal.confirm({
+            title: t('teacher.clearAllMarks', 'Clear All Marks?'),
+            content: t('teacher.confirmClearAll', 'This will remove all marks for the current assessment. This action cannot be undone once saved.'),
+            okText: t('common.yes', 'Yes, Clear All'),
+            okType: 'danger',
+            onOk: async () => {
+                const newMarks = { ...marks };
+                const newlyModified = new Set(modifiedMarks);
+                for (const student of studentsInGrade) {
+                    newMarks[student.id] = '';
+                    newlyModified.add(student.id);
+                }
+                setMarks(newMarks);
+                setModifiedMarks(newlyModified);
+                
+                // Immediate Auto-save
+                await handleSaveMarks(newMarks, newlyModified);
+                
+                message.success(t('teacher.clearSuccess', 'Marks cleared for this assessment.'));
             }
         });
     };
@@ -635,14 +681,14 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             return;
         }
 
+        const normS = (s) => String(s || "").trim().toLowerCase();
+        const targetSubject = normS(selectedAssessment.subjectName);
+
         // Pre-filter: only include students who have AT LEAST ONE mark in this subject already
         const studentsWithHistory = [];
         for (const student of studentsWithoutMarks) {
             const studentMarks = await db.marks.where('studentId').equals(student.id).toArray();
-            const hasSubjectHistory = studentMarks.some(m => {
-                const ass = allAssessments.find(a => a.id === m.assessmentId);
-                return ass && ass.subjectName === selectedAssessment.subjectName;
-            });
+            const hasSubjectHistory = studentMarks.some(m => normS(m.subject) === targetSubject);
             
             if (hasSubjectHistory) {
                 studentsWithHistory.push(student);
@@ -654,18 +700,20 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             return;
         }
 
-        modal.confirm({
+        Modal.confirm({
             title: t('teacher.predictMarks'),
             content: t('teacher.confirmPredict', { count: studentsWithHistory.length, subject: selectedAssessment.subjectName }),
             onOk: async () => {
                 const predictions = [];
+                const normS = (s) => String(s || "").trim().toLowerCase();
+                const targetSubject = normS(selectedAssessment.subjectName);
+
                 for (const student of studentsWithHistory) {
-                    // Find all marks for this student in the same subject
+                    // Find all marks for this student
                     const studentMarks = await db.marks.where('studentId').equals(student.id).toArray();
-                    const subjectMarks = studentMarks.filter(m => {
-                        const ass = allAssessments.find(a => a.id === m.assessmentId);
-                        return ass && ass.subjectName === selectedAssessment.subjectName;
-                    });
+                    
+                    // Strictly limit to the same subject
+                    const subjectMarks = studentMarks.filter(m => normS(m.subject) === targetSubject);
 
                     if (subjectMarks.length > 0) {
                         // Calculate average percentage
@@ -673,8 +721,10 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         let validCount = 0;
                         for (const m of subjectMarks) {
                             const assessment = allAssessments.find(a => a.id === m.assessmentId);
-                            if (assessment && assessment.maxScore > 0) {
-                                totalPercentage += (m.score / assessment.maxScore);
+                            // Fallback maxScore: if assessment not found, assume 100 or check if mark has it (unlikely)
+                            const maxScore = assessment?.maxScore || 100; 
+                            if (maxScore > 0) {
+                                totalPercentage += (Number(m.score) / maxScore);
                                 validCount++;
                             }
                         }
@@ -866,6 +916,14 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                             disabled={!selectedAssessmentId || studentsInGrade.length === 0}
                         >
                             {t('teacher.fillConstant')}
+                        </Button>
+                        <Button
+                            icon={<DeleteOutlined />}
+                            danger
+                            onClick={handleClearAssessmentMarks}
+                            disabled={!selectedAssessmentId || studentsInGrade.length === 0 || isSaving}
+                        >
+                            {t('teacher.clearAll', 'Clear All')}
                         </Button>
                     </Space>
                 )}

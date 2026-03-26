@@ -234,32 +234,71 @@ export async function syncData({ force = false } = {}) {
                     console.log(`Pushing ${unsyncedRecords.length} unsynced records for ${tableName}...`);
                     
                     const cleanRecords = unsyncedRecords.map(record => {
-                        const toPush = { ...record };
-                        delete toPush.synced;
+                        let toPush = { id: record.id };
 
-                        // Explicit Mapping: CamelCase -> Supabase Columns
+                        // Strict Whitelist Mapping: Dexie -> Supabase Columns
                         if (tableName === 'students') {
-                            if (record.baptismalName !== undefined) { toPush.baptismalname = record.baptismalName; delete toPush.baptismalName; }
-                            if (record.parentContact !== undefined) { toPush.parentcontact = record.parentContact; delete toPush.parentContact; }
-                            if (record.academicYear !== undefined) { toPush.academicyear = record.academicYear; delete toPush.academicYear; }
-                            if (record.dateOfEntry !== undefined) { toPush.dateofentry = record.dateOfEntry; delete toPush.dateofentry; }
-                            if (record.portalCode !== undefined) { toPush.portalcode = record.portalCode; delete toPush.portalCode; }
+                            toPush = {
+                                id: record.id,
+                                name: record.name,
+                                gender: record.gender,
+                                grade: record.grade,
+                                baptismalname: record.baptismalName || record.baptismalname,
+                                parentcontact: record.parentContact || record.parentcontact,
+                                academicyear: record.academicYear || record.academicyear,
+                                portalcode: record.portalCode || record.portalcode
+                            };
                         } else if (tableName === 'assessments') {
-                            if (record.subjectName !== undefined) { toPush.subjectname = record.subjectName; delete toPush.subjectName; }
-                            if (record.maxScore !== undefined) { toPush.maxscore = record.maxScore; delete toPush.maxScore; }
+                            toPush = {
+                                id: record.id,
+                                name: record.name,
+                                grade: record.grade,
+                                semester: record.semester,
+                                date: record.date,
+                                subjectname: record.subjectName || record.subjectname,
+                                maxscore: record.maxScore || record.maxscore
+                            };
                         } else if (tableName === 'marks') {
-                            if (record.studentId !== undefined) { toPush.studentid = record.studentId; delete toPush.studentId; }
-                            if (record.assessmentId !== undefined) { toPush.assessmentid = record.assessmentId; delete toPush.assessmentId; }
-                            if (record.assessmentDate !== undefined) { toPush.assessmentdate = record.assessmentDate; delete toPush.assessmentDate; }
-                            if (toPush.score !== undefined && toPush.score !== null) toPush.score = Math.round(parseFloat(toPush.score));
+                            toPush = {
+                                id: record.id,
+                                score: Math.round(parseFloat(record.score || 0)),
+                                semester: record.semester,
+                                studentid: record.studentId || record.studentid,
+                                assessmentid: record.assessmentId || record.assessmentid,
+                                assessmentdate: record.assessmentDate || record.assessmentdate
+                            };
                         } else if (tableName === 'attendance') {
-                            if (record.studentId !== undefined) { toPush.studentid = record.studentId; delete toPush.studentId; }
+                            toPush = {
+                                id: record.id,
+                                date: record.date,
+                                status: record.status,
+                                semester: record.semester,
+                                studentid: record.studentId || record.studentid
+                            };
                         } else if (tableName === 'teachers') {
-                            if (record.accessCode !== undefined) { toPush.accesscode = record.accessCode; delete toPush.accessCode; }
-                            if (record.assignedGrades !== undefined) { toPush.assignedgrades = record.assignedGrades; delete toPush.assignedGrades; }
-                            if (record.assignedSubjects !== undefined) { toPush.assignedsubjects = record.assignedSubjects; delete toPush.assignedSubjects; }
+                            toPush = {
+                                id: record.id,
+                                name: record.name,
+                                phone: record.phone,
+                                accesscode: record.accessCode || record.accesscode,
+                                assignedgrades: record.assignedGrades || record.assignedgrades,
+                                assignedsubjects: record.assignedSubjects || record.assignedsubjects
+                            };
+                        } else if (tableName === 'subjects') {
+                            toPush = {
+                                id: record.id,
+                                name: record.name,
+                                semester: record.semester
+                            };
+                        } else if (tableName === 'settings') {
+                            toPush = {
+                                key: record.key,
+                                value: record.value
+                            };
                         }
 
+                        // Remove undefined values to avoid Supabase errors
+                        Object.keys(toPush).forEach(key => toPush[key] === undefined && delete toPush[key]);
                         return toPush;
                     });
 

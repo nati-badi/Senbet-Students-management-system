@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Layout, Menu, Button, Space, Typography, ConfigProvider, theme, Badge, Tooltip, message } from 'antd';
 import {
@@ -112,7 +112,7 @@ export default function App() {
     setIsSyncing(false);
     if (hide) hide();
     if (result.success) {
-      if (!silent) message.success(`Sync successful! Pushed: ${result.pushed}, Pulled: ${result.pulled}`);
+      if (!silent) message.success(`Sync successful!`);
       window.dispatchEvent(new Event('syncComplete'));
     } else {
       message.error("Sync disabled: " + (result.error || "Check your internet connection and .env keys"));
@@ -223,16 +223,20 @@ export default function App() {
 
         <Content className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
           <Routes>
-            <Route path="/" element={<Home activeRole={activeRole} />} />
+            <Route path="/" element={<Home activeRole={activeRole} isDesktop={!!window.__TAURI_INTERNALS__} />} />
             <Route 
               path="/admin/*" 
-              element={isAdminAuth ? <AdminDashboard /> : <AdminLogin onLogin={handleAdminLogin} />} 
+              element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : isAdminAuth ? <AdminDashboard /> : <AdminLogin onLogin={handleAdminLogin} />} 
             />
             <Route 
               path="/teacher/*" 
-              element={<TeacherDashboard />} 
+              element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <TeacherDashboard />} 
             />
-            <Route path="/parent" element={<ParentPortal />} />
+            <Route 
+              path="/parent" 
+              element={window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <ParentPortal />} 
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Content>
 
@@ -244,7 +248,7 @@ export default function App() {
   );
 }
 
-function Home({ activeRole }) {
+function Home({ activeRole, isDesktop }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
@@ -254,26 +258,32 @@ function Home({ activeRole }) {
         {t('app.description')}
       </Text>
       <Space size="large">
-        <Link to="/admin">
-          <Button type="primary" size="large" className="px-8 flex items-center gap-2">
-            <UserOutlined />
-            {t('app.adminPortal')}
-          </Button>
-        </Link>
-        {activeRole !== 'admin' && (
-          <Link to="/teacher">
-            <Button size="large" className="px-8 flex items-center gap-2">
-              <TeamOutlined />
-              {t('app.teacherPortal')}
+        {isDesktop && (
+          <>
+            <Link to="/admin">
+              <Button type="primary" size="large" className="px-8 flex items-center gap-2">
+                <UserOutlined />
+                {t('app.adminPortal')}
+              </Button>
+            </Link>
+            {activeRole !== 'admin' && (
+              <Link to="/teacher">
+                <Button size="large" className="px-8 flex items-center gap-2">
+                  <TeamOutlined />
+                  {t('app.teacherPortal')}
+                </Button>
+              </Link>
+            )}
+          </>
+        )}
+        {!isDesktop && (
+          <Link to="/parent">
+            <Button type="primary" size="large" className="px-8 flex items-center gap-2">
+              <GlobalOutlined />
+              {t('parent.title', 'Parent Portal')}
             </Button>
           </Link>
         )}
-        <Link to="/parent">
-          <Button size="large" className="px-8 flex items-center gap-2">
-            <GlobalOutlined />
-            {t('parent.title', 'Parent Portal')}
-          </Button>
-        </Link>
       </Space>
     </div>
   );

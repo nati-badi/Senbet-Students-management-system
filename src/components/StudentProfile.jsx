@@ -206,7 +206,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                 <Row gutter={[16, 16]}>
                     <Col xs={24} sm={12}>
                         <Title level={3} style={{ margin: 0 }}>{student?.name}</Title>
-                        <Text type="secondary" className="text-lg">{student?.baptismalName || '-'}</Text>
+                        <Text type="secondary" className="text-lg">{student?.baptismalName || student?.baptismalname || '-'}</Text>
                     </Col>
                     <Col xs={24} sm={12} className="sm:text-right">
                         <Tag color="blue" className="text-lg px-4 py-1.5 mb-2">
@@ -221,8 +221,9 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
             <Descriptions bordered size="small" column={{ xxl: 2, xl: 2, lg: 2, md: 2, sm: 1, xs: 1 }}>
                 <Descriptions.Item label={t('admin.gender')}>{student?.gender === 'Male' ? t('admin.male') : t('admin.female')}</Descriptions.Item>
+                <Descriptions.Item label={t('admin.baptismalName')}>{student?.baptismalName || student?.baptismalname || '—'}</Descriptions.Item>
                 <Descriptions.Item label={t('admin.parentContact')}>
-                    <Space><PhoneOutlined /> {student?.parentContact}</Space>
+                    <Space><PhoneOutlined /> {student?.parentContact || student?.parentcontact || '—'}</Space>
                 </Descriptions.Item>
                 <Descriptions.Item label={t('teacher.totalAssessments')}>{gradeAssessments.length}</Descriptions.Item>
                 <Descriptions.Item label={t('teacher.missingMarks')}>
