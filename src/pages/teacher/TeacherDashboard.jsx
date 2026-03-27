@@ -475,10 +475,16 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     useEffect(() => {
+        if (!allAssessments || allAssessments.length === 0 || isLoading) return;
+
         if (location.state?.assessmentId) {
-            setSelectedAssessmentId(location.state.assessmentId);
-        }
-        if (location.state?.grade) {
+            const ass = allAssessments.find(a => a.id === location.state.assessmentId);
+            if (ass) {
+                setSelectedGrade(String(ass.grade));
+                setSelectedSubject(normalizeSubject(ass.subjectName));
+                setSelectedAssessmentId(ass.id);
+            }
+        } else if (location.state?.grade) {
             setSelectedGrade(location.state.grade);
             // If navigation targets only a grade, reset dependent selections.
             if (!location.state?.assessmentId) {
@@ -487,7 +493,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 setSearchQuery('');
             }
         }
-    }, [location.state]);
+    }, [location.state, allAssessments, isLoading]);
 
     useEffect(() => {
         if (!selectedAssessmentId) return;

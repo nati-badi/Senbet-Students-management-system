@@ -56,7 +56,7 @@ export default function SubjectManagement() {
     const handleDelete = async (id) => {
         try {
             await db.subjects.delete(id);
-            await db.deleted_records.add({ tableName: 'subjects', recordId: id });
+            await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'subjects', recordId: id });
             message.success(t('admin.subjectDeleted'));
         } catch (err) {
             message.error("Failed to delete subject");

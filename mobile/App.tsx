@@ -1170,7 +1170,7 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
     setSaving(true);
     try {
       const records = gradeStudents.map(st => ({
-        id: attendanceIds[st.id] || undefined,
+        id: attendanceIds[st.id] || generateUUID(),
         studentid: st.id,
         date,
         status: attendance[st.id] || 'absent',

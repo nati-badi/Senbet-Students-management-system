@@ -90,7 +90,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
     const handleDelete = async (id) => {
         try {
             await db.assessments.delete(id);
-            await db.deleted_records.add({ tableName: 'assessments', recordId: id });
+            await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'assessments', recordId: id });
             message.success(t('admin.assessmentDeleted'));
         } catch (err) {
             message.error("Failed to delete assessment");
@@ -211,20 +211,24 @@ export default function TeacherAssessmentManagement({ teacher }) {
                                 <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} />
                             </Form.Item>
                         </Col>
-                        <Col xs={24} md={8} className="flex justify-end items-end">
-                            <Space className="mb-6">
-                                {editingId && (
-                                    <Button onClick={() => {
-                                        setEditingId(null);
-                                        form.resetFields();
-                                    }}>
-                                        {t('admin.cancel')}
-                                    </Button>
-                                )}
-                                <Button type="primary" htmlType="submit">
-                                    {editingId ? t('common.save') : t('admin.addAssessment')}
-                                </Button>
-                            </Space>
+                        <Col xs={24} md={8}>
+                            <Form.Item label=" ">
+                                <div className="flex justify-end">
+                                    <Space>
+                                        {editingId && (
+                                            <Button onClick={() => {
+                                                setEditingId(null);
+                                                form.resetFields();
+                                            }}>
+                                                {t('admin.cancel')}
+                                            </Button>
+                                        )}
+                                        <Button type="primary" htmlType="submit" size="large" className="px-8">
+                                            {editingId ? t('common.save') : t('admin.addAssessment')}
+                                        </Button>
+                                    </Space>
+                                </div>
+                            </Form.Item>
                         </Col>
                     </Row>
                 </Form>

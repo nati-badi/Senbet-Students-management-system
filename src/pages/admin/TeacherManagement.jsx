@@ -163,7 +163,7 @@ export default function TeacherManagement() {
     const handleDelete = async (id) => {
         try {
             await db.teachers.delete(id);
-            await db.deleted_records.add({ tableName: 'teachers', recordId: id });
+            await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'teachers', recordId: id });
             message.success('Teacher deleted successfully');
             syncData().catch(console.error);
         } catch (error) {

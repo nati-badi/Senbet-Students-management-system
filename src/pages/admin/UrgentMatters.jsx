@@ -214,7 +214,7 @@ export default function UrgentMatters() {
                     // Queue for remote deletion
                     if (allIds.length > 0) {
                         for (const id of allIds) {
-                            await db.deleted_records.add({ tableName: 'marks', recordId: id });
+                            await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'marks', recordId: id });
                         }
                         
                         // Chunked Supabase Wipe (500 records at a time)

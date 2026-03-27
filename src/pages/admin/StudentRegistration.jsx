@@ -99,7 +99,7 @@ export default function StudentRegistration() {
     const handleDelete = async (id) => {
         try {
             await db.students.delete(id);
-            await db.deleted_records.add({ tableName: 'students', recordId: id });
+            await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'students', recordId: id });
             message.success('Student removed from database.');
         } catch (err) {
             message.error('Delete failed.');
