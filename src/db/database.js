@@ -128,14 +128,14 @@ db.version(18).stores({
 });
 
 db.version(20).stores({
-  students: "id, name, baptismalName, gender, academicYear, grade, parentContact, portalCode, synced, updated_at",
-  attendance: "id, studentId, date, status, semester, synced, updated_at, [studentId+date]",
-  marks: "id, studentId, assessmentDate, subject, score, assessmentId, semester, synced, updated_at, [studentId+assessmentId]",
-  subjects: "id, name, semester, synced, updated_at",
-  assessments: "id, name, subjectName, grade, maxScore, date, semester, synced, updated_at",
-  teachers: "id, name, phone, accessCode, assignedGrades, assignedSubjects, synced, updated_at",
+  students: "++id, name, baptismalName, gender, academicYear, grade, parentContact, portalCode, synced, updated_at",
+  attendance: "++id, studentId, date, status, semester, synced, updated_at, [studentId+date]",
+  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, semester, synced, updated_at, [studentId+assessmentId]",
+  subjects: "++id, name, semester, synced, updated_at",
+  assessments: "++id, name, subjectName, grade, maxScore, date, semester, synced, updated_at",
+  teachers: "++id, name, phone, accessCode, assignedGrades, assignedSubjects, synced, updated_at",
   settings: "key, value, updated_at",
-  deleted_records: "id, tableName, recordId"
+  deleted_records: "++id, tableName, recordId"
 }).upgrade(async trans => {
   const genUUID = () => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -225,6 +225,17 @@ db.version(20).stores({
       await trans.deleted_records.add({ ...dr, id: newId });
     } else if (changed) {
       await trans.deleted_records.put(dr);
+    }
+  }
+});
+
+db.version(21).upgrade(async trans => {
+  // Force a one-time re-sync for all tables that migrated to UUIDs in v20.
+  // This ensures the server gets the new UUID identities.
+  const tablesToReset = ['students', 'teachers', 'subjects', 'assessments', 'marks', 'attendance'];
+  for (const tableName of tablesToReset) {
+    if (trans[tableName]) {
+      await trans[tableName].toCollection().modify({ synced: 0 });
     }
   }
 });

@@ -49,12 +49,16 @@ export default function TeacherAssessmentManagement({ teacher }) {
                 return;
             }
 
+            const subject = allSubjects.find(s => s.name === values.subjectName);
+            const semester = subject?.semester || 'Semester I';
+
             const data = {
                 name: values.name,
                 subjectName: values.subjectName,
                 grade: values.grade,
                 maxScore: parseFloat(values.maxScore),
                 date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+                semester: semester,
                 synced: 0
             };
 
