@@ -17,7 +17,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import {
   Home, Users, CalendarCheck, BarChart3, AlertTriangle, Settings, LogOut, Moon, Sun, Languages, RefreshCw, TrendingUp, Info, BookOpen, Key, Phone,
-  Search, User, ArrowLeft, Eye, EyeOff, Trash2
+  Search, User, ArrowLeft, Eye, EyeOff, Trash2, FileText
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 
@@ -53,6 +53,8 @@ interface Teacher {
   accesscode: string;
   assignedgrades?: string[];
   assignedsubjects?: string[];
+  cancreateassessments?: boolean;
+  canCreateAssessments?: boolean;
 }
 
 // ── Polyfills & Helpers ──────────────────────────────────────────
@@ -442,7 +444,9 @@ export default function App() {
                   if (route.name === 'Attendance') return <CalendarCheck size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
                   if (route.name === 'Marks') return <BarChart3 size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
                   if (route.name === 'Analytics') return <TrendingUp size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                  return <AlertTriangle size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                  if (route.name === 'Urgent') return <AlertTriangle size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                  if (route.name === 'AssessmentsMgmt') return <FileText size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                  return null;
                 }
               })}
             >
@@ -452,6 +456,9 @@ export default function App() {
               <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} showToast={showToast} settings={settings} subjects={subjects} />}</Tab.Screen>
               <Tab.Screen name="Analytics">{(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} settings={settings} subjects={subjects} />}</Tab.Screen>
               <Tab.Screen name="Urgent">{(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}</Tab.Screen>
+              {!!(teacher!.cancreateassessments || teacher!.canCreateAssessments) && (
+                <Tab.Screen name="AssessmentsMgmt" options={{ title: 'Assessments' }}>{(props: any) => <AssessmentManagementTab {...props} teacher={teacher!} assessments={assessments} subjects={subjects} settings={settings} C={C} s={s} showToast={showToast} onRefresh={() => syncData()} />}</Tab.Screen>
+              )}
             </Tab.Navigator>
           )}
         </Drawer.Screen>
@@ -1988,6 +1995,224 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
           <Text style={{ color: C.muted, marginTop: 4 }}>No urgent matters found.</Text>
         </View>
       )}
+    </ScrollView>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ASSESSMENT MANAGEMENT TAB (Teacher)
+// ═══════════════════════════════════════════════════════════════
+function AssessmentManagementTab({ teacher, assessments: allAssessments, subjects, settings, C, s, showToast, onRefresh }: {
+  teacher: Teacher, assessments: Assessment[], subjects: any[], settings: any, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void, onRefresh?: () => Promise<void> | void
+}) {
+  const { t } = useTranslation();
+  const myGrades = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades ?? [];
+  const mySubjects = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects ?? [];
+
+  const myAssessments = allAssessments.filter(a =>
+    myGrades.some((g: string) => normG(g) === normG(a.grade)) &&
+    mySubjects.some((sub: string) => normS(sub) === normS(a.subjectname))
+  );
+
+  const [selectedGrade, setSelectedGrade] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [name, setName] = useState('');
+  const [maxScore, setMaxScore] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const gradeSubjects = subjects.filter((sub: any) =>
+    normG(sub.grade) === normG(selectedGrade) &&
+    mySubjects.some((ms: string) => normS(ms) === normS(sub.name))
+  );
+
+  const filteredAssessments = myAssessments.filter(a => {
+    if (selectedGrade && normG(a.grade) !== normG(selectedGrade)) return false;
+    if (selectedSubject && normS(a.subjectname) !== normS(selectedSubject)) return false;
+    return true;
+  });
+
+  const handleSave = async () => {
+    if (!selectedGrade || !selectedSubject || !name.trim() || !maxScore) {
+      showToast?.('❌ Please fill in all fields', 'error');
+      return;
+    }
+    const ms = parseFloat(maxScore);
+    if (isNaN(ms) || ms <= 0) {
+      showToast?.('❌ Max score must be a positive number', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const record = {
+        id: editingId || generateUUID(),
+        name: name.trim(),
+        subjectname: selectedSubject,
+        grade: selectedGrade,
+        maxscore: ms,
+        date: new Date().toISOString().split('T')[0],
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase.from('assessments').upsert(record, { onConflict: 'id' });
+      if (error) throw error;
+
+      showToast?.(editingId ? '✅ Assessment updated' : '✅ Assessment created', 'success');
+      setName(''); setMaxScore(''); setEditingId(null);
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      showToast?.('❌ ' + (err.message || 'Failed to save'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase.from('assessments').delete().eq('id', id);
+      if (error) throw error;
+      showToast?.('🗑️ Assessment deleted', 'success');
+      setDeleteConfirmId(null);
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      showToast?.('❌ ' + (err.message || 'Failed to delete'), 'error');
+    }
+  };
+
+  const handleEdit = (a: Assessment) => {
+    setSelectedGrade(a.grade);
+    setSelectedSubject(a.subjectname);
+    setName(a.name);
+    setMaxScore(String(a.maxscore));
+    setEditingId(a.id);
+  };
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+      <Text style={[s.sectionTitle, { marginBottom: 16 }]}>Manage Assessments</Text>
+
+      {/* Create / Edit Form */}
+      <View style={[s.dashboardCard, { borderRadius: 20, padding: 16, marginBottom: 20 }]}>
+        <Text style={{ color: C.text, fontWeight: '800', fontSize: 15, marginBottom: 12 }}>
+          {editingId ? '✏️ Edit Assessment' : '➕ New Assessment'}
+        </Text>
+
+        {/* Grade selector */}
+        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Grade</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+          {myGrades.map((g: string) => (
+            <TouchableOpacity
+              key={g}
+              style={[s.gradeChip, normG(selectedGrade) === normG(g) && s.gradeChipActive]}
+              onPress={() => { setSelectedGrade(g); setSelectedSubject(''); }}
+            >
+              <Text style={[s.gradeChipText, normG(selectedGrade) === normG(g) && s.gradeChipTextActive]}>{fmtGrade(g)}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Subject selector */}
+        {selectedGrade ? (
+          <>
+            <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Subject</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {gradeSubjects.map((sub: any) => (
+                <TouchableOpacity
+                  key={sub.id}
+                  style={[s.gradeChip, normS(selectedSubject) === normS(sub.name) && s.gradeChipActive]}
+                  onPress={() => setSelectedSubject(sub.name)}
+                >
+                  <Text style={[s.gradeChipText, normS(selectedSubject) === normS(sub.name) && s.gradeChipTextActive]}>{sub.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
+
+        {/* Name & Max Score */}
+        <TextInput
+          style={[s.searchInput, { marginBottom: 10 }]}
+          placeholder="Assessment name (e.g., Mid Term)"
+          placeholderTextColor={C.muted}
+          value={name}
+          onChangeText={setName}
+        />
+        <TextInput
+          style={[s.searchInput, { marginBottom: 14 }]}
+          placeholder="Max Score (e.g., 10)"
+          placeholderTextColor={C.muted}
+          value={maxScore}
+          onChangeText={setMaxScore}
+          keyboardType="numeric"
+        />
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {editingId && (
+            <TouchableOpacity
+              onPress={() => { setName(''); setMaxScore(''); setEditingId(null); }}
+              style={{ flex: 1, backgroundColor: C.border, padding: 12, borderRadius: 12, alignItems: 'center' }}
+            >
+              <Text style={{ color: C.text, fontWeight: '700' }}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={saving}
+            style={{ flex: 1, backgroundColor: C.accent, padding: 12, borderRadius: 12, alignItems: 'center', opacity: saving ? 0.6 : 1 }}
+          >
+            {saving
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={{ color: '#fff', fontWeight: '800' }}>{editingId ? 'Save Changes' : 'Create'}</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Assessment List */}
+      <Text style={{ color: C.text, fontWeight: '800', fontSize: 15, marginBottom: 12 }}>
+        Your Assessments ({filteredAssessments.length})
+      </Text>
+
+      {filteredAssessments.length === 0 && (
+        <Text style={[s.empty, { marginTop: 32 }]}>No assessments found. Create one above!</Text>
+      )}
+
+      {filteredAssessments.map(a => (
+        <View key={a.id} style={[s.dashboardCard, { borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>{a.name}</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{a.subjectname} • {fmtGrade(a.grade)} • Max: {a.maxscore}</Text>
+          </View>
+          <TouchableOpacity onPress={() => handleEdit(a)} style={{ padding: 8, marginRight: 4 }}>
+            <FileText size={18} color={C.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setDeleteConfirmId(a.id)} style={{ padding: 8 }}>
+            <Trash2 size={18} color={C.red} />
+          </TouchableOpacity>
+        </View>
+      ))}
+
+      {/* Delete confirmation modal */}
+      <Modal visible={!!deleteConfirmId} transparent animationType="fade">
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Delete Assessment?</Text>
+            <Text style={[s.modalSub, { marginBottom: 20 }]}>
+              This will permanently remove this assessment and may affect existing marks.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={() => setDeleteConfirmId(null)} style={[s.modalBtn, { backgroundColor: C.border }]}>
+                <Text style={[s.modalBtnText, { color: C.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => deleteConfirmId && handleDelete(deleteConfirmId)} style={[s.modalBtn, { backgroundColor: C.red }]}>
+                <Text style={[s.modalBtnText, { color: '#fff' }]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }

@@ -54,6 +54,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import StudentProfile from '../../components/StudentProfile';
 import StudentAnalytics from '../admin/StudentAnalytics';
 import TeacherUrgentMatters from './TeacherUrgentMatters';
+import TeacherAssessmentManagement from './TeacherAssessmentManagement';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
 import { Navigate } from 'react-router-dom';
 
@@ -82,12 +83,30 @@ export default function TeacherDashboard() {
         return () => window.removeEventListener('syncComplete', handleSync);
     }, []);
 
+    // IMPORTANT:
+    // Local Dexie `teachers` table uses an auto-increment primary key (historical schema: `++id`).
+    // When syncing from Supabase (UUID ids), this can result in duplicate rows locally rather than in-place updates.
+    // Therefore, resolve the active teacher by a stable identifier (`accessCode`) instead of the numeric local `id`.
     const liveTeacher = useLiveQuery(
-        () => teacherSession?.id ? db.teachers.get(teacherSession.id) : null,
-        [teacherSession?.id, syncKey]
+        async () => {
+            const accessCode = teacherSession?.accessCode || teacherSession?.accesscode;
+            if (!accessCode) return null;
+            return await db.teachers.where('accessCode').equals(accessCode).first();
+        },
+        [teacherSession?.accessCode, teacherSession?.accesscode, syncKey]
     );
 
     const activeTeacher = liveTeacher || teacherSession;
+
+    // If we got a fresher record from Dexie (e.g. updated permissions), refresh the session cache.
+    useEffect(() => {
+        if (!liveTeacher) return;
+        try {
+            sessionStorage.setItem('senbet_teacher_auth', JSON.stringify(liveTeacher));
+        } catch {}
+        setTeacherSession(liveTeacher);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [liveTeacher?.id]);
 
     if (!activeTeacher) {
         return <TeacherLogin onLogin={setTeacherSession} />;
@@ -98,6 +117,8 @@ export default function TeacherDashboard() {
         setTeacherSession(null);
         message.info(t('common.logout', 'Logged out'));
     };
+
+    const canManageAssessments = !!(activeTeacher?.canCreateAssessments ?? activeTeacher?.cancreateassessments);
 
     const menuItems = [
         {
@@ -120,6 +141,11 @@ export default function TeacherDashboard() {
             icon: <EditOutlined />,
             label: t('teacher.markEntry')
         },
+        ...(canManageAssessments ? [{
+            key: '/teacher/assessments',
+            icon: <BookOutlined />,
+            label: t('admin.assessments', 'Assessments')
+        }] : []),
         {
             key: '/teacher/attendance-soon',
             icon: <CheckCircleOutlined />,
@@ -243,6 +269,9 @@ export default function TeacherDashboard() {
                         <Route path="/attendance" element={<AttendanceModule teacher={activeTeacher} setProfileStudentId={setProfileStudentId} />} />
                         <Route path="/analytics" element={<StudentAnalytics isTeacherView={true} teacher={activeTeacher} />} />
                         <Route path="/urgent" element={<TeacherUrgentMatters teacher={activeTeacher} />} />
+                        {canManageAssessments && (
+                            <Route path="/assessments" element={<TeacherAssessmentManagement teacher={activeTeacher} />} />
+                        )}
                     </Routes>
                 </div>
             </div>
@@ -853,6 +882,19 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                 />
                             </Form.Item>
                         </Col>
+                        {!!(teacher?.canCreateAssessments || teacher?.cancreateassessments) && (
+                            <Col xs={24} md={6}>
+                                <Form.Item label=" " style={{ marginBottom: 0 }}>
+                                    <Button 
+                                        icon={<BookOutlined />} 
+                                        onClick={() => navigate('/teacher/assessments')}
+                                        className="w-full h-10 rounded-xl"
+                                    >
+                                        {t('admin.assessments', 'Assessments')}
+                                    </Button>
+                                </Form.Item>
+                            </Col>
+                        )}
                         {selectedAssessment && (
                             <Col xs={24} md={6}>
                                 <Form.Item label="&nbsp;" style={{ marginBottom: 0 }}>

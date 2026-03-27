@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Typography, Card, Table, Button, Space, Modal, Form, Input, Select, Popconfirm, message, Tag, Tooltip } from 'antd';
+import { Typography, Card, Table, Button, Space, Modal, Form, Input, Select, Popconfirm, message, Tag, Tooltip, Switch } from 'antd';
 import { UserAddOutlined, EditOutlined, DeleteOutlined, KeyOutlined, CopyOutlined } from '@ant-design/icons';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -46,6 +46,7 @@ export default function TeacherManagement() {
         if (teacher) {
             form.setFieldsValue({
                 ...teacher,
+                canCreateAssessments: !!(teacher.canCreateAssessments ?? teacher.cancreateassessments),
                 assignedGrades: teacher.assignedGrades || [],
                 assignedSubjects: teacher.assignedSubjects || []
             });
@@ -70,6 +71,23 @@ export default function TeacherManagement() {
             for (const t of teachers) {
                 if (editingTeacher && t.id === editingTeacher.id) continue;
                 
+                // 1. Identity checks for duplication
+                if (values.accessCode && (t.accessCode === values.accessCode || t.accesscode === values.accessCode)) {
+                    message.error(`Access code "${values.accessCode}" is already in use by ${t.name}`);
+                    return;
+                }
+                
+                if (values.phone && t.phone === values.phone) {
+                    message.error(`Phone number "${values.phone}" is already registered to ${t.name}`);
+                    return;
+                }
+
+                if (t.name.toLowerCase().trim() === values.name.toLowerCase().trim()) {
+                    message.error(`Teacher with name "${values.name}" already exists.`);
+                    return;
+                }
+
+                // 2. Assignment conflicts (same subject/grade pair)
                 const otherGrades = t.assignedGrades || [];
                 const otherSubjects = t.assignedSubjects || [];
 
@@ -203,6 +221,11 @@ export default function TeacherManagement() {
             render: (subs) => subs?.map(s => <Tag color="purple" key={s}>{s}</Tag>)
         },
         {
+            title: 'Permissions',
+            key: 'permissions',
+            render: (_, record) => (record.canCreateAssessments || record.cancreateassessments) ? <Tag color="green">Manage Assessments</Tag> : <Tag color="default">View Only</Tag>
+        },
+        {
             title: t('common.actions'),
             key: 'actions',
             align: 'right',
@@ -320,6 +343,15 @@ export default function TeacherManagement() {
                             placeholder={watchedGrades.length === 0 ? "Select grades first" : "Select subjects they teach"}
                             disabled={watchedGrades.length === 0}
                         />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="canCreateAssessments"
+                        valuePropName="checked"
+                        label="Assessment Permissions"
+                        extra="Allow teacher to create & manage assessments"
+                    >
+                        <Switch checkedChildren="Yes" unCheckedChildren="No" />
                     </Form.Item>
                 </Form>
             </Modal>

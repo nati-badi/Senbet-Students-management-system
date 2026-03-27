@@ -65,6 +65,12 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
                 if (serverRecord.accesscode !== undefined) { mapped.accessCode = serverRecord.accesscode; delete mapped.accesscode; }
                 if (serverRecord.assignedgrades !== undefined) { mapped.assignedGrades = serverRecord.assignedgrades; delete mapped.assignedgrades; }
                 if (serverRecord.assignedsubjects !== undefined) { mapped.assignedSubjects = serverRecord.assignedsubjects; delete mapped.assignedsubjects; }
+                if (serverRecord.cancreateassessments !== undefined) { mapped.canCreateAssessments = serverRecord.cancreateassessments; delete mapped.cancreateassessments; }
+                // Support alternate casing (in case the column was created as camelCase in Supabase)
+                if (serverRecord.canCreateAssessments !== undefined && mapped.canCreateAssessments === undefined) {
+                    mapped.canCreateAssessments = serverRecord.canCreateAssessments;
+                    // no delete needed: we only read from serverRecord
+                }
             }
 
             localReadyData.push(mapped);
@@ -246,7 +252,8 @@ export async function syncData({ force = false } = {}) {
                                 baptismalname: record.baptismalName || record.baptismalname,
                                 parentcontact: record.parentContact || record.parentcontact,
                                 academicyear: record.academicYear || record.academicyear,
-                                portalcode: record.portalCode || record.portalcode
+                                portalcode: record.portalCode || record.portalcode,
+                                updated_at: record.updated_at
                             };
                         } else if (tableName === 'assessments') {
                             toPush = {
@@ -256,7 +263,8 @@ export async function syncData({ force = false } = {}) {
                                 semester: record.semester,
                                 date: record.date,
                                 subjectname: record.subjectName || record.subjectname,
-                                maxscore: record.maxScore || record.maxscore
+                                maxscore: record.maxScore || record.maxscore,
+                                updated_at: record.updated_at
                             };
                         } else if (tableName === 'marks') {
                             toPush = {
@@ -265,7 +273,8 @@ export async function syncData({ force = false } = {}) {
                                 semester: record.semester,
                                 studentid: record.studentId || record.studentid,
                                 assessmentid: record.assessmentId || record.assessmentid,
-                                assessmentdate: record.assessmentDate || record.assessmentdate
+                                assessmentdate: record.assessmentDate || record.assessmentdate,
+                                updated_at: record.updated_at
                             };
                         } else if (tableName === 'attendance') {
                             toPush = {
@@ -273,7 +282,8 @@ export async function syncData({ force = false } = {}) {
                                 date: record.date,
                                 status: record.status,
                                 semester: record.semester,
-                                studentid: record.studentId || record.studentid
+                                studentid: record.studentId || record.studentid,
+                                updated_at: record.updated_at
                             };
                         } else if (tableName === 'teachers') {
                             toPush = {
@@ -282,13 +292,16 @@ export async function syncData({ force = false } = {}) {
                                 phone: record.phone,
                                 accesscode: record.accessCode || record.accesscode,
                                 assignedgrades: record.assignedGrades || record.assignedgrades,
-                                assignedsubjects: record.assignedSubjects || record.assignedsubjects
+                                assignedsubjects: record.assignedSubjects || record.assignedsubjects,
+                                cancreateassessments: record.canCreateAssessments !== undefined ? !!record.canCreateAssessments : (record.cancreateassessments !== undefined ? !!record.cancreateassessments : false),
+                                updated_at: record.updated_at || new Date().toISOString()
                             };
                         } else if (tableName === 'subjects') {
                             toPush = {
                                 id: record.id,
                                 name: record.name,
-                                semester: record.semester
+                                semester: record.semester,
+                                updated_at: record.updated_at
                             };
                         } else if (tableName === 'settings') {
                             toPush = {
