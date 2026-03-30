@@ -31,13 +31,14 @@ export default function TeacherManagement() {
 
     // Helper to filter and group subjects by grade
     const watchedGrades = Form.useWatch('assignedGrades', form) || [];
-    const availableSubjects = subjects.filter(s => 
-        (s.semester || 'Semester I') === currentSemester &&
-        watchedGrades.some(g => normalizeGrade(g) === normalizeGrade(s.grade))
-    );
+    const availableSubjects = subjects.filter(s => {
+        // Show subject if it matches a selected grade OR if it belongs to no specific grade
+        const matchesGrade = !s.grade || watchedGrades.some(g => normalizeGrade(g) === normalizeGrade(s.grade));
+        return matchesGrade;
+    });
 
     const subjectOptions = availableSubjects.map(s => ({
-        label: `[${formatGrade(s.grade)}] ${s.name}`,
+        label: s.grade ? `[${formatGrade(s.grade)}] ${s.name}` : s.name,
         value: s.name // Storing just the name for simplicity, as per current schema
     }));
 
@@ -270,12 +271,13 @@ export default function TeacherManagement() {
             </Card>
 
             <Modal
-                title={editingTeacher ? 'Edit Teacher' : 'Add New Teacher'}
+                title={editingTeacher ? t('admin.editTeacher') : t('admin.addTeacher')}
                 open={isModalVisible}
-                onCancel={handleCancel}
                 onOk={() => form.submit()}
-                destroyOnClose
-                okText="Save"
+                onCancel={handleCancel}
+                destroyOnHidden
+                width={800}
+                centered
                 className="rounded-2xl overflow-hidden"
             >
                 <Form

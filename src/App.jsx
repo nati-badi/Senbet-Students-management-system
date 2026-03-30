@@ -21,6 +21,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import ParentPortal from './pages/parent/ParentPortal';
 import { syncData } from './utils/sync';
+import { formatEthiopianTime } from './utils/dateUtils';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
@@ -32,12 +33,18 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
   const [isAdminAuth, setIsAdminAuth] = useState(() => sessionStorage.getItem('admin_auth') === 'true');
   const [activeRole, setActiveRole] = useState(() => sessionStorage.getItem('active_role') || null);
+  const [lastSync, setLastSync] = useState(() => localStorage.getItem('last_sync_time') || null);
   const location = useLocation();
   const themeTransitionTimeoutRef = useRef(null);
 
   useEffect(() => {
-    // Cleanup in case App unmounts while timer exists
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       if (themeTransitionTimeoutRef.current) {
         window.clearTimeout(themeTransitionTimeoutRef.current);
         themeTransitionTimeoutRef.current = null;
@@ -113,6 +120,9 @@ export default function App() {
     if (hide) hide();
     if (result.success) {
       if (!silent) message.success(`Sync successful!`);
+      const now = formatEthiopianTime(new Date());
+      setLastSync(now);
+      localStorage.setItem('last_sync_time', now);
       window.dispatchEvent(new Event('syncComplete'));
     } else {
       message.error("Sync disabled: " + (result.error || "Check your internet connection and .env keys"));
@@ -170,9 +180,15 @@ export default function App() {
 
           <div className="flex items-center gap-1 sm:gap-4">
             <Space size="small">
-              <Tooltip title={isOnline ? 'Network Online' : 'Network Offline'}>
+              <Tooltip title={
+                <div className="text-xs">
+                  <div>Status: <b>{isOnline ? 'Online' : 'Offline'}</b></div>
+                  <div>Sync: <b>{isSyncing ? 'In Progress' : (lastSync ? 'Completed' : 'Pending')}</b></div>
+                  {lastSync && <div className="mt-1 opacity-80 italic">Last synced: {lastSync}</div>}
+                </div>
+              }>
                 <Badge
-                  status={isSyncing ? 'processing' : isOnline ? 'success' : 'warning'}
+                  status={isSyncing ? 'processing' : isOnline ? (lastSync ? 'success' : 'warning') : 'error'}
                   text={
                     <Button
                       type="text"
@@ -182,7 +198,7 @@ export default function App() {
                     >
                       {isSyncing ? <SyncOutlined spin /> : isOnline ? <CloudOutlined /> : <DatabaseOutlined />}
                       <span className="text-xs font-medium hidden sm:inline">
-                        {isSyncing ? 'Syncing...' : isOnline ? 'Sync Ready' : t('teacher.savedLocal')}
+                        {isSyncing ? 'Syncing...' : isOnline ? (lastSync ? 'Synced' : 'Ready') : 'Offline'}
                       </span>
                     </Button>
                   }

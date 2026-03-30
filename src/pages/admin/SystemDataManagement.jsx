@@ -12,14 +12,20 @@ export default function SystemDataManagement() {
 
     const handleWipeDatabase = async () => {
         try {
-            // 1. Wipe cloud (Supabase) first — marks depend on students/assessments, so delete them first
-            const tables = ['marks', 'attendance', 'assessments', 'students', 'subjects'];
+            // 1. Wipe cloud (Supabase) first
+            // We delete in an order that respects potential foreign key constraints
+            const tables = ['marks', 'attendance', 'assessments', 'students', 'teachers', 'subjects', 'deleted_records'];
             for (const table of tables) {
-                // neq('id', '') matches ALL rows (every id is not empty)
-                const { error } = await supabase.from(table).delete().neq('id', '');
+                // Use .not('id', 'is', null) instead of .neq('id', '') to avoid UUID type mismatch errors
+                const { error } = await supabase.from(table).delete().not('id', 'is', null);
                 if (error) {
+                    // It's possible some tables don't exist yet or have different PK names
+                    if (error.code === 'PGRST116' || error.message?.includes('not found')) {
+                        console.warn(`Table ${table} not found or already empty.`);
+                        continue;
+                    }
                     console.error(`Failed to wipe Supabase table "${table}":`, error);
-                    throw error;
+                    throw new Error(`[${table}] ${error.message || error.details || 'Unknown Error'}`);
                 }
             }
 
@@ -29,6 +35,7 @@ export default function SystemDataManagement() {
             await db.marks.clear();
             await db.subjects.clear();
             await db.assessments.clear();
+            await db.teachers.clear();
 
             // 3. Clear the deleted_records queue so old deletions don't re-fire
             if (db.deleted_records) {
@@ -36,7 +43,7 @@ export default function SystemDataManagement() {
             }
 
             notification.success({
-                message: 'Database Erased',
+                title: 'Database Erased',
                 description: 'All data has been erased from both this device and the cloud server. Mobile devices will be cleared on next sync.',
                 placement: 'topRight',
                 duration: 5,
@@ -44,7 +51,7 @@ export default function SystemDataManagement() {
         } catch (error) {
             console.error('Wipe error:', error);
             notification.error({
-                message: 'Wipe Failed',
+                title: 'Wipe Failed',
                 description: 'Failed to completely wipe the database. ' + (error?.message || ''),
                 placement: 'topRight',
             });

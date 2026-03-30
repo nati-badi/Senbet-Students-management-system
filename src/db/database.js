@@ -239,3 +239,15 @@ db.version(21).upgrade(async trans => {
     }
   }
 });
+
+// Attempt to open and gracefully recover if a fatal schema conflict occurs 
+// (e.g., intermediate devices stuck between 'id' and '++id' primary key migration).
+db.open().catch(async err => {
+  if (err.name === 'UpgradeError' || err.inner?.name === 'UpgradeError' || String(err).includes('primary key')) {
+      console.warn("Dexie schema conflict detected. Wiping local database to recover...", err);
+      await db.delete();
+      window.location.reload();
+  } else {
+      console.error("Dexie failed to open:", err);
+  }
+});

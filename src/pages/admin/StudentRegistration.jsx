@@ -100,7 +100,8 @@ export default function StudentRegistration() {
         try {
             await db.students.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'students', recordId: id });
-            message.success('Student removed from database.');
+            message.success('Student removed locally. Propagating to cloud...');
+            syncData().catch(console.error);
         } catch (err) {
             message.error('Delete failed.');
         }
@@ -191,7 +192,7 @@ export default function StudentRegistration() {
             const dateKey = keys.find(k => k.toLowerCase().includes('year') || k.includes('ቀን'));
 
             if (!nameKey || !gradeKey) {
-                notification.error({ message: 'Missing Required Columns' });
+                notification.error({ title: 'Missing Required Columns' });
                 return;
             }
 
@@ -221,7 +222,7 @@ export default function StudentRegistration() {
 
         if (bulkStudents.length > 0) {
             await db.students.bulkAdd(bulkStudents);
-            notification.success({ message: `Imported ${bulkStudents.length} students.` });
+            notification.success({ title: `Imported ${bulkStudents.length} students.` });
         }
     };
 

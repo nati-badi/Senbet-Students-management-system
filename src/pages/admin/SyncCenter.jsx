@@ -12,10 +12,10 @@ export default function SyncCenter() {
     const [lastSync, setLastSync] = useState(null);
     const [syncStats, setSyncStats] = useState(null);
 
-    const handleSync = async () => {
+    const handleSync = async (options = {}) => {
         setIsSyncing(true);
         try {
-            const result = await syncData();
+            const result = await syncData(options);
             if (result.success) {
                 setSyncStats({
                     pushed: result.pushed,
@@ -30,24 +30,24 @@ export default function SyncCenter() {
 
                 if (failedTables.length > 0) {
                     notification.warning({
-                        message: 'Sync Partial Success',
+                        title: 'Sync Partial Success',
                         description: `Synced successfully but failed for tables: ${failedTables.join(', ')}. Check Supabase schema.`
                     });
                 } else {
                     notification.success({
-                        message: 'Sync Successful',
+                        title: 'Sync Successful',
                         description: `Pushed ${result.pushed} records and pulled ${result.pulled} records.`
                     });
                 }
             } else {
                 notification.error({
-                    message: 'Sync Failed',
+                    title: 'Sync Failed',
                     description: result.error
                 });
             }
         } catch (error) {
             notification.error({
-                message: 'Sync Error',
+                title: 'Sync Error',
                 description: error.message
             });
         } finally {

@@ -1274,7 +1274,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
 
         await handleAttendanceChange(student.id, 'present');
         notification.success({
-            message: t('teacher.scanSuccess', { name: student.name }),
+            title: t('teacher.scanSuccess', { name: student.name }),
             placement: 'topRight',
             duration: 2
         });

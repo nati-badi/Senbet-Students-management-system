@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image, Image as RNImage, Linking, Animated
 } from 'react-native';
+import NetInfo from "@react-native-community/netinfo";
 import { StatusBar } from 'expo-status-bar';
 import dayjs from 'dayjs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -68,19 +69,19 @@ const generateUUID = () => {
 // ── Theme Management ──────────────────────────────────────────
 const THEMES = {
   dark: {
-    bg: '#020617', // Deeper blue-black
-    card: '#0f172a',
-    border: '#1e293b',
+    bg: '#0f172a',
+    card: '#1e293b',
+    border: '#334155',
     accent: '#3b82f6',
     accentMuted: '#3b82f622',
     green: '#10b981',
     amber: '#f59e0b',
     red: '#ef4444',
-    slate: '#64748b',
+    slate: '#94a3b8',
     text: '#f8fafc',
-    muted: '#64748b',
-    input: '#1e293b',
-    glass: 'rgba(15, 23, 42, 0.8)',
+    muted: '#94a3b8',
+    input: '#0f172a',
+    glass: 'rgba(30, 41, 59, 0.8)',
   },
   light: {
     bg: '#f8fafc',
@@ -163,6 +164,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'landing' | 'teacher_login' | 'parent_portal'>('landing');
   const [authLoading, setAuthLoading] = useState(true);
   const [isDark, setIsDark] = useState(true);
+  const [isOnline, setIsOnline] = useState(true);
 
   const [toast, setToast] = useState<{msg: string, type: 'success'|'error'|'info', visible: boolean}>({msg: '', type: 'success', visible: false});
   const toastOp = useRef(new Animated.Value(0)).current;
@@ -189,6 +191,14 @@ export default function App() {
 
   const C = isDark ? THEMES.dark : THEMES.light;
   const s = makeStyles(C);
+
+  // Network listener
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(!!state.isConnected && !!state.isInternetReachable);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Load Auth, Theme & Cached Data
   useEffect(() => {
@@ -240,7 +250,7 @@ export default function App() {
   };
 
   const syncData = useCallback(async (isBackground = false) => {
-    if (!teacher) return;
+    if (!teacher || !isOnline) return;
     if (!isBackground) setSyncing(true);
 
     try {
@@ -249,10 +259,20 @@ export default function App() {
         .from('teachers')
         .select('*')
         .eq('id', teacher.id)
-        .single();
+        .maybeSingle();
+
+      if (tErr) {
+        console.warn('Teacher fetch error:', tErr);
+      } else if (!tRes) {
+        // Teacher not found! Probably wiped from database.
+        console.warn('Teacher record not found in Supabase. They may have been deleted.');
+        setTeacher(null);
+        await AsyncStorage.removeItem('senbet_teacher_auth');
+        return; // Stop syncing since user is logged out
+      }
         
       let activeTeacher = teacher;
-      if (tRes && !tErr) {
+      if (tRes) {
         activeTeacher = tRes;
         
         // Deep compare to prevent infinite render loops where the background sync triggers a state update,
@@ -263,54 +283,72 @@ export default function App() {
         }
       }
 
-      // 1. Students: Fetch all. Narrowing by grade on Supabase is unreliable due to format discrepancies (e.g. "1" vs "Grade 1").
-      // We will filter LOCALLY in the components using normG.
-      const { data: sRes, error: sErr } = await supabase.from('students').select('*').order('name');
-      if (sErr) throw sErr;
+      // 1. Students
+      try {
+        const { data: sRes, error: sErr } = await supabase.from('students').select('*').order('name');
+        if (sErr) throw sErr;
+        if (sRes) {
+          setStudents(sRes);
+          await AsyncStorage.setItem('cached_students', JSON.stringify(sRes));
+        }
+      } catch (e) { console.error('Sync students error', e); }
 
-      // 2. Assessments: Fetch all. Same logic as students.
-      const { data: aRes, error: aErr } = await supabase.from('assessments').select('*').order('name');
-      if (aErr) throw aErr;
+      // 2. Assessments
+      let aIds: string[] = [];
+      try {
+        const { data: aRes, error: aErr } = await supabase.from('assessments').select('*').order('name');
+        if (aErr) throw aErr;
+        if (aRes) {
+          setAssessments(aRes);
+          await AsyncStorage.setItem('cached_assessments', JSON.stringify(aRes));
+          aIds = aRes.map(a => a.id);
+        }
+      } catch (e) { console.error('Sync assessments error', e); }
 
-      const aIds = (aRes || []).map(a => a.id);
-      let mRes: any[] = [];
-      if (aIds.length > 0) {
-        const { data, error: mErr } = await supabase.from('marks').select('*').in('assessmentid', aIds);
-        if (mErr) throw mErr;
-        mRes = data || [];
-      }
+      // 3. Marks
+      try {
+        if (aIds.length > 0) {
+          const { data: mRes, error: mErr } = await supabase.from('marks').select('*').in('assessmentid', aIds);
+          if (mErr) throw mErr;
+          if (mRes) {
+            setMarks(mRes);
+            await AsyncStorage.setItem('cached_marks', JSON.stringify(mRes));
+          }
+        }
+      } catch (e) { console.error('Sync marks error', e); }
 
-      const { data: attRes, error: attErr } = await supabase
-        .from('attendance')
-        .select('*')
-        .eq('date', dayjs().format('YYYY-MM-DD'));
-      if (attErr) throw attErr;
+      // 4. Attendance
+      try {
+        const { data: attRes, error: attErr } = await supabase
+          .from('attendance')
+          .select('*')
+          .eq('date', dayjs().format('YYYY-MM-DD'));
+        if (attErr) throw attErr;
+        if (attRes) {
+          setAttendance(attRes);
+          await AsyncStorage.setItem('cached_attendance', JSON.stringify(attRes));
+        }
+      } catch (e) { console.error('Sync attendance error', e); }
 
-      const { data: subRes } = await supabase.from('subjects').select('*');
-      const { data: setRes } = await supabase.from('settings').select('*');
-      const sMap: Record<string, string> = {};
-      if (setRes) {
-        setRes.forEach((r: any) => { sMap[r.key] = r.value; });
-      }
+      // 5. Subjects & Settings
+      try {
+        const { data: subRes } = await supabase.from('subjects').select('*');
+        const { data: setRes } = await supabase.from('settings').select('*');
+        if (subRes) {
+          setSubjects(subRes);
+          await AsyncStorage.setItem('cached_subjects', JSON.stringify(subRes));
+        }
+        if (setRes) {
+          const sMap: Record<string, string> = {};
+          setRes.forEach((r: any) => { sMap[r.key] = r.value; });
+          setSettings(sMap);
+          await AsyncStorage.setItem('cached_settings', JSON.stringify(sMap));
+        }
+      } catch (e) { console.error('Sync metadata error', e); }
 
       const now = formatEthiopianTime(new Date());
-      setStudents(sRes || []);
-      setAssessments(aRes || []);
-      setMarks(mRes);
-      setAttendance(attRes || []);
-      setSubjects(subRes || []);
-      setSettings(sMap);
       setLastSync(now);
-
-      await Promise.all([
-        AsyncStorage.setItem('cached_students', JSON.stringify(sRes || [])),
-        AsyncStorage.setItem('cached_assessments', JSON.stringify(aRes || [])),
-        AsyncStorage.setItem('cached_marks', JSON.stringify(mRes)),
-        AsyncStorage.setItem('cached_attendance', JSON.stringify(attRes || [])),
-        AsyncStorage.setItem('cached_subjects', JSON.stringify(subRes || [])),
-        AsyncStorage.setItem('cached_settings', JSON.stringify(sMap)),
-        AsyncStorage.setItem('last_sync_time', now),
-      ]);
+      await AsyncStorage.setItem('last_sync_time', now);
 
       if (!isBackground) showToast('✅ Sync complete — data updated', 'success');
     } catch (err: any) {
@@ -319,7 +357,7 @@ export default function App() {
     } finally {
       if (!isBackground) setSyncing(false);
     }
-  }, [teacher]);
+  }, [teacher, isOnline]);
 
   useEffect(() => {
     if (teacher) syncData(true);
@@ -344,18 +382,46 @@ export default function App() {
     setTeacher(null);
     setStudents([]); setAssessments([]); setMarks([]); setAttendance([]);
     await AsyncStorage.multiRemove([
-      'senbet_teacher_auth', 'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'last_sync_time'
+      'senbet_teacher_auth', 'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'last_sync_time', 'cached_subjects', 'cached_settings'
     ]);
+  };
+
+  const handleHardRefresh = async () => {
+    Alert.alert(
+      t('common.hardRefresh', 'Hard Refresh'),
+      t('common.hardRefreshConfirm', 'This will wipe your local cache and download everything fresh from the cloud. Proceed?'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { 
+          text: t('common.proceed'), 
+          onPress: async () => {
+            setSyncing(true);
+            try {
+              await AsyncStorage.multiRemove([
+                'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'cached_subjects', 'cached_settings', 'last_sync_time'
+              ]);
+              setStudents([]); setAssessments([]); setMarks([]); setAttendance([]);
+              await syncData();
+              showToast('✨ Cache cleared and fresh data synced');
+            } catch (e) {
+              showToast('❌ Refresh failed', 'error');
+            } finally {
+              setSyncing(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (authLoading) return <View style={[s.center, { backgroundColor: C.bg }]}><ActivityIndicator size="large" color={C.accent} /></View>;
   
   if (!teacher) {
     if (authMode === 'parent_portal') {
-      return <ParentPortal isDark={isDark} onBack={() => setAuthMode('landing')} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} />;
+      return <ParentPortal isDark={isDark} onBack={() => setAuthMode('landing')} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} isOnline={isOnline} />;
     }
     if (authMode === 'teacher_login') {
-      return <TeacherLogin onLogin={handleLogin} onBack={() => setAuthMode('landing')} isDark={isDark} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} />;
+      return <TeacherLogin onLogin={handleLogin} onBack={() => setAuthMode('landing')} isDark={isDark} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} isOnline={isOnline} />;
     }
     return <LandingPage onSelectMode={(m: 'teacher' | 'parent') => setAuthMode(m === 'teacher' ? 'teacher_login' : 'parent_portal')} isDark={isDark} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} />;
   }
@@ -371,8 +437,13 @@ export default function App() {
               </View>
               <Text style={{ color: C.text, fontWeight: '900', fontSize: 16, textAlign: 'center', lineHeight: 22 }}>{t('app.title')}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.green, marginRight: 6 }} />
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isOnline ? C.green : C.red, marginRight: 6 }} />
                 <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700' }}>{teacher.name}</Text>
+              </View>
+              <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ color: C.muted, fontSize: 10, fontWeight: '600' }}>
+                  {isOnline ? 'Online' : 'Offline'} • Last synced: {lastSync || 'Never'}
+                </Text>
               </View>
             </View>
 
@@ -408,7 +479,7 @@ export default function App() {
           drawerActiveBackgroundColor: C.accent + '15',
           drawerActiveTintColor: C.accent,
           drawerInactiveTintColor: C.muted,
-          drawerLabelStyle: { fontWeight: '700', fontSize: 14, marginLeft: -12 },
+          drawerLabelStyle: { fontWeight: '700', fontSize: 14 },
           drawerStyle: { width: 280, borderRightWidth: 0 },
         }}
       >
@@ -450,7 +521,7 @@ export default function App() {
                 }
               })}
             >
-              <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} subjects={subjects} settings={settings} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} showToast={showToast} />}</Tab.Screen>
+              <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} subjects={subjects} settings={settings} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} isOnline={isOnline} lastSync={lastSync} showToast={showToast} />}</Tab.Screen>
               <Tab.Screen name="Students">{(props: any) => <StudentsTab {...props} teacher={teacher!} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
               <Tab.Screen name="Attendance">{(props: any) => <AttendanceTab {...props} teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={() => syncData()} C={C} s={s} showToast={showToast} settings={settings} />}</Tab.Screen>
               <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} showToast={showToast} settings={settings} subjects={subjects} />}</Tab.Screen>
@@ -553,7 +624,7 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
   );
 }
 
-function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage }: { isDark: boolean, onBack: () => void, toggleTheme: () => void, toggleLanguage: () => void }) {
+function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }: { isDark: boolean, onBack: () => void, toggleTheme: () => void, toggleLanguage: () => void, isOnline: boolean }) {
   const { t, i18n } = useTranslation();
   const C = isDark ? THEMES.dark : THEMES.light;
   const s = makeStyles(C);
@@ -568,6 +639,9 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage }: { isDark:
   const [attendance, setAttendance] = useState<any[]>([]);
 
   const doSearch = async () => {
+    if (!isOnline) {
+      return Alert.alert(t('common.offline', 'Offline'), t('common.offlineMessage', 'Please check your internet connection and try again.'));
+    }
     if (!studentName.trim() || !accessCode.trim()) {
       return Alert.alert(t('common.error', 'Error'), t('parent.loginFieldsRequired', 'Both Student Name and Access Code are required.'));
     }
@@ -777,7 +851,7 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage }: { isDark:
   );
 }
 
-function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage }: { onLogin: (t: Teacher) => void, onBack: () => void, isDark: boolean, toggleTheme: () => void, toggleLanguage: () => void }) {
+function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, isOnline }: { onLogin: (t: Teacher) => void, onBack: () => void, isDark: boolean, toggleTheme: () => void, toggleLanguage: () => void, isOnline: boolean }) {
   const { t, i18n } = useTranslation();
   const C = isDark ? THEMES.dark : THEMES.light;
   const s = makeStyles(C);
@@ -785,9 +859,18 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage }: 
   const [code, setCode] = useState('');
   const [showCode, setShowCode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const doLogin = async () => {
-    if (!name || !code) return Alert.alert('Missing info', 'Name and code required.');
+    setErrorMsg('');
+    if (!isOnline) {
+      setErrorMsg(t('common.offlineMessage', 'Please check your internet connection and try again.'));
+      return;
+    }
+    if (!name.trim() || !code.trim()) {
+      setErrorMsg(t('auth.missingInfo', 'Name and access code are required.'));
+      return;
+    }
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -798,11 +881,14 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage }: 
         .maybeSingle();
 
       if (error) throw error;
-      if (!data) return Alert.alert('Error', 'Invalid name or access code.');
+      if (!data) {
+        setErrorMsg(t('auth.invalidLogin', 'Invalid name or access code.'));
+        return;
+      }
 
       onLogin(data);
     } catch (err: any) {
-      Alert.alert('Login failed', err.message);
+      setErrorMsg(err.message || t('auth.loginFailed', 'Login failed.'));
     } finally {
       setLoading(false);
     }
@@ -828,21 +914,27 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage }: 
       </View>
 
       <View style={s.loginCard}>
-        <Text style={s.inputLabel}>Full Name</Text>
+        {errorMsg ? (
+          <View style={{ backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, marginBottom: 20, borderWidth: 1, borderColor: '#fca5a5' }}>
+             <Text style={{ color: '#ef4444', fontSize: 13, textAlign: 'center', fontWeight: 'bold' }}>{errorMsg}</Text>
+          </View>
+        ) : null}
+
+        <Text style={s.inputLabel}>{t('teacher.name', 'Full Name')}</Text>
         <TextInput
           style={s.loginInput}
           value={name}
-          onChangeText={setName}
-          placeholder="e.g. Abebe Kedebe"
+          onChangeText={(text) => { setName(text); setErrorMsg(''); }}
+          placeholder="e.g. Abebe Kebede"
           placeholderTextColor={C.muted}
         />
 
-        <Text style={s.inputLabel}>Access Code</Text>
+        <Text style={s.inputLabel}>{t('teacher.accessCode', 'Access Code')}</Text>
         <View style={{ position: 'relative' }}>
           <TextInput
             style={[s.loginInput, { paddingRight: 50 }]}
             value={code}
-            onChangeText={setCode}
+            onChangeText={(text) => { setCode(text); setErrorMsg(''); }}
             secureTextEntry={!showCode}
             placeholder="6-digit code"
             placeholderTextColor={C.muted}
@@ -858,7 +950,7 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage }: 
         </View>
 
         <TouchableOpacity style={s.loginBtn} onPress={doLogin} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>Login</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('auth.login', 'Login')}</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -868,8 +960,8 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage }: 
 // ═══════════════════════════════════════════════════════════════
 //  DASHBOARD TAB
 // ═══════════════════════════════════════════════════════════════
-function DashboardTab({ teacher, students: allStudents, assessments: allAssessments, marks, attendance, subjects, settings, C, s, setTab, onSync, isSyncing, showToast }: {
-  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], attendance: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, setTab: (t: any) => void, onSync: () => void, isSyncing: boolean, showToast?: (msg: string, type: 'success'|'error'|'info') => void
+function DashboardTab({ teacher, students: allStudents, assessments: allAssessments, marks, attendance, subjects, settings, C, s, setTab, onSync, isSyncing, isOnline, lastSync, showToast }: {
+  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], attendance: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, setTab: (t: any) => void, onSync: () => void, isSyncing: boolean, isOnline: boolean, lastSync: string | null, showToast?: (msg: string, type: 'success'|'error'|'info') => void
 }) {
   const { t } = useTranslation();
   const today = formatEthiopianDate(new Date());
@@ -920,7 +1012,12 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
       <View style={{ marginBottom: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View>
           <Text style={[s.sectionTitle, { marginBottom: 4 }]}>{t('dashboard.title')}</Text>
-          <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600' }}>📅 {today}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isOnline ? C.green : C.red }} />
+            <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600' }}>{isOnline ? 'Online' : 'Offline'}</Text>
+            <Text style={{ color: C.border, fontSize: 12 }}>|</Text>
+            <Text style={{ color: C.muted, fontSize: 12 }}>{lastSync ? `Synced ${lastSync}` : 'Not synced'}</Text>
+          </View>
         </View>
         <TouchableOpacity 
           onPress={onSync} 

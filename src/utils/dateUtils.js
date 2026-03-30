@@ -34,6 +34,16 @@ export const formatEthiopianDate = (dateInput, forceAmharic = false) => {
 };
 
 /**
+ * Formats a date into Ethiopian time (12-hour format with E.C. context).
+ * @param {Date} date - The date to format.
+ * @returns {string} The formatted Ethiopian time.
+ */
+export const formatEthiopianTime = (date) => {
+    if (!date || isNaN(date.getTime())) return '—';
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+/**
  * Computes the current Ethiopian Academic Year based on the current date.
  * Ethiopian New Year is in September.
  * @returns {string} The formatted academic year (e.g., "2016 E.C.").
