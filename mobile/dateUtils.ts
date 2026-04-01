@@ -44,14 +44,20 @@ export const formatEthiopianTime = (dateInput: any): string => {
     const dateObj = dateInput instanceof Date ? dateInput : new Date(dateInput);
     if (isNaN(dateObj.getTime())) return '-';
     
-    // Force Amharic locale for time
-    const locale = 'am-ET';
+    const h = dateObj.getHours();
+    const m = dateObj.getMinutes();
+    
+    // Ethiopian hour = (StandardHour - 6 + 12) % 12
+    const etHour = ((h - 6 + 12) % 12) || 12;
+    const etMin = m < 10 ? `0${m}` : m;
+    
+    let suffix = 'ጥዋት';
+    if (h >= 23 || h < 6) suffix = 'ሌሊት';
+    else if (h >= 6 && h < 12) suffix = 'ጥዋት';
+    else if (h >= 12 && h < 18) suffix = 'ከሰዓት';
+    else if (h >= 18 && h < 23) suffix = 'ማታ';
 
-    return new Intl.DateTimeFormat(locale, {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-    }).format(dateObj);
+    return `${etHour}:${etMin} ${suffix}`;
 };
 
 export const computeEthiopianYear = (): string => {

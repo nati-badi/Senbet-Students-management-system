@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image, Image as RNImage, Linking, Animated, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback
+  StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image as RNImage, Linking, Animated, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback
 } from 'react-native';
 import NetInfo from "@react-native-community/netinfo";
 import { StatusBar } from 'expo-status-bar';
@@ -484,13 +484,15 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
-      <Drawer.Navigator
+    <SafeAreaView style={s.root}>
+      <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
+      <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
+        <Drawer.Navigator
         drawerContent={(props) => (
           <DrawerContentScrollView {...props} style={{ backgroundColor: C.bg }}>
             <View style={{ padding: 24, paddingBottom: 32, alignItems: 'center' }}>
               <View style={{ width: 100, height: 100, borderRadius: 24, padding: 4, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginBottom: 20 }}>
-                <RNImage source={require('./assets/logo.jpg')} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
+                <RNImage source={require('./assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
               </View>
               <Text style={{ color: C.text, fontWeight: '900', fontSize: 16, textAlign: 'center', lineHeight: 22 }}>{t('app.title')}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 }}>
@@ -499,13 +501,43 @@ export default function App() {
               </View>
               <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={{ color: C.muted, fontSize: 10, fontWeight: '600' }}>
-                  {isOnline ? 'Online' : 'Offline'} • Last synced: {lastSync || 'Never'}
+                  {isOnline ? t('common.online') : t('common.offline')} • {t('common.lastSynced')}: {lastSync || t('common.never')}
                 </Text>
               </View>
             </View>
 
             <View style={{ padding: 16, paddingBottom: 0 }}>
-              <DrawerItemList {...props} />
+              <TouchableOpacity 
+                onPress={() => props.navigation.navigate('Main', { screen: 'Dashboard' })} 
+                style={[s.sidebarItem, props.state.index === 0 && props.state.routes[props.state.index].name === 'Main' && !props.state.routes[props.state.index].params?.screen && { backgroundColor: C.accent + '15' }]}
+              >
+                <View style={[s.sidebarIcon, { backgroundColor: C.accent + '10' }]}><Home size={18} color={C.accent} /></View>
+                <Text style={[s.sidebarText, { color: C.accent, fontWeight: '700' }]}>{t('dashboard.title')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => props.navigation.navigate('Main', { screen: 'Students' })} 
+                style={s.sidebarItem}
+              >
+                <View style={[s.sidebarIcon, { backgroundColor: C.accent + '10' }]}><Users size={18} color={C.accent} /></View>
+                <Text style={s.sidebarText}>{t('teacher.students')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => props.navigation.navigate('Main', { screen: 'Urgent' })} 
+                style={s.sidebarItem}
+              >
+                <View style={[s.sidebarIcon, { backgroundColor: C.amber + '10' }]}><AlertTriangle size={18} color={C.amber} /></View>
+                <Text style={s.sidebarText}>{t('teacher.urgent')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => props.navigation.navigate('Main', { screen: 'Marks' })} 
+                style={s.sidebarItem}
+              >
+                <View style={[s.sidebarIcon, { backgroundColor: C.green + '10' }]}><BarChart3 size={18} color={C.green} /></View>
+                <Text style={s.sidebarText}>{t('teacher.marks')}</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={{ padding: 24, marginTop: 'auto', borderTopWidth: 1, borderTopColor: C.border }}>
@@ -515,7 +547,7 @@ export default function App() {
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleTheme} style={s.sidebarItem}>
                 <View style={[s.sidebarIcon, { backgroundColor: C.amber + '10' }]}>{isDark ? <Sun size={18} color={C.amber} /> : <Moon size={18} color={C.slate} />}</View>
-                <Text style={s.sidebarText}>{isDark ? 'Light Mode' : 'Dark Mode'}</Text>
+                <Text style={s.sidebarText}>{isDark ? t('common.lightMode') : t('common.darkMode')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { syncData(); props.navigation.closeDrawer(); }} style={s.sidebarItem}>
                 <View style={[s.sidebarIcon, { backgroundColor: C.green + '10' }]}><RefreshCw size={18} color={C.green} /></View>
@@ -530,8 +562,21 @@ export default function App() {
           </DrawerContentScrollView>
         )}
         screenOptions={{
-          headerStyle: { backgroundColor: C.bg, elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: C.border },
-          headerTitleStyle: { color: C.text, fontWeight: '900', fontSize: 18, letterSpacing: -0.5 },
+          headerStyle: { 
+            backgroundColor: C.bg, 
+            elevation: 0, 
+            shadowOpacity: 0, 
+            borderBottomWidth: 1, 
+            borderBottomColor: C.border,
+            height: Platform.OS === 'android' ? 64 : undefined,
+          },
+          headerTitleStyle: { 
+            color: C.text, 
+            fontWeight: '900', 
+            fontSize: 18, 
+            letterSpacing: -0.5,
+            marginTop: Platform.OS === 'android' ? 8 : 0
+          },
           headerTintColor: C.accent,
           drawerActiveBackgroundColor: C.accent + '15',
           drawerActiveTintColor: C.accent,
@@ -590,25 +635,8 @@ export default function App() {
             </Tab.Navigator>
           )}
         </Drawer.Screen>
-        <Drawer.Screen
-          name="StudentList"
-          options={{
-            title: t('teacher.students'),
-            drawerIcon: ({ color }) => <Users size={18} color={color} />
-          }}
-        >{(props: any) => (
-          <View style={{ flex: 1 }}>
-            <StudentsTab {...props} teacher={teacher} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />
-          </View>
-        )}</Drawer.Screen>
-        <Drawer.Screen
-          name="UrgentList"
-          options={{
-            title: t('teacher.urgent'),
-            drawerIcon: ({ color }) => <AlertTriangle size={18} color={color} />
-          }}
-        >{(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}</Drawer.Screen>
-      </Drawer.Navigator>
+        </Drawer.Navigator>
+      </NavigationContainer>
 
       <StudentProfileModal
         student={profileStudent}
@@ -631,7 +659,7 @@ export default function App() {
           <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>{toast.msg}</Text>
         </Animated.View>
       )}
-    </NavigationContainer>
+    </SafeAreaView>
   );
 }
 
@@ -642,6 +670,7 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
       <View style={{ position: 'absolute', top: 60, right: 24, flexDirection: 'row', alignItems: 'center', gap: 12, zIndex: 100 }}>
         <TouchableOpacity onPress={toggleLanguage} style={{ backgroundColor: C.card, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.border, elevation: 2 }}>
           <Text style={{ color: C.text, fontWeight: '800', fontSize: 13 }}>{i18n.language === 'en' ? 'አማ' : 'EN'}</Text>
@@ -653,7 +682,7 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
         <View style={{ alignItems: 'center', marginBottom: 48 }}>
           <View style={{ width: 120, height: 120, borderRadius: 30, padding: 6, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, marginBottom: 24 }}>
             {/* @ts-ignore */}
-            <RNImage source={require('./assets/logo.jpg')} style={{ width: '100%', height: '100%', borderRadius: 24 }} resizeMode="contain" />
+            <RNImage source={require('./assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 24 }} resizeMode="contain" />
           </View>
           <Text style={[s.loginTitle, { fontSize: 28 }]}>በግ/ደ/አ/ቅ/አርሴማ</Text>
           <Text style={[s.loginSub, { fontSize: 16, marginTop: 4 }]}>ፍኖተ ብርሃን ሰ/ቤት</Text>
@@ -737,6 +766,7 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border }}>
           <ArrowLeft size={20} color={C.text} />
@@ -856,7 +886,7 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
 
                   {attendance.filter(a => a.status !== 'present').length > 0 ? (
                      <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingTop: 16 }}>
-                        <Text style={{ color: C.muted, fontSize: 11, fontWeight: '800', marginBottom: 12, textTransform: 'uppercase' }}>Recent History</Text>
+                        <Text style={{ color: C.muted, fontSize: 11, fontWeight: '800', marginBottom: 12, textTransform: 'uppercase' }}>{t('parent.recentHistory')}</Text>
                         {attendance.filter(a => a.status !== 'present').slice(0, 3).map((a, i) => (
                            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, backgroundColor: C.bg, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: C.border }}>
                               <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }}>{formatEthiopianDate(a.date)}</Text>
@@ -968,6 +998,7 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
       <View style={{ position: 'absolute', top: 32, right: 24, zIndex: 100 }}>
         <TouchableOpacity onPress={toggleTheme} style={{ padding: 8 }}><Text style={{ fontSize: 24 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
       </View>
@@ -994,7 +1025,7 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
             <View style={{ alignItems: 'center', marginBottom: 32 }}>
               <View style={{ width: 100, height: 100, borderRadius: 24, padding: 4, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginBottom: 20 }}>
                 {/* @ts-ignore */}
-                <Image source={require('./assets/logo.jpg')} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
+                <RNImage source={require('./assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
               </View>
               <Text style={s.loginTitle}>በግ/ደ/አ/ቅ/አርሴማ</Text>
               <Text style={s.loginSub}>ፍኖተ ብርሃን ሰ/ቤት</Text>
@@ -1037,7 +1068,7 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
               </View>
 
               <TouchableOpacity style={s.loginBtn} onPress={doLogin} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('auth.login', 'Login')}</Text>}
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('teacher.login', 'Login')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -1058,18 +1089,11 @@ const EthiopicClockWidget = ({ C }: { C: any }) => {
     return () => clearInterval(timer);
   }, []);
 
-  const hours24 = timeObj.getHours();
-  const hours12 = hours24 % 12 || 12;
-  const minutes = timeObj.getMinutes().toString().padStart(2, '0');
-  
-  let ampmAmh = "";
-  if (hours24 >= 6 && hours24 < 12) ampmAmh = "ጧት";
-  else if (hours24 >= 12 && hours24 < 18) ampmAmh = "ከሰዓት";
-  else if (hours24 >= 18 && hours24 < 23) ampmAmh = "ማታ";
-  else ampmAmh = "ሌሊት";
+  const fullEtTime = formatEthiopianTime(timeObj);
+  const [etTime, etSuffix] = fullEtTime.split(' ');
 
   const gregDateStr = timeObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const ethpoianDateStr = formatEthiopianDate(timeObj); // Updated utility handles order and cleaning
+  const ethpoianDateStr = formatEthiopianDate(timeObj); 
   const amhDays = ["እሑድ", "ሰኞ", "ማክሰኞ", "ረቡዕ", "ሐሙስ", "አርብ", "ቅዳሜ"];
   const ethDayName = amhDays[timeObj.getDay()];
 
@@ -1098,13 +1122,13 @@ const EthiopicClockWidget = ({ C }: { C: any }) => {
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ fontSize: 38, fontWeight: '700', color: C.text, letterSpacing: -1 }}>{hours12}:{minutes}</Text>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: C.muted, marginLeft: 6 }}>{ampmAmh}</Text>
+            <Text style={{ fontSize: 38, fontWeight: '700', color: C.text, letterSpacing: -1 }}>{etTime}</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: C.muted, marginLeft: 6 }}>{etSuffix}</Text>
           </View>
           <Text style={{ fontSize: 13, color: C.muted, marginTop: 2, fontWeight: '500' }}>{gregDateStr}</Text>
         </View>
 
-        <View style={{ width: 1, height: 40, backgroundColor: C.border, mx: 12 }} />
+        <View style={{ width: 1, height: 40, backgroundColor: C.border, marginHorizontal: 12 }} />
 
         <View style={{ alignItems: 'flex-end', flex: 1 }}>
           <Text style={{ fontSize: 16, fontWeight: '700', color: C.accent, marginBottom: 2 }}>{ethDayName}</Text>
@@ -1174,9 +1198,9 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
           <Text style={[s.sectionTitle, { marginBottom: 4 }]}>{t('dashboard.title')}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isOnline ? C.green : C.red }} />
-            <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600' }}>{isOnline ? 'Online' : 'Offline'}</Text>
+            <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600' }}>{isOnline ? t('common.online') : t('common.offline')}</Text>
             <Text style={{ color: C.border, fontSize: 12 }}>|</Text>
-            <Text style={{ color: C.muted, fontSize: 12 }}>{lastSync ? `Synced ${lastSync}` : 'Not synced'}</Text>
+            <Text style={{ color: C.muted, fontSize: 12 }}>{lastSync ? `${t('common.synced')} ${lastSync}` : t('common.notSynced')}</Text>
           </View>
         </View>
         <TouchableOpacity 
@@ -1208,7 +1232,7 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
         <View style={[s.sidebarIcon, { backgroundColor: C.accent + '15' }]}><CalendarCheck size={20} color={C.accent} /></View>
         <View style={{ flex: 1 }}>
           <Text style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>{t('teacher.attendance')}</Text>
-          <Text style={{ color: C.muted, fontSize: 12 }}>Mark or review student presence</Text>
+          <Text style={{ color: C.muted, fontSize: 12 }}>{t('dashboard.attendanceDesc')}</Text>
         </View>
         <TrendingUp size={16} color={C.muted} />
       </TouchableOpacity>
@@ -1217,7 +1241,7 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
         <View style={[s.sidebarIcon, { backgroundColor: C.amber + '15' }]}><BarChart3 size={20} color={C.amber} /></View>
         <View style={{ flex: 1 }}>
           <Text style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>{t('teacher.marks')}</Text>
-          <Text style={{ color: C.muted, fontSize: 12 }}>Update scores and performance</Text>
+          <Text style={{ color: C.muted, fontSize: 12 }}>{t('dashboard.marksDesc')}</Text>
         </View>
         <TrendingUp size={16} color={C.muted} />
       </TouchableOpacity>
@@ -1295,7 +1319,7 @@ function StudentsTab({ route, navigation, teacher, students: allStudents, onRefr
 
         <TextInput
           style={[s.searchInput, { margin: 0 }]}
-          placeholder="Search students…"
+          placeholder={t('common.searchStudents')}
           placeholderTextColor={C.muted}
           value={search}
           onChangeText={setSearch}
@@ -1310,7 +1334,7 @@ function StudentsTab({ route, navigation, teacher, students: allStudents, onRefr
         ListEmptyComponent={
           <View style={{ alignItems: 'center', marginTop: 40 }}>
             <Users size={48} color={C.border} />
-            <Text style={[s.empty, { marginTop: 12 }]}>No students found</Text>
+            <Text style={[s.empty, { marginTop: 12 }]}>{t('common.noStudentsFound')}</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -1461,7 +1485,7 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
         if (delErr) throw delErr;
       }
       
-      showToast?.('✅ Attendance saved', 'success');
+      showToast?.(`✅ ${t('common.statusSaved')}`, 'success');
       onRefresh();
     } catch (e: any) {
       showToast?.('❌ ' + e.message, 'error');
@@ -1494,7 +1518,7 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
 
         <TextInput
           style={[s.searchInput, { margin: 0, marginBottom: 16 }]}
-          placeholder="Search students..."
+          placeholder={t('common.searchStudents')}
           placeholderTextColor={C.muted}
           value={search}
           onChangeText={setSearch}
@@ -1538,7 +1562,7 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
                         ? (status === 'present' ? C.green : status === 'late' ? C.amber : C.red)
                         : C.muted
                     }
-                  ]}>{status.toUpperCase()}</Text>
+                  ]}>{t(`teacher.${status}`).toUpperCase()}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1800,7 +1824,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const applyBulkFill = () => {
     const val = parseFloat(bulkScore);
     if (isNaN(val) || val < 0 || val > selectedAssessment!.maxscore) {
-      showToast?.(`❌ Valid score: 0–${selectedAssessment!.maxscore}`, 'error');
+      showToast?.(`❌ ${t('teacher.validScore')}: 0–${selectedAssessment!.maxscore}`, 'error');
       return;
     }
     const studentsWithoutMarks = gradeStudents.filter(st => marks[st.id] === undefined || marks[st.id] === '');
@@ -1827,7 +1851,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     });
 
     if (studentsWithMarks.length === 0) {
-      showToast?.('ℹ️ Marks are already cleared for this assessment', 'info');
+      showToast?.(`ℹ️ ${t('teacher.alreadyCleared')}`, 'info');
       return;
     }
 
@@ -1841,14 +1865,14 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     setMarks(updates);
     setClearAllVisible(false);
     saveMarksWithData(updates);
-    showToast?.('🧹 Marks cleared for this assessment', 'success');
+    showToast?.(`🧹 ${t('teacher.clearedSuccess')}`, 'success');
   };
 
   const handlePredictMarks = () => {
     if (!selectedAssessment) return;
     const studentsWithoutMarks = gradeStudents.filter(st => marks[st.id] === undefined || marks[st.id] === '');
     if (studentsWithoutMarks.length === 0) {
-      showToast?.('ℹ️ All students already have marks', 'info');
+      showToast?.(`ℹ️ ${t('teacher.allHaveMarks')}`, 'info');
       return;
     }
 
@@ -1867,7 +1891,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     }
 
     if (studentsWithHistory.length === 0) {
-      showToast?.('⚠️ No history found for predictions', 'info');
+      showToast?.(`⚠️ ${t('teacher.noHistoryPoints')}`, 'info');
       return;
     }
 
@@ -1960,7 +1984,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
 
         <TextInput
           style={[s.searchInput, { margin: 0, marginBottom: 16 }]}
-          placeholder="Search students..."
+          placeholder={t('common.searchStudents')}
           placeholderTextColor={C.muted}
           value={search}
           onChangeText={setSearch}
@@ -1979,20 +2003,20 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
         ListHeaderComponent={selectedAssessment ? (
           <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16, padding: 16 }]}>
             <Text style={{ color: C.accent, fontWeight: '800', textAlign: 'center', marginBottom: 12, fontSize: 16 }}>
-              {selectedAssessment.name} - Max Score: {selectedAssessment.maxscore}
+              {selectedAssessment.name} - {t('teacher.maxScoreLabel')}: {selectedAssessment.maxscore}
             </Text>
             <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'center' }}>
               <TouchableOpacity onPress={handlePredictMarks} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}>
                 <TrendingUp size={18} color={C.accent} style={{ marginBottom: 4 }} />
-                <Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>Predict</Text>
+                <Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.predict')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleFillConstantMark} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}>
                 <Text style={{ fontSize: 16, marginBottom: 2 }}>📝</Text>
-                <Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>Constant</Text>
+                <Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.constant')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleClearMarks} style={{ flex: 1, backgroundColor: C.red + '11', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.red + '33' }}>
                 <Trash2 size={18} color={C.red} style={{ marginBottom: 4 }} />
-                <Text style={{ color: C.red, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.clearAll', 'Clear All')}</Text>
+                <Text style={{ color: C.red, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.clearAll')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2028,8 +2052,8 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       <Modal visible={bulkVisible} transparent animationType="fade">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Fill Constant Mark</Text>
-            <Text style={s.modalSub}>Enter a score to fill for all currently ungraded students (Max: {selectedAssessment?.maxscore})</Text>
+            <Text style={s.modalTitle}>{t('teacher.fillConstant')}</Text>
+            <Text style={s.modalSub}>{t('teacher.fillConstantDesc', 'Enter a score to fill for all currently ungraded students')} (Max: {selectedAssessment?.maxscore})</Text>
             <TextInput
               style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]}
               keyboardType="numeric"
@@ -2041,10 +2065,10 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
             />
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.border }]}>
-                <Text style={[s.modalBtnText, { color: C.text }]}>Cancel</Text>
+                <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}>
-                <Text style={s.modalBtnText}>Apply</Text>
+                <Text style={s.modalBtnText}>{t('common.apply', 'Apply')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2054,16 +2078,16 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       <Modal visible={predictVisible} transparent animationType="fade">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Predict Missing Marks</Text>
+            <Text style={s.modalTitle}>{t('teacher.predictMarks')}</Text>
             <Text style={[s.modalSub, { marginBottom: 20 }]}>
-              Predict missing marks for <Text style={{fontWeight: '800', color: C.accent}}>{predictDetails.count} students</Text> based on their past performance history in {predictDetails.subject}?
+              {t('teacher.predictDesc', { count: predictDetails.count, subject: predictDetails.subject })}
             </Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity onPress={() => setPredictVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}>
-                <Text style={[s.modalBtnText, { color: C.text }]}>Cancel</Text>
+                <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={applyPrediction} style={[s.modalBtn, { backgroundColor: C.accent }]}>
-                <Text style={[s.modalBtnText, { color: '#fff' }]}>Predict</Text>
+                <Text style={[s.modalBtnText, { color: '#fff' }]}>{t('teacher.predict')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2105,7 +2129,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
             onPress={saveMarks}
             disabled={saving}
           >
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>Save Marks</Text>}
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('teacher.saveMarks', 'Save Marks')}</Text>}
           </TouchableOpacity>
         </View>
       )}
@@ -2183,20 +2207,20 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
       <View style={{ marginBottom: 24 }}>
         <Text style={s.sectionTitle}>⚠️ {t('teacher.urgent')}</Text>
-        <Text style={{ color: C.muted, fontSize: 13 }}>Items requiring immediate attention</Text>
+        <Text style={{ color: C.muted, fontSize: 13 }}>{t('teacher.urgentSubtitle')}</Text>
       </View>
 
       {studentsWithNoMarks.length > 0 && (
         <View style={[s.issueCard, { borderRadius: 20, padding: 20 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
             <AlertTriangle size={20} color={C.red} stroke={C.red} />
-            <Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>Students with NO Marks</Text>
+            <Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>{t('teacher.noMarksTitle')}</Text>
             <View style={{ flex: 1 }} />
             <View style={{ backgroundColor: C.red + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}>
               <Text style={{ color: C.red, fontSize: 12, fontWeight: '800' }}>{studentsWithNoMarks.length}</Text>
             </View>
           </View>
-          <Text style={s.issueSub}>These students have no recorded assessments.</Text>
+          <Text style={s.issueSub}>{t('teacher.noMarksDesc')}</Text>
           {displayedStudents.map(st => (
             <View key={st.id} style={[s.issueRow, { borderTopColor: C.border }]}>
               <Users size={14} color={C.muted} stroke={C.muted} />
@@ -2211,7 +2235,7 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
               style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.red + '12' }}
             >
               <Text style={{ color: C.red, fontWeight: '700', fontSize: 13 }}>
-                {showAllStudents ? 'Show Less' : `Show All ${studentsWithNoMarks.length} Students`}
+                {showAllStudents ? t('urgent.showLess') : t('urgent.showAllStudents', { count: studentsWithNoMarks.length })}
               </Text>
             </TouchableOpacity>
           )}
@@ -2222,13 +2246,13 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
         <View style={[s.issueCard, { borderRadius: 20, padding: 20, marginTop: 16 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
             <BarChart3 size={20} color={C.amber} stroke={C.amber} />
-            <Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>Incomplete Assessments</Text>
+            <Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>{t('urgent.incompleteAssessments')}</Text>
             <View style={{ flex: 1 }} />
             <View style={{ backgroundColor: C.amber + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}>
               <Text style={{ color: C.amber, fontSize: 12, fontWeight: '800' }}>{missingMarksByAssessment.length}</Text>
             </View>
           </View>
-          <Text style={s.issueSub}>Assessments with missing student scores.</Text>
+          <Text style={s.issueSub}>{t('urgent.missingScoresDesc')}</Text>
           {displayedAssessments.map(item => (
             <TouchableOpacity 
               key={item.assessment.id} 
@@ -2237,13 +2261,13 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
             >
               <View style={{ flex: 1 }}>
                 <Text style={s.issueText}>{item.assessment.name}</Text>
-                <Text style={s.issueSub}>{item.assessment.subjectname} • {fmtGrade(item.assessment.grade)} • {item.count} missing</Text>
+                <Text style={s.issueSub}>{item.assessment.subjectname} • {fmtGrade(item.assessment.grade)} • {t('urgent.missingCount', { count: item.count })}</Text>
               </View>
               <TouchableOpacity
                 onPress={() => navigation.navigate('Marks', { assessmentId: item.assessment.id, grade: item.assessment.grade })}
                 style={{ backgroundColor: C.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
               >
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Fix Now</Text>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{t('urgent.fixNow')}</Text>
               </TouchableOpacity>
             </TouchableOpacity>
           ))}
@@ -2253,7 +2277,7 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
               style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.amber + '12' }}
             >
               <Text style={{ color: C.amber, fontWeight: '700', fontSize: 13 }}>
-                {showAllAssessments ? 'Show Less' : `Show All ${missingMarksByAssessment.length} Assessments`}
+                {showAllAssessments ? t('urgent.showLess') : t('urgent.showAllAssessments', { count: missingMarksByAssessment.length })}
               </Text>
             </TouchableOpacity>
           )}
@@ -2265,8 +2289,8 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
           <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: C.green + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
             <TrendingUp size={40} color={C.green} stroke={C.green} />
           </View>
-          <Text style={[s.empty, { color: C.text, fontWeight: '700' }]}>Everything is up to date!</Text>
-          <Text style={{ color: C.muted, marginTop: 4 }}>No urgent matters found.</Text>
+          <Text style={[s.empty, { color: C.text, fontWeight: '700' }]}>{t('urgent.everyoneUpToDate')}</Text>
+          <Text style={{ color: C.muted, marginTop: 4 }}>{t('urgent.noUrgentMatters')}</Text>
         </View>
       )}
     </ScrollView>
@@ -2357,11 +2381,11 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
     try {
       const { error } = await supabase.from('assessments').delete().eq('id', id);
       if (error) throw error;
-      showToast?.('🗑️ Assessment deleted', 'success');
+      showToast?.(`🗑️ ${t('assessment.deletedSuccess')}`, 'success');
       setDeleteConfirmId(null);
       if (onRefresh) onRefresh();
     } catch (err: any) {
-      showToast?.('❌ ' + (err.message || 'Failed to delete'), 'error');
+      showToast?.(`❌ ${err.message || t('common.error')}`, 'error');
     }
   };
 
@@ -2382,16 +2406,16 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
       keyboardDismissMode="on-drag"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
     >
-      <Text style={[s.sectionTitle, { marginBottom: 16 }]}>Manage Assessments</Text>
+      <Text style={[s.sectionTitle, { marginBottom: 16 }]}>{t('assessment.manageTitle')}</Text>
 
       {/* Create / Edit Form */}
       <View style={[s.dashboardCard, { borderRadius: 20, padding: 16, marginBottom: 20 }]}>
         <Text style={{ color: C.text, fontWeight: '800', fontSize: 15, marginBottom: 12 }}>
-          {editingId ? '✏️ Edit Assessment' : '➕ New Assessment'}
+          {editingId ? `✏️ ${t('common.save')}` : `➕ ${t('assessment.newTitle')}`}
         </Text>
 
         {/* Grade selector */}
-        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Grade</Text>
+        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{t('profile.grade')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
           {myGrades.map((g: string) => (
             <TouchableOpacity
@@ -2407,7 +2431,7 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
         {/* Subject selector */}
         {selectedGrade ? (
           <>
-            <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Subject</Text>
+            <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{t('assessment.subject')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               {mySubjects.map((subName: string, i: number) => (
                 <TouchableOpacity
@@ -2425,14 +2449,14 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
         {/* Name & Max Score */}
         <TextInput
           style={[s.searchInput, { marginBottom: 10 }]}
-          placeholder="Assessment name (e.g., Mid Term)"
+          placeholder={t('assessment.namePlaceholder')}
           placeholderTextColor={C.muted}
           value={name}
           onChangeText={setName}
         />
         <TextInput
           style={[s.searchInput, { marginBottom: 14 }]}
-          placeholder="Max Score (e.g., 10)"
+          placeholder={t('assessment.maxScorePlaceholder')}
           placeholderTextColor={C.muted}
           value={maxScore}
           onChangeText={setMaxScore}
@@ -2445,7 +2469,7 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
               onPress={() => { setName(''); setMaxScore(''); setEditingId(null); }}
               style={{ flex: 1, backgroundColor: C.border, padding: 12, borderRadius: 12, alignItems: 'center' }}
             >
-              <Text style={{ color: C.text, fontWeight: '700' }}>Cancel</Text>
+              <Text style={{ color: C.text, fontWeight: '700' }}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -2455,7 +2479,7 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
           >
             {saving
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={{ color: '#fff', fontWeight: '800' }}>{editingId ? 'Save Changes' : 'Create'}</Text>
+              : <Text style={{ color: '#fff', fontWeight: '800' }}>{editingId ? t('common.save') : t('common.save')}</Text>
             }
           </TouchableOpacity>
         </View>
@@ -2463,11 +2487,11 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
 
       {/* Assessment List */}
       <Text style={{ color: C.text, fontWeight: '800', fontSize: 15, marginBottom: 12 }}>
-        Your Assessments ({filteredAssessments.length})
+        {t('assessment.yourAssessments', { count: filteredAssessments.length })}
       </Text>
 
       {filteredAssessments.length === 0 && (
-        <Text style={[s.empty, { marginTop: 32 }]}>No assessments found. Create one above!</Text>
+        <Text style={[s.empty, { marginTop: 32 }]}>{t('assessment.noAssessments')}</Text>
       )}
 
       {filteredAssessments.map(a => (
@@ -2489,9 +2513,9 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
       <Modal visible={!!deleteConfirmId} transparent animationType="fade">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Delete Assessment?</Text>
+            <Text style={s.modalTitle}>{t('assessment.confirmDelete')}</Text>
             <Text style={[s.modalSub, { marginBottom: 20 }]}>
-              This will permanently remove this assessment and may affect existing marks.
+              {t('assessment.deleteWarning')}
             </Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity onPress={() => setDeleteConfirmId(null)} style={[s.modalBtn, { backgroundColor: C.border }]}>
@@ -2570,7 +2594,7 @@ function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessme
       <View style={[s.dashboardCard, { borderRadius: 24, padding: 20 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
           <TrendingUp size={20} color={C.green} stroke={C.green} />
-          <Text style={{ color: C.text, fontSize: 17, fontWeight: '800', marginLeft: 8 }}>Top Performers</Text>
+          <Text style={{ color: C.text, fontSize: 17, fontWeight: '800', marginLeft: 8 }}>{t('teacher.topPerformers')}</Text>
         </View>
         {studentStats.slice(0, 5).map((st, i) => (
           <View key={i} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: i < 4 ? 1 : 0, borderBottomColor: C.border }}>
@@ -2581,13 +2605,13 @@ function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessme
             <Text style={{ color: C.green, fontWeight: '900', fontSize: 15 }}>{st.perc.toFixed(1)}%</Text>
           </View>
         ))}
-        {studentStats.length === 0 && <Text style={[s.empty, { marginTop: 20 }]}>No performance data yet.</Text>}
+        {studentStats.length === 0 && <Text style={[s.empty, { marginTop: 20 }]}>{t('teacher.noPerfData')}</Text>}
       </View>
 
       <View style={[s.dashboardCard, { borderRadius: 24, padding: 20, marginTop: 20 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
           <BarChart3 size={20} color={C.accent} stroke={C.accent} />
-          <Text style={{ color: C.text, fontSize: 17, fontWeight: '800', marginLeft: 8 }}>Class Average Trend</Text>
+          <Text style={{ color: C.text, fontSize: 17, fontWeight: '800', marginLeft: 8 }}>{t('teacher.classTrend')}</Text>
         </View>
         {assessments.slice(0, 5).map((ass, i) => {
           const aMarks = marks.filter(m => m.assessmentid === ass.id);
@@ -2605,7 +2629,7 @@ function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessme
             </View>
           );
         })}
-        {assessments.length === 0 && <Text style={[s.empty, { marginTop: 20 }]}>No assessment data yet.</Text>}
+        {assessments.length === 0 && <Text style={[s.empty, { marginTop: 20 }]}>{t('teacher.noAssData')}</Text>}
       </View>
     </ScrollView>
   );
@@ -2727,18 +2751,18 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
                   </View>
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <Text style={{ color: C.accent, fontSize: 28, fontWeight: '900' }}>{student.grade}</Text>
-                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>GRADE</Text>
+                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.grade').toUpperCase()}</Text>
                   </View>
                 </View>
 
                 <View style={{ gap: 16 }}>
                   <View>
-                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>BAPTISMAL NAME</Text>
-                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.baptismalname || 'Not provided'}</Text>
+                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.baptismalName').toUpperCase()}</Text>
+                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.baptismalname || t('profile.notProvided')}</Text>
                   </View>
                   <View>
-                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>PARENT CONTACT</Text>
-                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.parentcontact || 'Not provided'}</Text>
+                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.contact').toUpperCase()}</Text>
+                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.parentcontact || t('profile.notProvided')}</Text>
                   </View>
                 </View>
               </View>
@@ -2766,7 +2790,7 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
                             </>
                           ) : (
                             <View style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                              <Text style={{ color: C.amber, fontWeight: '900', fontSize: 12 }}>MISSING</Text>
+                              <Text style={{ color: C.amber, fontWeight: '900', fontSize: 12 }}>{t('profile.missing').toUpperCase()}</Text>
                             </View>
                           )}
                         </View>
@@ -2794,27 +2818,27 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
                   {/* Header - Amharic First */}
                   <View style={{ alignItems: 'center', marginBottom: 24 }}>
                     <EthiopianCross size={40} />
-                    <Text style={{ color: '#2c1810', fontSize: 18, fontWeight: '900', textAlign: 'center', marginTop: 12 }}>በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Text>
-                    <Text style={{ color: '#5c4033', fontSize: 11, textAlign: 'center', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginTop: 4 }}>የተማሪዎች ውጤት መግለጫ</Text>
+                    <Text style={{ color: '#2c1810', fontSize: 18, fontWeight: '900', textAlign: 'center', marginTop: 12 }}>{t('cert.title', { lng: 'am' })}</Text>
+                    <Text style={{ color: '#5c4033', fontSize: 11, textAlign: 'center', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginTop: 4 }}>{t('cert.title', { lng: 'am' })}</Text>
                     <View style={{ height: 1, width: 40, backgroundColor: '#d4af37', marginVertical: 12 }} />
-                    <Text style={{ color: '#8b0000', fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>Academic Transcript</Text>
+                    <Text style={{ color: '#8b0000', fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>{t('cert.title', { lng: 'en' })}</Text>
                   </View>
 
                   {/* Student Info - Amharic/English Labels */}
                   <View style={{ borderBottomWidth: 1, borderBottomColor: '#e8dfce', paddingBottom: 16, marginBottom: 24 }}>
                     <View style={{ marginBottom: 16 }}>
-                      <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>ሙሉ ስም / Name</Text>
+                      <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>{t('cert.name', { lng: 'am' })} / {t('cert.name', { lng: 'en' })}</Text>
                       <Text style={{ fontSize: 20, color: '#2c1810', fontWeight: '700' }}>{student.name}</Text>
                       {student.baptismalname ? <Text style={{ fontSize: 13, color: '#5c4033', fontStyle: 'italic', fontWeight: '500' }}>{student.baptismalname}</Text> : null}
                     </View>
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                       <View>
-                        <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>ክፍል / Grade</Text>
+                        <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>{t('cert.grade', { lng: 'am' })} / {t('cert.grade', { lng: 'en' })}</Text>
                         <Text style={{ fontSize: 16, color: '#2c1810', fontWeight: '700' }}>{fmtGrade(student.grade)}</Text>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>ዓ.ም / Academic Year</Text>
+                        <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>{t('cert.year', { lng: 'am' })} / {t('cert.year', { lng: 'en' })}</Text>
                         <Text style={{ fontSize: 16, color: '#2c1810', fontWeight: '700' }}>{computeEthiopianYear()} E.C.</Text>
                       </View>
                     </View>
@@ -2823,9 +2847,9 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
                   {/* Table - Amharic Headers First */}
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#d4af3733', paddingBottom: 10, marginBottom: 12 }}>
-                      <Text style={{ flex: 2, fontSize: 11, fontWeight: '800', color: '#8c7361' }}>የትምህርት አይነት / Subject</Text>
-                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: '#8c7361', textAlign: 'center' }}>ውጤት / Score</Text>
-                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: '#8c7361', textAlign: 'center' }}>አማካይ / Avg</Text>
+                      <Text style={{ flex: 2, fontSize: 11, fontWeight: '800', color: '#8c7361' }}>{t('cert.subject', { lng: 'am' })} / {t('cert.subject', { lng: 'en' })}</Text>
+                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: '#8c7361', textAlign: 'center' }}>{t('cert.score', { lng: 'am' })} / {t('cert.score', { lng: 'en' })}</Text>
+                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: '#8c7361', textAlign: 'center' }}>{t('cert.avg', { lng: 'am' })} / {t('cert.avg', { lng: 'en' })}</Text>
                     </View>
                     
                     {assessments.filter(a => String(a.grade) === String(student.grade) && !isConduct(a)).slice(0, 7).map((a, i) => {
@@ -2842,7 +2866,7 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
 
                     <View style={{ marginTop: 24, paddingTop: 16, borderTopWidth: 2, borderTopColor: '#e8dfce' }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#2c1810' }}>አጠቃላይ ድምር / Grand Total</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#2c1810' }}>{t('cert.total', { lng: 'am' })} / {t('cert.total', { lng: 'en' })}</Text>
                         <Text style={{ fontSize: 18, fontWeight: '900', color: '#8b0000' }}>{avg}%</Text>
                       </View>
                       
@@ -2888,7 +2912,8 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
 // ═══════════════════════════════════════════════════════════════
 //  STYLES
 // ═══════════════════════════════════════════════════════════════
-const makeStyles = (C: any) => StyleSheet.create({
+function makeStyles(C: any) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg, paddingTop: Platform.OS === 'android' ? 36 : 0 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
 
@@ -3013,4 +3038,5 @@ const makeStyles = (C: any) => StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', marginRight: 12
   },
   sidebarText: { color: C.text, fontSize: 15, fontWeight: '600' },
-});
+  });
+}

@@ -38,9 +38,24 @@ export const formatEthiopianDate = (dateInput, forceAmharic = false) => {
  * @param {Date} date - The date to format.
  * @returns {string} The formatted Ethiopian time.
  */
-export const formatEthiopianTime = (date) => {
-    if (!date || isNaN(date.getTime())) return '—';
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+export const formatEthiopianTime = (dateInput) => {
+    const dateObj = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (!dateObj || isNaN(dateObj.getTime())) return '—';
+    
+    const h = dateObj.getHours();
+    const m = dateObj.getMinutes();
+    
+    // Ethiopian hour = (StandardHour - 6 + 12) % 12
+    const etHour = ((h - 6 + 12) % 12) || 12;
+    const etMin = m < 10 ? `0${m}` : m;
+    
+    let suffix = 'ጥዋት';
+    if (h >= 23 || h < 6) suffix = 'ሌሊት';
+    else if (h >= 6 && h < 12) suffix = 'ጥዋት';
+    else if (h >= 12 && h < 18) suffix = 'ከሰዓት';
+    else if (h >= 18 && h < 23) suffix = 'ማታ';
+
+    return `${etHour}:${etMin} ${suffix}`;
 };
 
 /**

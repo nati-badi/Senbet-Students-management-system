@@ -164,7 +164,7 @@ export default function ParentDashboard() {
                     <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
                         {/* Logo and school name */}
                         <div className="p-5 text-center border-b border-slate-50 dark:border-slate-800 bg-gradient-to-b from-forest-600 to-forest-700">
-                            <img src="/Logo.jpg" alt="School Logo" className="w-16 h-16 rounded-full object-cover mx-auto shadow-lg border-4 border-white/30 mb-3" />
+                            <img src="/logo.png" alt="School Logo" className="w-16 h-16 rounded-full object-cover mx-auto shadow-lg border-4 border-white/30 mb-3" />
                             <p className="text-white font-bold text-sm leading-snug">{t('app.title', 'Senbet School')}</p>
                             <Tag color="green" className="mt-2 text-xs">{t('parent.portalSuffix', 'Parent & Student Portal')}</Tag>
                         </div>

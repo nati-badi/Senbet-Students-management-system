@@ -48,7 +48,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { syncData } from '../../utils/sync';
 import { supabase } from '../../utils/supabaseClient';
-import { formatEthiopianDate } from '../../utils/dateUtils';
+import { formatEthiopianDate, formatEthiopianTime } from '../../utils/dateUtils';
 import dayjs from 'dayjs';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import StudentProfile from '../../components/StudentProfile';
@@ -63,22 +63,15 @@ const { Sider, Content } = Layout;
 
 
 const EthiopicClockWidget = () => {
-    const [timeObj, useStateObj] = useState(new Date());
+    const [timeObj, setTimeObj] = useState(new Date());
 
     useEffect(() => {
-        const timer = setInterval(() => useStateObj(new Date()), 1000);
+        const timer = setInterval(() => setTimeObj(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
 
-    const hours24 = timeObj.getHours();
-    const hours12 = hours24 % 12 || 12;
-    const minutes = timeObj.getMinutes().toString().padStart(2, '0');
-    
-    let ampmAmh = "";
-    if (hours24 >= 6 && hours24 < 12) ampmAmh = "ጧት";
-    else if (hours24 >= 12 && hours24 < 18) ampmAmh = "ከሰዓት";
-    else if (hours24 >= 18 && hours24 < 23) ampmAmh = "ማታ";
-    else ampmAmh = "ሌሊት";
+    const fullEtTime = formatEthiopianTime(timeObj);
+    const [etTime, etSuffix] = fullEtTime.split(' ');
 
     const gregDateStr = timeObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const ethpoianDateStr = formatEthiopianDate(timeObj, true).replace(/ E\.C\./i, '').trim();
@@ -93,8 +86,8 @@ const EthiopicClockWidget = () => {
             <div className="flex flex-row items-center justify-between py-6 px-10 relative">
                 <div className="flex flex-col items-start">
                     <div className="flex items-baseline gap-2">
-                        <span className="text-6xl font-light tracking-tight text-slate-800 dark:text-white">{hours12}:{minutes}</span>
-                        <span className="text-2xl text-slate-400 dark:text-slate-500 font-normal">{ampmAmh}</span>
+                        <span className="text-6xl font-light tracking-tight text-slate-800 dark:text-white">{etTime}</span>
+                        <span className="text-2xl text-slate-400 dark:text-slate-500 font-normal">{etSuffix}</span>
                     </div>
                     <span className="text-slate-400 dark:text-slate-500 mt-2 text-base tracking-wide">{gregDateStr}</span>
                 </div>

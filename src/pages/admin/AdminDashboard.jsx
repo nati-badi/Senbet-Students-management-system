@@ -14,6 +14,8 @@ import {
 } from '@ant-design/icons';
 import { Layout, Menu, Typography, Badge, Tag } from 'antd';
 import { useTranslation } from 'react-i18next';
+import { formatEthiopianDate, formatEthiopianTime } from '../../utils/dateUtils';
+import { useState, useEffect } from 'react';
 
 // Lazy load or import sub-components
 import StudentRegistration from './StudentRegistration';
@@ -31,6 +33,47 @@ import StudentAnalytics from './StudentAnalytics';
 
 const { Text } = Typography;
 const { Content, Sider } = Layout;
+
+const EthiopicClockWidget = () => {
+    const [timeObj, setTimeObj] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setTimeObj(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const fullEtTime = formatEthiopianTime(timeObj); // Returns "8:03 ከሰዓት"
+    const [etTime, etSuffix] = fullEtTime.split(' ');
+
+    const gregDateStr = timeObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const ethpoianDateStr = formatEthiopianDate(timeObj, true).replace(/ E\.C\./i, '').trim();
+    const amhDays = ["እሑድ", "ሰኞ", "ማክሰኞ", "ረቡዕ", "ሐሙስ", "አርብ", "ቅዳሜ"];
+    const ethDayName = amhDays[timeObj.getDay()];
+
+    return (
+        <div className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden relative mb-6">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 dark:bg-slate-800/80 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-50/30 dark:bg-blue-900/20 rounded-full blur-2xl opacity-40 translate-y-1/2 -translate-x-1/4 pointer-events-none"></div>
+            
+            <div className="flex flex-row items-center justify-between py-6 px-10 relative">
+                <div className="flex flex-col items-start">
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-6xl font-light tracking-tight text-slate-800 dark:text-white">{etTime}</span>
+                        <span className="text-2xl text-slate-400 dark:text-slate-500 font-normal">{etSuffix}</span>
+                    </div>
+                    <span className="text-slate-400 dark:text-slate-500 mt-2 text-base tracking-wide">{gregDateStr}</span>
+                </div>
+
+                <div className="w-px h-16 bg-slate-200 dark:bg-slate-700/50 mx-4"></div>
+
+                <div className="flex flex-col items-end text-right">
+                    <span className="text-3xl text-slate-400 dark:text-slate-300 font-normal mb-1 tracking-wide">{ethDayName}</span>
+                    <span className="text-4xl text-slate-800 dark:text-white font-light">{ethpoianDateStr}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export default function AdminDashboard() {
     const location = useLocation();
@@ -150,13 +193,17 @@ export default function AdminDashboard() {
                 />
             </div>
 
+            <div className="mb-6">
+                <EthiopicClockWidget />
+            </div>
+
             <Layout className="bg-transparent">
             <Sider
                 width={240}
                 className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden lg:block overflow-hidden"
             >
                 <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-slate-800">
-                    <img src="/Logo.jpg" alt="Logo" className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow" />
+                    <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow" />
                     <div className="min-w-0">
                         <Text strong className="text-sm leading-tight block truncate">{t('app.shortTitle', 'Senbet School')}</Text>
                         <Text type="secondary" style={{ fontSize: '10px' }} className="uppercase tracking-wider block">{t('admin.menu')}</Text>

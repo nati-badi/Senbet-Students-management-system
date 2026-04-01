@@ -182,7 +182,7 @@ export default function App() {
         >
           <Space align="center" size="small">
             <Link to="/" className="flex items-center gap-2 notranslate" translate="no">
-              <img src="/Logo.jpg" alt="Logo" className="w-9 h-9 object-cover rounded-full shadow-sm flex-shrink-0" />
+              <img src="/logo.png" alt="Logo" className="w-9 h-9 object-cover rounded-full shadow-sm flex-shrink-0" />
               <Title level={4} style={{ margin: 0, fontSize: '1rem', maxWidth: '220px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }} className="hidden sm:block">
                 በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት
               </Title>
