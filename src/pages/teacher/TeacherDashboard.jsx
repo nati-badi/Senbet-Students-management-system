@@ -503,17 +503,38 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 .where('assessmentId').equals(selectedAssessmentId)
                 .toArray();
 
-            // Sort by updated_at ascending so the newest ones overwrite the older ones in the map
-            marks.sort((a, b) => {
-                const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-                const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-                return timeA - timeB;
-            });
+            // If duplicates exist for a student+assessment (can happen after sync conflicts),
+            // prefer the newest non-null score so a newer "empty" record doesn't wipe a valid mark.
+            const bestByStudent = new Map();
+            for (const m of marks) {
+                const sid = m.studentId;
+                if (!sid) continue;
+                const t = m.updated_at ? new Date(m.updated_at).getTime() : 0;
+                const hasScore = m.score !== null && m.score !== undefined && m.score !== '';
+
+                const prev = bestByStudent.get(sid);
+                if (!prev) {
+                    bestByStudent.set(sid, { rec: m, t, hasScore });
+                    continue;
+                }
+
+                // Prefer any record with a real score over empty ones.
+                if (hasScore && !prev.hasScore) {
+                    bestByStudent.set(sid, { rec: m, t, hasScore });
+                    continue;
+                }
+                if (!hasScore && prev.hasScore) continue;
+
+                // Same score-emptiness class: keep the newest.
+                if (t >= prev.t) {
+                    bestByStudent.set(sid, { rec: m, t, hasScore });
+                }
+            }
 
             const markMap = {};
-            marks.forEach(m => {
-                markMap[m.studentId] = m.score;
-            });
+            for (const [sid, v] of bestByStudent.entries()) {
+                markMap[sid] = v.rec.score;
+            }
             setMarks(markMap);
             setModifiedMarks(new Set()); // Clear modified marks on assessment change
         }
@@ -539,8 +560,12 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const handleSaveMarks = async (passedMarks = null, passedModified = null) => {
         if (!selectedAssessmentId) return;
         
-        const marksToUse = passedMarks || marks;
-        const modifiedToUse = passedModified || modifiedMarks;
+        // Safety guard: if passedMarks is a React Event object, ignore it
+        const actualPassedMarks = (passedMarks && !passedMarks.nativeEvent) ? passedMarks : null;
+        const actualPassedModified = (passedModified && !(passedModified instanceof Event)) ? passedModified : null;
+        
+        const marksToUse = actualPassedMarks || marks;
+        const modifiedToUse = actualPassedModified || modifiedMarks;
 
         if (modifiedToUse.size === 0) {
             message.info(t('teacher.noChanges', 'No changes to save.'));
@@ -575,7 +600,8 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     await db.marks.delete(old.id);
                 }
 
-                if (value === '' || value === null || value === undefined || isNaN(score)) {
+                const isCleared = value === '' || value === null || value === undefined;
+                if (isCleared || isNaN(score)) {
                     // If value is cleared, delete existing mark if any
                     if (existingMark) {
                         idsToDelete.push(existingMark.id);
@@ -584,23 +610,38 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     continue;
                 }
 
-                if (score > selectedAssessment.maxScore) continue;
+                if (score > selectedAssessment.maxScore) {
+                    message.error(`❌ Mark for ${studentId} exceeds max score of ${selectedAssessment.maxScore}. Mark ignored.`);
+                    continue;
+                }
 
                 if (existingMark) {
                     await db.marks.update(existingMark.id, { 
-                        score, 
-                        synced: 0,
+                        score,
+                        subject: selectedAssessment.subjectName,
+                        assessmentDate: selectedAssessment.date,
                         semester: currentSemesterSetting,
+                        markedBy: teacher.id,
+                        synced: 0,
                         updated_at: new Date().toISOString()
                     });
                 } else {
+                    const genUUID = () => {
+                        if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                            return v.toString(16);
+                        });
+                    };
+
                     await db.marks.add({
-                        id: crypto.randomUUID(),
+                        id: genUUID(),
                         studentId: studentId,
                         assessmentId: selectedAssessmentId,
                         subject: selectedAssessment.subjectName,
                         assessmentDate: selectedAssessment.date,
                         score,
+                        markedBy: teacher.id,
                         synced: 0,
                         semester: currentSemesterSetting,
                         updated_at: new Date().toISOString()
@@ -616,7 +657,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
             setModifiedMarks(new Set());
             message.success(t('teacher.saveSuccess', 'Marks saved successfully!'));
-            syncData().catch(console.error);
+            await syncData().catch(console.error);
         } catch (err) {
             console.error("Save failed:", err);
             message.error(t('teacher.saveError', 'Failed to save marks!'));
@@ -634,7 +675,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             return;
         }
 
-        Modal.confirm({
+        modal.confirm({
             title: t('teacher.fillConstant'),
             content: (
                 <div className="py-4">
@@ -676,6 +717,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 await handleSaveMarks(newMarks, newlyModified);
                 
                 message.success(t('teacher.fillSuccess', { count }));
+                await syncData().catch(console.error);
                 delete window._tempBulkValue;
             }
         });
@@ -683,7 +725,16 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
     const handleClearAssessmentMarks = () => {
         if (!selectedAssessment) return;
-        Modal.confirm({
+        
+        // Check if there's actually anything to clear (non-empty marks)
+        const hasMarksToClear = studentsInGrade.some(s => marks[s.id] !== undefined && marks[s.id] !== '');
+        
+        if (!hasMarksToClear) {
+            message.info(t('teacher.alreadyCleared', 'All marks for this assessment are already cleared.'));
+            return;
+        }
+
+        modal.confirm({
             title: t('teacher.clearAllMarks', 'Clear All Marks?'),
             content: t('teacher.confirmClearAll', 'This will remove all marks for the current assessment. This action cannot be undone once saved.'),
             okText: t('common.yes', 'Yes, Clear All'),
@@ -716,14 +767,25 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             return;
         }
 
-        const normS = (s) => String(s || "").trim().toLowerCase();
+        const normS = (s) => String(s || "").trim().toLowerCase().normalize('NFC');
         const targetSubject = normS(selectedAssessment.subjectName);
+
+        // Pre-fetch a map of assessment subject names for fast fallback lookup
+        const allAssMap = new Map((assessmentsData || []).map(a => [a.id, normS(a.subjectName)]));
 
         // Pre-filter: only include students who have AT LEAST ONE mark in this subject already
         const studentsWithHistory = [];
         for (const student of studentsWithoutMarks) {
             const studentMarks = await db.marks.where('studentId').equals(student.id).toArray();
-            const hasSubjectHistory = studentMarks.some(m => normS(m.subject) === targetSubject);
+            
+            // Check both the explicitly stored subject AND the assessment lookup for robustness
+            const hasSubjectHistory = studentMarks.some(m => {
+                const markSub = normS(m.subject);
+                if (markSub === targetSubject) return true;
+                
+                const assessmentSub = allAssMap.get(m.assessmentId);
+                return assessmentSub === targetSubject;
+            });
             
             if (hasSubjectHistory) {
                 studentsWithHistory.push(student);
@@ -735,20 +797,27 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             return;
         }
 
-        Modal.confirm({
+        modal.confirm({
             title: t('teacher.predictMarks'),
             content: t('teacher.confirmPredict', { count: studentsWithHistory.length, subject: selectedAssessment.subjectName }),
             onOk: async () => {
                 const predictions = [];
-                const normS = (s) => String(s || "").trim().toLowerCase();
+                const normS = (s) => String(s || "").trim().toLowerCase().normalize('NFC');
                 const targetSubject = normS(selectedAssessment.subjectName);
+                const allAssMap = new Map((assessmentsData || []).map(a => [a.id, normS(a.subjectName)]));
 
                 for (const student of studentsWithHistory) {
                     // Find all marks for this student
                     const studentMarks = await db.marks.where('studentId').equals(student.id).toArray();
                     
-                    // Strictly limit to the same subject
-                    const subjectMarks = studentMarks.filter(m => normS(m.subject) === targetSubject);
+                    // Strictly limit to the same subject (using the same robust check as above)
+                    const subjectMarks = studentMarks.filter(m => {
+                        const markSub = normS(m.subject);
+                        if (markSub === targetSubject) return true;
+                        
+                        const assessmentSub = allAssMap.get(m.assessmentId);
+                        return assessmentSub === targetSubject;
+                    });
 
                     if (subjectMarks.length > 0) {
                         // Calculate average percentage
@@ -793,7 +862,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 <Input
                     type="number"
                     placeholder={selectedAssessment ? `0-${selectedAssessment.maxScore}` : ''}
-                    value={marks[record.id] || ''}
+                    value={(marks[record.id] !== undefined && marks[record.id] !== null && marks[record.id] !== '') ? marks[record.id] : ''}
                     onChange={e => handleMarkChange(record.id, e.target.value)}
                     style={{ textAlign: 'right' }}
                     max={selectedAssessment?.maxScore}
@@ -945,7 +1014,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         <Button
                             type="primary"
                             icon={<SaveOutlined />}
-                            onClick={handleSaveMarks}
+                            onClick={() => handleSaveMarks()}
                             loading={isSaving}
                             disabled={!selectedAssessmentId || studentsInGrade.length === 0}
                         >
@@ -1200,6 +1269,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                     await db.attendance.update(existingRecord.id, { 
                         status, 
                         semester: currentSemesterSetting, 
+                        markedBy: teacher?.id,
                         synced: 0,
                         updated_at: new Date().toISOString()
                     });
@@ -1210,6 +1280,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                         date: attendanceDate,
                         status,
                         semester: currentSemesterSetting,
+                        markedBy: teacher?.id,
                         synced: 0,
                         updated_at: new Date().toISOString()
                     });

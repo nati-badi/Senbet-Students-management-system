@@ -39,6 +39,7 @@ export default function SubjectManagement() {
             }
             form.resetFields();
             setEditingId(null);
+            await syncData().catch(console.error);
         } catch (err) {
             message.error("Error saving subject");
         }
@@ -58,6 +59,7 @@ export default function SubjectManagement() {
             await db.subjects.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'subjects', recordId: id });
             message.success(t('admin.subjectDeleted'));
+            await syncData().catch(console.error);
         } catch (err) {
             message.error("Failed to delete subject");
         }

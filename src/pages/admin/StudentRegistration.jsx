@@ -91,6 +91,7 @@ export default function StudentRegistration() {
             form.setFieldsValue({ dateOfEntry: dayjs() });
             setIsFormValid(false);
             message.success('ተማሪ በተሳካ ሁኙ ተመዘግቷል!');
+            await syncData().catch(console.error);
         } catch (err) {
             message.error('ተማሪ መዘግበት አልታቸለም።');
         }
@@ -101,7 +102,7 @@ export default function StudentRegistration() {
             await db.students.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'students', recordId: id });
             message.success('Student removed locally. Propagating to cloud...');
-            syncData().catch(console.error);
+            await syncData().catch(console.error);
         } catch (err) {
             message.error('Delete failed.');
         }
@@ -129,6 +130,7 @@ export default function StudentRegistration() {
             });
             setIsEditModalVisible(false);
             message.success('Student record updated.');
+            await syncData().catch(console.error);
         } catch (err) {
             console.error("Failed to edit student:", err);
         }
@@ -279,7 +281,7 @@ export default function StudentRegistration() {
             }
             
             message.success(`Generated codes for ${missing.length} students.`);
-            syncData().catch(console.error);
+            await syncData().catch(console.error);
         } catch (error) {
             console.error('Error generating codes:', error);
             message.error('Failed to generate codes');
@@ -300,7 +302,7 @@ export default function StudentRegistration() {
                 updated_at: new Date().toISOString()
             });
             message.success('Code generated');
-            syncData().catch(console.error);
+            await syncData().catch(console.error);
         } catch (error) {
             message.error('Failed to generate code');
         }

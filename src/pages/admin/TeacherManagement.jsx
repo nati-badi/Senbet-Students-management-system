@@ -123,7 +123,7 @@ export default function TeacherManagement() {
                 });
                 message.success('Teacher added successfully');
             }
-            syncData().catch(console.error);
+            await syncData().catch(console.error);
             handleCancel();
         } catch (error) {
             console.error('Error saving teacher:', error);
@@ -166,7 +166,7 @@ export default function TeacherManagement() {
             await db.teachers.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'teachers', recordId: id });
             message.success('Teacher deleted successfully');
-            syncData().catch(console.error);
+            await syncData().catch(console.error);
         } catch (error) {
             console.error('Error deleting teacher:', error);
             message.error('Failed to delete teacher');

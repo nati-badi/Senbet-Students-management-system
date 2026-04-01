@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image, Image as RNImage, Linking, Animated
+  StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image, Image as RNImage, Linking, Animated, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback
 } from 'react-native';
 import NetInfo from "@react-native-community/netinfo";
 import { StatusBar } from 'expo-status-bar';
@@ -187,6 +187,7 @@ export default function App() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [lastSyncIso, setLastSyncIso] = useState<string | null>(null);
   const [profileStudent, setProfileStudent] = useState<Student | null>(null);
 
   const C = isDark ? THEMES.dark : THEMES.light;
@@ -213,6 +214,7 @@ export default function App() {
           AsyncStorage.getItem('cached_subjects'),
           AsyncStorage.getItem('cached_settings'),
           AsyncStorage.getItem('last_sync_time'),
+          AsyncStorage.getItem('last_sync_iso'),
         ]);
 
         if (savedAuth) setTeacher(JSON.parse(savedAuth));
@@ -226,6 +228,7 @@ export default function App() {
         
         if (await AsyncStorage.getItem('cached_attendance')) setAttendance(JSON.parse(await AsyncStorage.getItem('cached_attendance') || '[]'));
         if (savedLastSync) setLastSync(savedLastSync);
+        if (await AsyncStorage.getItem('last_sync_iso')) setLastSyncIso(await AsyncStorage.getItem('last_sync_iso'));
 
       } catch (e) {
         console.error('Initial load error', e);
@@ -345,10 +348,64 @@ export default function App() {
           await AsyncStorage.setItem('cached_settings', JSON.stringify(sMap));
         }
       } catch (e) { console.error('Sync metadata error', e); }
+      
+      // 6. Pull Remote Deletions
+      try {
+        // If no lastSyncIso, use a VERY recent anchor (effectively "now") to skip toxic history.
+        // This stops existing valid marks from being deleted by old "ghost" records.
+        const syncAnchor = lastSyncIso || new Date().toISOString();
+        
+        const { data: deletions } = await supabase
+          .from('deleted_records')
+          .select('*')
+          .gt('deleted_at', syncAnchor);
+          
+        if (deletions && deletions.length > 0) {
+          console.log(`Mobile: Syncing ${deletions.length} remote deletions...`);
+          // Note: Since mobile uses state/AsyncStorage, we need to filter out deleted records
+          // for each relevant local data set.
+          
+          let updatedStudents = [...students];
+          let updatedAssessments = [...assessments];
+          let updatedMarks = [...marks];
+          let updatedAttendance = [...attendance];
+          let changed = false;
+
+          for (const del of deletions) {
+            if (del.table_name === 'students') {
+              updatedStudents = updatedStudents.filter(r => r.id !== del.record_id);
+              changed = true;
+            } else if (del.table_name === 'assessments') {
+              updatedAssessments = updatedAssessments.filter(r => r.id !== del.record_id);
+              changed = true;
+            } else if (del.table_name === 'marks') {
+              updatedMarks = updatedMarks.filter(r => r.id !== del.record_id);
+              changed = true;
+            } else if (del.table_name === 'attendance') {
+              updatedAttendance = updatedAttendance.filter(r => r.id !== del.record_id);
+              changed = true;
+            }
+          }
+          
+          if (changed) {
+            setStudents(updatedStudents);
+            setAssessments(updatedAssessments);
+            setMarks(updatedMarks);
+            setAttendance(updatedAttendance);
+            await AsyncStorage.setItem('cached_students', JSON.stringify(updatedStudents));
+            await AsyncStorage.setItem('cached_assessments', JSON.stringify(updatedAssessments));
+            await AsyncStorage.setItem('cached_marks', JSON.stringify(updatedMarks));
+            await AsyncStorage.setItem('cached_attendance', JSON.stringify(updatedAttendance));
+          }
+        }
+      } catch (e) { console.warn('Sync deletions error', e); }
 
       const now = formatEthiopianTime(new Date());
+      const nowIso = new Date().toISOString();
       setLastSync(now);
+      setLastSyncIso(nowIso);
       await AsyncStorage.setItem('last_sync_time', now);
+      await AsyncStorage.setItem('last_sync_iso', nowIso);
 
       if (!isBackground) showToast('✅ Sync complete — data updated', 'success');
     } catch (err: any) {
@@ -584,7 +641,7 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
   const s = makeStyles(C);
 
   return (
-    <View style={s.loginRoot}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ position: 'absolute', top: 60, right: 24, flexDirection: 'row', alignItems: 'center', gap: 12, zIndex: 100 }}>
         <TouchableOpacity onPress={toggleLanguage} style={{ backgroundColor: C.card, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.border, elevation: 2 }}>
           <Text style={{ color: C.text, fontWeight: '800', fontSize: 13 }}>{i18n.language === 'en' ? 'አማ' : 'EN'}</Text>
@@ -592,34 +649,36 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
         <TouchableOpacity onPress={toggleTheme} style={{ padding: 8 }}><Text style={{ fontSize: 28 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
       </View>
       
-      <View style={{ alignItems: 'center', marginBottom: 48 }}>
-        <View style={{ width: 120, height: 120, borderRadius: 30, padding: 6, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, marginBottom: 24 }}>
-          {/* @ts-ignore */}
-          <RNImage source={require('./assets/logo.jpg')} style={{ width: '100%', height: '100%', borderRadius: 24 }} resizeMode="contain" />
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 100 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={{ alignItems: 'center', marginBottom: 48 }}>
+          <View style={{ width: 120, height: 120, borderRadius: 30, padding: 6, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, marginBottom: 24 }}>
+            {/* @ts-ignore */}
+            <RNImage source={require('./assets/logo.jpg')} style={{ width: '100%', height: '100%', borderRadius: 24 }} resizeMode="contain" />
+          </View>
+          <Text style={[s.loginTitle, { fontSize: 28 }]}>በግ/ደ/አ/ቅ/አርሴማ</Text>
+          <Text style={[s.loginSub, { fontSize: 16, marginTop: 4 }]}>ፍኖተ ብርሃን ሰ/ቤት</Text>
         </View>
-        <Text style={[s.loginTitle, { fontSize: 28 }]}>በግ/ደ/አ/ቅ/አርሴማ</Text>
-        <Text style={[s.loginSub, { fontSize: 16, marginTop: 4 }]}>ፍኖተ ብርሃን ሰ/ቤት</Text>
-      </View>
 
-      <Text style={{ color: C.muted, textAlign: 'center', marginBottom: 32, fontWeight: '700', fontSize: 15 }}>{t('app.welcomeMessage', 'Welcome! Please select your portal')}</Text>
+        <Text style={{ color: C.muted, textAlign: 'center', marginBottom: 32, fontWeight: '700', fontSize: 15 }}>{t('app.welcomeMessage', 'Welcome! Please select your portal')}</Text>
 
-      <TouchableOpacity 
-        style={[s.loginBtn, { backgroundColor: C.accent, marginBottom: 20, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]} 
-        onPress={() => onSelectMode('teacher')}
-      >
-        <Key size={22} color="#fff" />
-        <Text style={[s.loginBtnText, { fontSize: 18 }]}>{t('app.teacherPortal', 'Teacher Portal')}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity 
+          style={[s.loginBtn, { backgroundColor: C.accent, marginBottom: 20, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]} 
+          onPress={() => onSelectMode('teacher')}
+        >
+          <Key size={22} color="#fff" />
+          <Text style={[s.loginBtnText, { fontSize: 18 }]}>{t('app.teacherPortal', 'Teacher Portal')}</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={[s.loginBtn, { backgroundColor: 'transparent', borderWidth: 2, borderColor: C.accent, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]} 
-        onPress={() => onSelectMode('parent')}
-      >
-        <Users size={22} color={C.accent} />
-        <Text style={[s.loginBtnText, { color: C.accent, fontSize: 18 }]}>{t('parent.title', 'Parent Portal')}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity 
+          style={[s.loginBtn, { backgroundColor: 'transparent', borderWidth: 2, borderColor: C.accent, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]} 
+          onPress={() => onSelectMode('parent')}
+        >
+          <Users size={22} color={C.accent} />
+          <Text style={[s.loginBtnText, { color: C.accent, fontSize: 18 }]}>{t('parent.title', 'Parent Portal')}</Text>
+        </TouchableOpacity>
 
-      <Text style={{ color: C.muted, textAlign: 'center', marginTop: 'auto', fontSize: 12 }}>v2.4.0 • ©{new Date().getFullYear()}</Text>
+        <Text style={{ color: C.muted, textAlign: 'center', marginTop: 40, marginBottom: 20, fontSize: 12 }}>v2.4.0 • ©{new Date().getFullYear()}</Text>
+      </ScrollView>
     </View>
   );
 }
@@ -677,17 +736,28 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
   };
 
   return (
-    <View style={[s.root, { padding: 0 }]}>
-       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingTop: 60, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
-         <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border }}>
-           <ArrowLeft size={20} color={C.text} />
-         </TouchableOpacity>
-         <Text style={{ color: C.text, fontSize: 18, fontWeight: '900' }}>{t('parent.title', 'Parent Portal')}</Text>
-         <View style={{ width: 40 }} />
-       </View>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border }}>
+          <ArrowLeft size={20} color={C.text} />
+        </TouchableOpacity>
+        <Text style={{ color: C.text, fontSize: 18, fontWeight: '900' }}>{t('parent.title', 'Parent Portal')}</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
-       {!student ? (
-         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
+      {!student ? (
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <ScrollView
+              style={{ flex: 1, backgroundColor: C.bg }}
+              contentContainerStyle={{ padding: 24, paddingBottom: 200 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
             <View style={{ alignItems: 'center', marginBottom: 40 }}>
               <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}>
                 <Search size={48} color={C.accent} />
@@ -731,9 +801,11 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('parent.viewResults', 'View Student Results')}</Text>}
                </TouchableOpacity>
             </View>
-         </ScrollView>
-       ) : (
-         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
             <View style={[s.dashboardCard, { marginBottom: 24, alignItems: 'center', padding: 24 }]}>
                <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: C.accent + '33' }}>
                  <User size={40} color={C.accent} />
@@ -845,8 +917,8 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
                <Text style={{ color: C.muted, textAlign: 'center', marginTop: 12, fontWeight: '600', fontSize: 13 }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
             </View>
             <View style={{ height: 40 }} />
-         </ScrollView>
-       )}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -895,64 +967,82 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
   };
 
   return (
-    <View style={s.loginRoot}>
-      <View style={{ position: 'absolute', top: 60, right: 24, zIndex: 100 }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ position: 'absolute', top: 32, right: 24, zIndex: 100 }}>
         <TouchableOpacity onPress={toggleTheme} style={{ padding: 8 }}><Text style={{ fontSize: 24 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
       </View>
-      <View style={{ position: 'absolute', top: 60, left: 24, zIndex: 100 }}>
+      <View style={{ position: 'absolute', top: 32, left: 24, zIndex: 100 }}>
          <TouchableOpacity onPress={onBack} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, elevation: 2 }}>
            <ArrowLeft size={22} color={C.text} />
          </TouchableOpacity>
       </View>
-      <View style={{ alignItems: 'center', marginBottom: 32 }}>
-        <View style={{ width: 100, height: 100, borderRadius: 24, padding: 4, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginBottom: 20 }}>
-          {/* @ts-ignore */}
-          <Image source={require('./assets/logo.jpg')} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
-        </View>
-        <Text style={s.loginTitle}>በግ/ደ/አ/ቅ/አርሴማ</Text>
-        <Text style={s.loginSub}>ፍኖተ ብርሃን ሰ/ቤት</Text>
-      </View>
-
-      <View style={s.loginCard}>
-        {errorMsg ? (
-          <View style={{ backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, marginBottom: 20, borderWidth: 1, borderColor: '#fca5a5' }}>
-             <Text style={{ color: '#ef4444', fontSize: 13, textAlign: 'center', fontWeight: 'bold' }}>{errorMsg}</Text>
-          </View>
-        ) : null}
-
-        <Text style={s.inputLabel}>{t('teacher.name', 'Full Name')}</Text>
-        <TextInput
-          style={s.loginInput}
-          value={name}
-          onChangeText={(text) => { setName(text); setErrorMsg(''); }}
-          placeholder="e.g. Abebe Kebede"
-          placeholderTextColor={C.muted}
-        />
-
-        <Text style={s.inputLabel}>{t('teacher.accessCode', 'Access Code')}</Text>
-        <View style={{ position: 'relative' }}>
-          <TextInput
-            style={[s.loginInput, { paddingRight: 50 }]}
-            value={code}
-            onChangeText={(text) => { setCode(text); setErrorMsg(''); }}
-            secureTextEntry={!showCode}
-            placeholder="6-digit code"
-            placeholderTextColor={C.muted}
-            keyboardType="numeric"
-            maxLength={6}
-          />
-          <TouchableOpacity 
-            onPress={() => setShowCode(!showCode)} 
-            style={{ position: 'absolute', right: 15, top: 12 }}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 24, paddingTop: 96, paddingBottom: 250 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            keyboardDismissMode="on-drag"
+            scrollEnabled={true}
+            bounces={true}
           >
-            {showCode ? <EyeOff size={24} color={C.muted} /> : <Eye size={24} color={C.muted} />}
-          </TouchableOpacity>
-        </View>
+            <View style={{ alignItems: 'center', marginBottom: 32 }}>
+              <View style={{ width: 100, height: 100, borderRadius: 24, padding: 4, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginBottom: 20 }}>
+                {/* @ts-ignore */}
+                <Image source={require('./assets/logo.jpg')} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
+              </View>
+              <Text style={s.loginTitle}>በግ/ደ/አ/ቅ/አርሴማ</Text>
+              <Text style={s.loginSub}>ፍኖተ ብርሃን ሰ/ቤት</Text>
+            </View>
 
-        <TouchableOpacity style={s.loginBtn} onPress={doLogin} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('auth.login', 'Login')}</Text>}
-        </TouchableOpacity>
-      </View>
+            <View style={s.loginCard}>
+              {errorMsg ? (
+                <View style={{ backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, marginBottom: 20, borderWidth: 1, borderColor: '#fca5a5' }}>
+                   <Text style={{ color: '#ef4444', fontSize: 13, textAlign: 'center', fontWeight: 'bold' }}>{errorMsg}</Text>
+                </View>
+              ) : null}
+
+              <Text style={s.inputLabel}>{t('teacher.name', 'Full Name')}</Text>
+              <TextInput
+                style={s.loginInput}
+                value={name}
+                onChangeText={(text) => { setName(text); setErrorMsg(''); }}
+                placeholder="e.g. Abebe Kebede"
+                placeholderTextColor={C.muted}
+              />
+
+              <Text style={s.inputLabel}>{t('teacher.accessCode', 'Access Code')}</Text>
+              <View style={{ position: 'relative' }}>
+                <TextInput
+                  style={[s.loginInput, { paddingRight: 50 }]}
+                  value={code}
+                  onChangeText={(text) => { setCode(text); setErrorMsg(''); }}
+                  secureTextEntry={!showCode}
+                  placeholder="6-digit code"
+                  placeholderTextColor={C.muted}
+                  keyboardType="numeric"
+                  maxLength={6}
+                />
+                <TouchableOpacity 
+                  onPress={() => setShowCode(!showCode)} 
+                  style={{ position: 'absolute', right: 15, top: 12 }}
+                >
+                  {showCode ? <EyeOff size={24} color={C.muted} /> : <Eye size={24} color={C.muted} />}
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={s.loginBtn} onPress={doLogin} disabled={loading}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('auth.login', 'Login')}</Text>}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -1180,6 +1270,8 @@ function StudentsTab({ route, navigation, teacher, students: allStudents, onRefr
 function AttendanceTab({ route, navigation, teacher, students: allStudents, attendanceData, setAttendanceData, onRefresh, C, s, showToast, settings }: {
   route: any, navigation: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any
 }) {
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
   // Filter for THIS teacher (Memoized)
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
   const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
@@ -1271,7 +1363,7 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
         studentid: st.id,
         date,
         status: attendance[st.id] || 'absent',
-        markedby: teacher.id,
+        last_modified_by: teacher.id,
         semester: settings.currentSemester || 'Semester I',
         updated_at: new Date().toISOString()
       }));
@@ -1309,7 +1401,7 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       <View style={{ padding: 16, paddingBottom: 0 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <View>
@@ -1342,7 +1434,10 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
       <FlatList
         data={filteredStudents}
         keyExtractor={item => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         renderItem={({ item }) => (
           <View style={[s.attendanceRow, { padding: 12, borderRadius: 16 }]}>
             <View style={{ flex: 1 }}>
@@ -1420,7 +1515,7 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
           <CalendarCheck size={24} color={C.accent} />
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1474,6 +1569,8 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const [clearAllVisible, setClearAllVisible] = useState(false);
   const [predictDetails, setPredictDetails] = useState<{count: number, subject: string, students: any[]}>({ count: 0, subject: '', students: [] });
   const [page, setPage] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
   useEffect(() => {
     if (route.params?.assessmentId) {
@@ -1575,6 +1672,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
           score,
           assessmentdate: selectedAssessment.date,
           semester: settings.currentSemester || 'Semester I',
+          last_modified_by: teacher.id,
           updated_at: new Date().toISOString()
         };
         recordsToProcess.push(record);
@@ -1746,7 +1844,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
       <View style={{ padding: 16, paddingBottom: 0 }}>
         <Text style={[s.sectionTitle, { marginBottom: 16 }]}>{t('teacher.marks')}</Text>
 
@@ -1802,9 +1900,12 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       <FlatList
         data={paginate(filteredStudents, page)}
         keyExtractor={item => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
         // Force refresh when selected assessment changes (header buttons) or marks map changes (row inputs).
         extraData={[selectedAssessment?.id, marks]}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         ListHeaderComponent={selectedAssessment ? (
           <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16, padding: 16 }]}>
             <Text style={{ color: C.accent, fontWeight: '800', textAlign: 'center', marginBottom: 12, fontSize: 16 }}>
@@ -1938,7 +2039,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1988,14 +2089,20 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
 
   const missingMarksByAssessment = myAssessments.map(a => {
     const studentsForGrade = students.filter(st => normG(st.grade) === normG(a.grade));
-    const ungraded = studentsForGrade.filter(st => !marksData.some(m => m.studentid === st.id && m.assessmentid === a.id));
+    const ungraded = studentsForGrade.filter(st => !marksData.some(m => 
+        (m.studentid === st.id || m.studentId === st.id) && 
+        (m.assessmentid === a.id || m.assessmentId === a.id)
+    ));
     return { assessment: a, count: ungraded.length, students: ungraded };
   }).filter(item => item.count > 0);
 
   const studentsWithNoMarks = students.filter(st => {
     const assessmentsForGrade = myAssessments.filter(a => normG(a.grade) === normG(st.grade));
     if (assessmentsForGrade.length === 0) return false;
-    return !marksData.some(m => m.studentid === st.id && assessmentsForGrade.some(a => a.id === m.assessmentid));
+    return !marksData.some(m => 
+        (m.studentid === st.id || m.studentId === st.id) && 
+        assessmentsForGrade.some(a => a.id === (m.assessmentid || m.assessmentId))
+    );
   });
 
   const PAGE_SIZE = 5;
@@ -2118,6 +2225,8 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
   const gradeSubjects = subjects.filter((sub: any) =>
     normG(sub.grade) === normG(selectedGrade) &&
@@ -2187,7 +2296,14 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+    <ScrollView 
+      style={{ flex: 1, backgroundColor: C.bg }} 
+      contentContainerStyle={{ padding: 16, paddingBottom: 100 }} 
+      keyboardShouldPersistTaps="handled" 
+      keyboardDismissMode="on-drag"
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
+    >
       <Text style={[s.sectionTitle, { marginBottom: 16 }]}>Manage Assessments</Text>
 
       {/* Create / Edit Form */}
@@ -2311,6 +2427,7 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
         </View>
       </Modal>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

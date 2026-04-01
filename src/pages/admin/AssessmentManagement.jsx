@@ -51,6 +51,7 @@ export default function AssessmentManagement() {
             }
             form.resetFields();
             setEditingId(null);
+            await syncData().catch(console.error);
         } catch (err) {
             message.error("Error saving assessment");
         }
@@ -69,6 +70,7 @@ export default function AssessmentManagement() {
             await db.assessments.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'assessments', recordId: id });
             message.success(t('admin.assessmentDeleted'));
+            await syncData().catch(console.error);
         } catch (err) {
             message.error("Failed to delete assessment");
         }

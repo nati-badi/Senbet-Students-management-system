@@ -11,7 +11,9 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
     console.log(`Pulled ${cloudData.length} records from ${tableName}. Filtering local conflicts...`);
     
     // Fetch local unsynced records to detect conflicts
-    const currentUnsynced = await tableDb.where('synced').equals(0).toArray();
+    // Bypass potential IndexedDB index corruption by filtering in-memory
+    const allTableRecords = await tableDb.toArray();
+    const currentUnsynced = allTableRecords.filter(r => r.synced === 0);
     const unsyncedMap = new Map(currentUnsynced.map(r => [r.id, r]));
     
     const localReadyData = [];
@@ -55,12 +57,21 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
             } else if (tableName === 'assessments') {
                 if (serverRecord.subjectname !== undefined) { mapped.subjectName = serverRecord.subjectname; delete mapped.subjectname; }
                 if (serverRecord.maxscore !== undefined) { mapped.maxScore = serverRecord.maxscore; delete mapped.maxscore; }
-            } else if (tableName === 'marks') {
-                if (serverRecord.studentid !== undefined) { mapped.studentId = serverRecord.studentid; delete mapped.studentid; }
-                if (serverRecord.assessmentid !== undefined) { mapped.assessmentId = serverRecord.assessmentid; delete mapped.assessmentid; }
-                if (serverRecord.assessmentdate !== undefined) { mapped.assessmentDate = serverRecord.assessmentdate; delete mapped.assessmentdate; }
             } else if (tableName === 'attendance') {
                 if (serverRecord.studentid !== undefined) { mapped.studentId = serverRecord.studentid; delete mapped.studentid; }
+                if (serverRecord.last_modified_by !== undefined) { mapped.markedBy = serverRecord.last_modified_by; }
+            } else if (tableName === 'marks') {
+                if (serverRecord.studentid !== undefined) { mapped.studentId = serverRecord.studentid; delete mapped.studentid; }
+                if (serverRecord.studentId !== undefined && mapped.studentId === undefined) { mapped.studentId = serverRecord.studentId; }
+                
+                if (serverRecord.assessmentid !== undefined) { mapped.assessmentId = serverRecord.assessmentid; delete mapped.assessmentid; }
+                if (serverRecord.assessmentId !== undefined && mapped.assessmentId === undefined) { mapped.assessmentId = serverRecord.assessmentId; }
+                
+                if (serverRecord.assessmentdate !== undefined) { mapped.assessmentDate = serverRecord.assessmentdate; delete mapped.assessmentdate; }
+                if (serverRecord.subject !== undefined) { mapped.subject = serverRecord.subject; }
+                if (serverRecord.semester !== undefined) { mapped.semester = serverRecord.semester; }
+                if (serverRecord.score !== undefined) { mapped.score = serverRecord.score; }
+                if (serverRecord.last_modified_by !== undefined) { mapped.markedBy = serverRecord.last_modified_by; }
             } else if (tableName === 'teachers') {
                 if (serverRecord.accesscode !== undefined) { mapped.accessCode = serverRecord.accesscode; delete mapped.accesscode; }
                 if (serverRecord.assignedgrades !== undefined) { mapped.assignedGrades = serverRecord.assignedgrades; delete mapped.assignedgrades; }
@@ -87,33 +98,41 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
     }
 }
 
-async function cleanupDeletedRecords(tableName, tableDb) {
-    // Only for tables where deletions are common and need propagation
-    if (!['marks', 'attendance'].includes(tableName)) return;
-
-    console.log(`Checking for deleted records in ${tableName}...`);
+async function syncDeletionsFromCloud(lastSyncTime) {
+    console.log("Checking for remote deletions...");
     try {
-        // Fetch All current IDs from Supabase for this table
-        const { data: remoteIds, error: idError } = await supabase
-            .from(tableName)
-            .select('id');
+        const { data: deletions, error } = await supabase
+            .from('deleted_records')
+            .select('*')
+            .gt('deleted_at', lastSyncTime);
+            
+        if (error) throw error;
+        if (!deletions || deletions.length === 0) return;
         
-        if (idError) throw idError;
+        console.log(`Applying ${deletions.length} remote deletions...`);
+        for (const del of deletions) {
+            const tableDb = db[del.table_name];
+            if (tableDb) {
+                // Determine if we should delete locally
+                const exists = await tableDb.get(del.record_id);
+                if (exists) {
+                    // Safety Shield: Do NOT delete if the local record was updated AFTER the deletion was logged on the server.
+                    // This prevents "toxic" or accidental deletion histories (e.g. from buggy update triggers) from wiping new data.
+                    const localTime = exists.updated_at ? new Date(exists.updated_at).getTime() : 0;
+                    const delTime = new Date(del.deleted_at).getTime();
+                    
+                    if (localTime > delTime) {
+                        console.log(`Shield: Skipping deletion for ${del.table_name}:${del.record_id}. Local record is newer.`);
+                        continue;
+                    }
 
-        const remoteIdSet = new Set(remoteIds.map(r => r.id));
-        
-        // Find local records that are marked as synced but missing from remote
-        const localSyncedRecords = await tableDb.where('synced').equals(1).toArray();
-        const idsToRemove = localSyncedRecords
-            .filter(r => !remoteIdSet.has(r.id))
-            .map(r => r.id);
-
-        if (idsToRemove.length > 0) {
-            console.log(`Sync: removing ${idsToRemove.length} deleted records from local ${tableName}`);
-            await tableDb.bulkDelete(idsToRemove);
+                    await tableDb.delete(del.record_id);
+                    console.log(`Deleted local ${del.table_name} record ${del.record_id} based on cloud.`);
+                }
+            }
         }
     } catch (e) {
-        console.warn(`Deletion cleanup failed for ${tableName}:`, e);
+        console.warn("Remote deletion sync failed:", e);
     }
 }
 
@@ -234,7 +253,9 @@ export async function syncData({ force = false } = {}) {
 
                 // --- 2a. PUSH PHASE ---
                 let tablePushed = 0;
-                const unsyncedRecords = await db.table(tableName).where('synced').equals(0).toArray();
+                // Bypass potential IndexedDB index corruption on the 'synced' field by fetching all and filtering in-memory
+                const allRecords = await tableDb.toArray();
+                const unsyncedRecords = allRecords.filter(r => r.synced === 0);
                 
                 if (unsyncedRecords.length > 0) {
                     console.log(`Pushing ${unsyncedRecords.length} unsynced records for ${tableName}...`);
@@ -269,11 +290,13 @@ export async function syncData({ force = false } = {}) {
                         } else if (tableName === 'marks') {
                             toPush = {
                                 id: record.id,
-                                score: Math.round(parseFloat(record.score || 0)),
+                                score: parseFloat(record.score || 0),
+                                subject: record.subject,
                                 semester: record.semester,
                                 studentid: record.studentId || record.studentid,
                                 assessmentid: record.assessmentId || record.assessmentid,
                                 assessmentdate: record.assessmentDate || record.assessmentdate,
+                                last_modified_by: record.markedBy || record.markedby || record.last_modified_by,
                                 updated_at: record.updated_at
                             };
                         } else if (tableName === 'attendance') {
@@ -283,6 +306,7 @@ export async function syncData({ force = false } = {}) {
                                 status: record.status,
                                 semester: record.semester,
                                 studentid: record.studentId || record.studentid,
+                                last_modified_by: record.markedBy || record.markedby || record.last_modified_by,
                                 updated_at: record.updated_at
                             };
                         } else if (tableName === 'teachers') {
@@ -354,14 +378,18 @@ export async function syncData({ force = false } = {}) {
                     await processCloudData(tableName, cloudData, tableDb, tableStatus, pulledTotalRef);
                 }
 
-                // --- 2c. DELETION CLEANUP (Plan B) ---
-                await cleanupDeletedRecords(tableName, tableDb);
+                // --- 2c. DELETION CLEANUP ---
+                // cleanupDeletedRecords was removed here to prevent accidental data loss.
+                // Deletions are now handled via syncDeletionsFromCloud (explicit pulling).
 
             } catch (err) {
                 console.error(`Fatal error syncing table ${tableName}:`, err);
                 tableStatus[tableName] = { status: 'fatal', error: err.message };
             }
         }
+
+        // --- 3. PULL DELETIONS PHASE ---
+        await syncDeletionsFromCloud(lastSyncTime);
 
         await db.settings.put({ key: 'last_sync_timestamp', value: currentSyncStartedAt });
         
