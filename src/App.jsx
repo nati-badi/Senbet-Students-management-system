@@ -138,6 +138,17 @@ export default function App() {
     }
   }, [isOnline, handleSync]);
 
+  // Auto-sync every 60 seconds in the background
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isOnline) {
+        // Run silently to not disrupt the UI
+        void handleSync({ silent: true });
+      }
+    }, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isOnline, handleSync]);
+
   return (
     <ConfigProvider
       theme={{

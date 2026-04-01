@@ -18,7 +18,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import {
   Home, Users, CalendarCheck, BarChart3, AlertTriangle, Settings, LogOut, Moon, Sun, Languages, RefreshCw, TrendingUp, Info, BookOpen, Key, Phone,
-  Search, User, ArrowLeft, Eye, EyeOff, Trash2, FileText
+  Search, User, ArrowLeft, Eye, EyeOff, Trash2, FileText, Edit
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 
@@ -2228,10 +2228,17 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
-  const gradeSubjects = subjects.filter((sub: any) =>
-    normG(sub.grade) === normG(selectedGrade) &&
-    mySubjects.some((ms: string) => normS(ms) === normS(sub.name))
-  );
+  useEffect(() => {
+    if (myGrades.length === 1 && !selectedGrade) {
+      setSelectedGrade(myGrades[0]);
+    }
+  }, [myGrades]);
+
+  useEffect(() => {
+    if (mySubjects.length === 1 && !selectedSubject) {
+      setSelectedSubject(mySubjects[0]);
+    }
+  }, [mySubjects]);
 
   const filteredAssessments = myAssessments.filter(a => {
     if (selectedGrade && normG(a.grade) !== normG(selectedGrade)) return false;
@@ -2240,10 +2247,11 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
   });
 
   const handleSave = async () => {
-    if (!selectedGrade || !selectedSubject || !name.trim() || !maxScore) {
-      showToast?.('❌ Please fill in all fields', 'error');
-      return;
-    }
+    if (!selectedGrade) { showToast?.('❌ Please select a grade', 'error'); return; }
+    if (!selectedSubject) { showToast?.('❌ Please select a subject', 'error'); return; }
+    if (!name.trim()) { showToast?.('❌ Please enter an assessment name', 'error'); return; }
+    if (!maxScore) { showToast?.('❌ Please enter a max score', 'error'); return; }
+
     const ms = parseFloat(maxScore);
     if (isNaN(ms) || ms <= 0) {
       showToast?.('❌ Max score must be a positive number', 'error');
@@ -2331,13 +2339,13 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
           <>
             <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Subject</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              {gradeSubjects.map((sub: any) => (
+              {mySubjects.map((subName: string, i: number) => (
                 <TouchableOpacity
-                  key={sub.id}
-                  style={[s.gradeChip, normS(selectedSubject) === normS(sub.name) && s.gradeChipActive]}
-                  onPress={() => setSelectedSubject(sub.name)}
+                  key={`sub-${i}`}
+                  style={[s.gradeChip, normS(selectedSubject) === normS(subName) && s.gradeChipActive]}
+                  onPress={() => setSelectedSubject(subName)}
                 >
-                  <Text style={[s.gradeChipText, normS(selectedSubject) === normS(sub.name) && s.gradeChipTextActive]}>{sub.name}</Text>
+                  <Text style={[s.gradeChipText, normS(selectedSubject) === normS(subName) && s.gradeChipTextActive]}>{subName}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -2399,7 +2407,7 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
             <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{a.subjectname} • {fmtGrade(a.grade)} • Max: {a.maxscore}</Text>
           </View>
           <TouchableOpacity onPress={() => handleEdit(a)} style={{ padding: 8, marginRight: 4 }}>
-            <FileText size={18} color={C.accent} />
+            <Edit size={18} color={C.accent} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setDeleteConfirmId(a.id)} style={{ padding: 8 }}>
             <Trash2 size={18} color={C.red} />

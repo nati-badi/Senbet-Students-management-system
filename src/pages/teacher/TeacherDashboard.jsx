@@ -122,11 +122,6 @@ export default function TeacherDashboard() {
 
     const menuItems = [
         {
-            key: '/teacher',
-            icon: <HomeOutlined />,
-            label: t('app.title')
-        },
-        {
             key: '/teacher/analytics',
             icon: <BarChartOutlined />,
             label: t('admin.analyticsDashboard', 'Analytics Dashboard')
