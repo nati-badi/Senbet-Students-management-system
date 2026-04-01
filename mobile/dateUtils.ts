@@ -13,24 +13,30 @@ export const formatEthiopianDate = (dateInput: string | Date | any): string => {
 
     if (!dateObj || isNaN(dateObj.getTime())) return String(dateInput || '—');
 
-    // Force Amharic Ethiopic locale regardless of current i18n language
     const locale = 'am-ET-u-ca-ethiopic';
 
     try {
-        const options: Intl.DateTimeFormatOptions = {
+        const formatter = new Intl.DateTimeFormat(locale, {
             year: 'numeric',
             month: 'long',
             day: 'numeric'
-        };
+        });
         
-        const date = (typeof dateInput === 'string' && !dateInput.includes('T'))
-            ? new Date(dateInput + 'T00:00:00')
-            : dateObj;
+        // Use formatToParts to avoid "ERA1" artifacts and force a consistent order
+        const parts = formatter.formatToParts(dateObj);
+        const day = parts.find(p => p.type === 'day')?.value || '';
+        const month = parts.find(p => p.type === 'month')?.value || '';
+        const year = parts.find(p => p.type === 'year')?.value || '';
 
-        const formatter = new Intl.DateTimeFormat(locale, options);
-        return formatter.format(date);
+        return `${month} ${day}, ${year}`;
     } catch (e) {
-        return String(dateInput || '—');
+        // Fallback for environments that don't support formatToParts or the locale properly
+        try {
+            const formatter = new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long', day: 'numeric' });
+            return formatter.format(dateObj).replace(/(ERA\d|ERA|AM|PM)/gi, '').trim();
+        } catch (inner) {
+            return String(dateInput || '—');
+        }
     }
 };
 

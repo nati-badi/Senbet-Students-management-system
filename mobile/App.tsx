@@ -1048,6 +1048,74 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  WIDGETS
+// ═══════════════════════════════════════════════════════════════
+const EthiopicClockWidget = ({ C }: { C: any }) => {
+  const [timeObj, setTimeObj] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTimeObj(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const hours24 = timeObj.getHours();
+  const hours12 = hours24 % 12 || 12;
+  const minutes = timeObj.getMinutes().toString().padStart(2, '0');
+  
+  let ampmAmh = "";
+  if (hours24 >= 6 && hours24 < 12) ampmAmh = "ጧት";
+  else if (hours24 >= 12 && hours24 < 18) ampmAmh = "ከሰዓት";
+  else if (hours24 >= 18 && hours24 < 23) ampmAmh = "ማታ";
+  else ampmAmh = "ሌሊት";
+
+  const gregDateStr = timeObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const ethpoianDateStr = formatEthiopianDate(timeObj); // Updated utility handles order and cleaning
+  const amhDays = ["እሑድ", "ሰኞ", "ማክሰኞ", "ረቡዕ", "ሐሙስ", "አርብ", "ቅዳሜ"];
+  const ethDayName = amhDays[timeObj.getDay()];
+
+  return (
+    <View style={{
+      width: '100%',
+      backgroundColor: C.card,
+      borderRadius: 24,
+      padding: 20,
+      marginBottom: 20,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: C.border,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    }}>
+      {/* Visual Decorations - subtle hints */}
+      <View style={{ 
+        position: 'absolute', top: -40, right: -40, width: 140, height: 140, 
+        borderRadius: 70, backgroundColor: C.accent, opacity: 0.05 
+      }} />
+      
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+            <Text style={{ fontSize: 38, fontWeight: '700', color: C.text, letterSpacing: -1 }}>{hours12}:{minutes}</Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: C.muted, marginLeft: 6 }}>{ampmAmh}</Text>
+          </View>
+          <Text style={{ fontSize: 13, color: C.muted, marginTop: 2, fontWeight: '500' }}>{gregDateStr}</Text>
+        </View>
+
+        <View style={{ width: 1, height: 40, backgroundColor: C.border, mx: 12 }} />
+
+        <View style={{ alignItems: 'flex-end', flex: 1 }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: C.accent, marginBottom: 2 }}>{ethDayName}</Text>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>{ethpoianDateStr}</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
 //  DASHBOARD TAB
 // ═══════════════════════════════════════════════════════════════
 function DashboardTab({ teacher, students: allStudents, assessments: allAssessments, marks, attendance, subjects, settings, C, s, setTab, onSync, isSyncing, isOnline, lastSync, showToast }: {
@@ -1099,6 +1167,8 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
+      <EthiopicClockWidget C={C} />
+      
       <View style={{ marginBottom: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View>
           <Text style={[s.sectionTitle, { marginBottom: 4 }]}>{t('dashboard.title')}</Text>

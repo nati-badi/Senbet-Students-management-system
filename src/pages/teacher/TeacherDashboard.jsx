@@ -62,6 +62,54 @@ const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 
 
+const EthiopicClockWidget = () => {
+    const [timeObj, useStateObj] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => useStateObj(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const hours24 = timeObj.getHours();
+    const hours12 = hours24 % 12 || 12;
+    const minutes = timeObj.getMinutes().toString().padStart(2, '0');
+    
+    let ampmAmh = "";
+    if (hours24 >= 6 && hours24 < 12) ampmAmh = "ጧት";
+    else if (hours24 >= 12 && hours24 < 18) ampmAmh = "ከሰዓት";
+    else if (hours24 >= 18 && hours24 < 23) ampmAmh = "ማታ";
+    else ampmAmh = "ሌሊት";
+
+    const gregDateStr = timeObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const ethpoianDateStr = formatEthiopianDate(timeObj, true).replace(/ E\.C\./i, '').trim();
+    const amhDays = ["እሑድ", "ሰኞ", "ማክሰኞ", "ረቡዕ", "ሐሙስ", "አርብ", "ቅዳሜ"];
+    const ethDayName = amhDays[timeObj.getDay()];
+
+    return (
+        <div className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden relative mb-6">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 dark:bg-slate-800/80 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-50/30 dark:bg-blue-900/20 rounded-full blur-2xl opacity-40 translate-y-1/2 -translate-x-1/4 pointer-events-none"></div>
+            
+            <div className="flex flex-row items-center justify-between py-6 px-10 relative">
+                <div className="flex flex-col items-start">
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-6xl font-light tracking-tight text-slate-800 dark:text-white">{hours12}:{minutes}</span>
+                        <span className="text-2xl text-slate-400 dark:text-slate-500 font-normal">{ampmAmh}</span>
+                    </div>
+                    <span className="text-slate-400 dark:text-slate-500 mt-2 text-base tracking-wide">{gregDateStr}</span>
+                </div>
+
+                <div className="w-px h-16 bg-slate-200 dark:bg-slate-700/50 mx-4"></div>
+
+                <div className="flex flex-col items-end text-right">
+                    <span className="text-3xl text-slate-400 dark:text-slate-300 font-normal mb-1 tracking-wide">{ethDayName}</span>
+                    <span className="text-4xl text-slate-800 dark:text-white font-light">{ethpoianDateStr}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function TeacherDashboard() {
     const location = useLocation();
     const { t } = useTranslation();
@@ -155,7 +203,7 @@ export default function TeacherDashboard() {
     ];
 
     return (
-        <div className="flex flex-col w-full gap-4">
+        <div className="flex flex-col w-full gap-4 pt-4">
             <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -206,18 +254,21 @@ export default function TeacherDashboard() {
             {/* Desktop: Sidebar + Content */}
             <div className="flex flex-row gap-6 items-start">
                 <div className="hidden lg:flex flex-col flex-shrink-0 w-[240px] bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden teacher-sidebar">
-                    <div style={{ padding: '16px' }}>
-                        <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
-                            {t('teacher.menu')}
-                        </Text>
+                    <div>
+                        <div style={{ padding: '16px' }}>
+                            <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
+                                {t('teacher.menu')}
+                            </Text>
+                        </div>
+                        <Menu
+                            mode="inline"
+                            selectedKeys={[location.pathname]}
+                            items={menuItems}
+                            onClick={({ key }) => navigate(key)}
+                            className="border-none"
+                        />
                     </div>
-                    <Menu
-                        mode="inline"
-                        selectedKeys={[location.pathname]}
-                        items={menuItems}
-                        onClick={({ key }) => navigate(key)}
-                        className="border-none"
-                    />
+                    
                     <style>{`
                         .teacher-sidebar .ant-menu-item-selected {
                             background-color: #eff6ff !important;
@@ -257,7 +308,8 @@ export default function TeacherDashboard() {
                     `}</style>
                 </div>
 
-                <div className="flex-1 min-w-0 min-h-[600px]">
+                <div className="flex-1 min-w-0 min-h-[600px] mt-4">
+                    <EthiopicClockWidget />
                     <Routes>
                         <Route path="/" element={<Navigate to="mark-entry" replace />} />
                         <Route path="/mark-entry" element={<SpeedEntryMarks teacher={activeTeacher} setProfileStudentId={setProfileStudentId} />} />
@@ -968,12 +1020,9 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         {selectedAssessment && (
                             <Col xs={24} md={6}>
                                 <Form.Item label="&nbsp;" style={{ marginBottom: 0 }}>
-                                    <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded flex flex-col gap-1">
-                                        <Text strong className="text-blue-700 dark:text-blue-300">
+                                    <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded flex flex-col justify-center h-10">
+                                        <Text strong className="text-blue-700 dark:text-blue-300 text-[15px]">
                                             {t('admin.maxScore')}: {selectedAssessment.maxScore}
-                                        </Text>
-                                        <Text type="secondary" className="text-xs">
-                                            {formatEthiopianDate(selectedAssessment.date)}
                                         </Text>
                                     </div>
                                 </Form.Item>

@@ -177,7 +177,7 @@ export default function App() {
     >
       <Layout className="min-h-screen flex-1 w-full flex flex-col bg-slate-50 dark:bg-slate-950">
         <Header
-          className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800"
+          className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-50 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800"
           style={{ height: '64px' }}
         >
           <Space align="center" size="small">
