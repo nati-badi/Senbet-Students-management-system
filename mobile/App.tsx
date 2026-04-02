@@ -1989,44 +1989,56 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
           </Animated.View>
         )}} onEndReached={() => setPage(p => p + 1)} onEndReachedThreshold={0.5} />
 
-      <Modal visible={bulkVisible} transparent animationType="fade">
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>{t('teacher.fillConstant')}</Text>
-            <Text style={s.modalSub}>{t('teacher.fillConstantDesc')} (Max: {selectedAssessment?.maxscore})</Text>
-            <TextInput style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]} keyboardType="numeric" placeholder={`0 - ${selectedAssessment?.maxscore || 10}`} placeholderTextColor={C.muted} value={bulkScore} onChangeText={setBulkScore} autoFocus />
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
-              <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}><Text style={s.modalBtnText}>{t('common.apply')}</Text></TouchableOpacity>
-            </View>
+      <Modal visible={bulkVisible} transparent animationType="fade" onRequestClose={() => { setBulkVisible(false); setBulkScore(''); }}>
+        <TouchableWithoutFeedback onPress={() => { setBulkVisible(false); setBulkScore(''); }}>
+          <View style={s.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={s.modalCard}>
+                <Text style={s.modalTitle}>{t('teacher.fillConstant')}</Text>
+                <Text style={s.modalSub}>{t('teacher.fillConstantDesc')} (Max: {selectedAssessment?.maxscore})</Text>
+                <TextInput style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]} keyboardType="numeric" placeholder={`0 - ${selectedAssessment?.maxscore || 10}`} placeholderTextColor={C.muted} value={bulkScore} onChangeText={setBulkScore} autoFocus />
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}><Text style={s.modalBtnText}>{t('common.apply')}</Text></TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
-      <Modal visible={predictVisible} transparent animationType="fade">
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>{t('teacher.predictMarks')}</Text>
-            <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('teacher.predictDesc', { count: predictDetails.count, subject: predictDetails.subject })}</Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={() => setPredictVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
-              <TouchableOpacity onPress={applyPrediction} style={[s.modalBtn, { backgroundColor: C.accent }]}><Text style={[s.modalBtnText, { color: '#fff' }]}>{t('teacher.predict')}</Text></TouchableOpacity>
-            </View>
+      <Modal visible={predictVisible} transparent animationType="fade" onRequestClose={() => setPredictVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setPredictVisible(false)}>
+          <View style={s.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={s.modalCard}>
+                <Text style={s.modalTitle}>{t('teacher.predictMarks')}</Text>
+                <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('teacher.predictDesc', { count: predictDetails.count, subject: predictDetails.subject })}</Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={() => setPredictVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={applyPrediction} style={[s.modalBtn, { backgroundColor: C.accent }]}><Text style={[s.modalBtnText, { color: '#fff' }]}>{t('teacher.predict')}</Text></TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
-      <Modal visible={clearAllVisible} transparent animationType="fade">
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>{t('teacher.clearAllMarks')}</Text>
-            <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('teacher.confirmClearAll')}</Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={() => setClearAllVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
-              <TouchableOpacity onPress={applyClearAllMarks} style={[s.modalBtn, { backgroundColor: C.red + '33', borderColor: C.red + '66', borderWidth: 1 }]}><Text style={[s.modalBtnText, { color: C.red, fontWeight: '800' }]}>{t('common.yes')}</Text></TouchableOpacity>
-            </View>
+      <Modal visible={clearAllVisible} transparent animationType="fade" onRequestClose={() => setClearAllVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setClearAllVisible(false)}>
+          <View style={s.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={s.modalCard}>
+                <Text style={s.modalTitle}>{t('teacher.clearAllMarks')}</Text>
+                <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('teacher.confirmClearAll')}</Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={() => setClearAllVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={applyClearAllMarks} style={[s.modalBtn, { backgroundColor: C.red + '33', borderColor: C.red + '66', borderWidth: 1 }]}><Text style={[s.modalBtnText, { color: C.red, fontWeight: '800' }]}>{t('common.yes')}</Text></TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {selectedAssessment && (
@@ -2281,93 +2293,101 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
       </ScrollView>
 
       {/* CREATE / EDIT MODAL */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={s.modalOverlay}>
-          <BlurView intensity={20} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center' }}>
-            <View style={[s.modalCard, { padding: 24 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <Text style={[s.modalTitle, { marginBottom: 0 }]}>
-                  {editingId ? t('assessment.editTitle', 'Edit Assessment') : t('assessment.newTitle', 'New Assessment')}
-                </Text>
-                <TouchableOpacity onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
-                  <Text style={{ color: C.muted, fontSize: 24 }}>×</Text>
-                </TouchableOpacity>
-              </View>
+      <Modal visible={modalVisible} animationType="fade" transparent onRequestClose={() => setModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+          <View style={s.modalOverlay}>
+            <BlurView intensity={20} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center' }}>
+              <TouchableWithoutFeedback>
+                <View style={[s.modalCard, { padding: 24 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                    <Text style={[s.modalTitle, { marginBottom: 0 }]}>
+                      {editingId ? t('assessment.editTitle', 'Edit Assessment') : t('assessment.newTitle', 'New Assessment')}
+                    </Text>
+                    <TouchableOpacity onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
+                      <Text style={{ color: C.muted, fontSize: 24 }}>×</Text>
+                    </TouchableOpacity>
+                  </View>
 
-              <PremiumDropdown 
-                label={t('profile.grade')} 
-                placeholder={t('common.selectGrade')} 
-                items={myGrades.map((g: string) => ({ key: g, label: fmtGrade(g) }))} 
-                selectedKey={selectedGrade} 
-                onSelect={setSelectedGrade} 
-                C={C} s={s} 
-              />
+                  <PremiumDropdown 
+                    label={t('profile.grade')} 
+                    placeholder={t('common.selectGrade')} 
+                    items={myGrades.map((g: string) => ({ key: g, label: fmtGrade(g) }))} 
+                    selectedKey={selectedGrade} 
+                    onSelect={setSelectedGrade} 
+                    C={C} s={s} 
+                  />
 
-              <PremiumDropdown 
-                label={t('assessment.subject')} 
-                placeholder={t('common.selectSubject')} 
-                items={mySubjects.map((sub: string) => ({ key: sub, label: sub }))} 
-                selectedKey={selectedSubject} 
-                onSelect={setSelectedSubject} 
-                C={C} s={s} 
-                disabled={!selectedGrade}
-              />
+                  <PremiumDropdown 
+                    label={t('assessment.subject')} 
+                    placeholder={t('common.selectSubject')} 
+                    items={mySubjects.map((sub: string) => ({ key: sub, label: sub }))} 
+                    selectedKey={selectedSubject} 
+                    onSelect={setSelectedSubject} 
+                    C={C} s={s} 
+                    disabled={!selectedGrade}
+                  />
 
-              <Text style={s.inputLabel}>{t('assessment.assessmentName')}</Text>
-              <TextInput
-                style={[s.loginInput, { marginBottom: 16 }]}
-                placeholder={t('assessment.nameExample')}
-                placeholderTextColor={C.muted}
-                value={name}
-                onChangeText={setName}
-              />
+                  <Text style={s.inputLabel}>{t('assessment.assessmentName')}</Text>
+                  <TextInput
+                    style={[s.loginInput, { marginBottom: 16 }]}
+                    placeholder={t('assessment.nameExample')}
+                    placeholderTextColor={C.muted}
+                    value={name}
+                    onChangeText={setName}
+                  />
 
-              <Text style={s.inputLabel}>{t('assessment.maxScore')}</Text>
-              <TextInput
-                style={[s.loginInput, { marginBottom: 24 }]}
-                placeholder={t('assessment.maxScoreExample')}
-                placeholderTextColor={C.muted}
-                value={maxScore}
-                onChangeText={setMaxScore}
-                keyboardType="numeric"
-              />
+                  <Text style={s.inputLabel}>{t('assessment.maxScore')}</Text>
+                  <TextInput
+                    style={[s.loginInput, { marginBottom: 24 }]}
+                    placeholder={t('assessment.maxScoreExample')}
+                    placeholderTextColor={C.muted}
+                    value={maxScore}
+                    onChangeText={setMaxScore}
+                    keyboardType="numeric"
+                  />
 
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <TouchableOpacity
-                  onPress={() => setModalVisible(false)}
-                  style={[s.modalBtn, { backgroundColor: C.border }]}
-                >
-                  <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSave}
-                  disabled={saving}
-                  style={[s.modalBtn, { backgroundColor: C.accent, opacity: saving ? 0.6 : 1 }]}
-                >
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.modalBtnText}>{editingId ? t('common.save') : t('common.create')}</Text>}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity
+                      onPress={() => setModalVisible(false)}
+                      style={[s.modalBtn, { backgroundColor: C.border }]}
+                    >
+                      <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleSave}
+                      disabled={saving}
+                      style={[s.modalBtn, { backgroundColor: C.accent, opacity: saving ? 0.6 : 1 }]}
+                    >
+                      {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.modalBtnText}>{editingId ? t('common.save') : t('common.create')}</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
-      <Modal visible={!!deleteConfirmId} transparent animationType="fade">
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>{t('assessment.confirmDelete')}</Text>
-            <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('assessment.deleteWarning')}</Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={() => setDeleteConfirmId(null)} style={[s.modalBtn, { backgroundColor: C.border }]}>
-                <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => deleteConfirmId && handleDelete(deleteConfirmId)} style={[s.modalBtn, { backgroundColor: C.red }]}>
-                <Text style={[s.modalBtnText, { color: '#fff' }]}>{t('common.delete')}</Text>
-              </TouchableOpacity>
-            </View>
+      <Modal visible={!!deleteConfirmId} transparent animationType="fade" onRequestClose={() => setDeleteConfirmId(null)}>
+        <TouchableWithoutFeedback onPress={() => setDeleteConfirmId(null)}>
+          <View style={s.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={s.modalCard}>
+                <Text style={s.modalTitle}>{t('assessment.confirmDelete')}</Text>
+                <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('assessment.deleteWarning')}</Text>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={() => setDeleteConfirmId(null)} style={[s.modalBtn, { backgroundColor: C.border }]}>
+                    <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => deleteConfirmId && handleDelete(deleteConfirmId)} style={[s.modalBtn, { backgroundColor: C.red }]}>
+                    <Text style={[s.modalBtnText, { color: '#fff' }]}>{t('common.delete')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   );
@@ -2521,87 +2541,91 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
   ];
 
   return (
-    <Modal visible={!!student} animationType="slide" transparent>
-      <View style={s.modalOverlay}>
-        <BlurView intensity={20} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
-        <View style={[s.modalCard, { height: '85%', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 0, overflow: 'hidden' }]}>
-          <View style={{ padding: 24, paddingBottom: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <View><Text style={[s.modalTitle, { fontSize: 24, fontWeight: '900', color: C.text }]}>{student.name}</Text></View>
-              <TouchableOpacity onPress={onClose} style={[s.themeBtn, { width: 40, height: 40, borderRadius: 20 }]}><Text style={{ color: C.text, fontSize: 24, lineHeight: 28 }}>×</Text></TouchableOpacity>
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-            {sections.map(sec => (
-              <TouchableOpacity key={sec.key} onPress={() => setSubTab(sec.key as any)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: subTab === sec.key ? 2 : 0, borderBottomColor: C.accent }}>
-                {sec.icon}<Text style={{ color: subTab === sec.key ? C.accent : C.muted, fontSize: 11, fontWeight: subTab === sec.key ? '800' : '600', marginTop: 4 }}>{sec.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-            {subTab === 'overview' && (
-              <View>
-                <View style={[s.dashboardCard, { flexDirection: 'row', padding: 20, marginBottom: 20, borderRadius: 24 }]}>
-                  <View style={{ flex: 1, alignItems: 'center', borderRightWidth: 1, borderRightColor: C.border }}><Text style={{ color: C.green, fontSize: 28, fontWeight: '900' }}>{avg}%</Text><Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.average').toUpperCase()}</Text></View>
-                  <View style={{ flex: 1, alignItems: 'center' }}><Text style={{ color: C.accent, fontSize: 28, fontWeight: '900' }}>{student.grade}</Text><Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.grade').toUpperCase()}</Text></View>
-                </View>
-                <View style={{ gap: 16 }}>
-                   <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.baptismalName').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.baptismalname || t('profile.notProvided')}</Text></View>
-                   <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.contact').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.parentcontact || t('profile.notProvided')}</Text></View>
+    <Modal visible={!!student} animationType="fade" transparent onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
+          <TouchableWithoutFeedback>
+            <View style={[s.modalCard, { maxHeight: '90%', padding: 0, overflow: 'hidden' }]}>
+              <View style={{ padding: 24, paddingBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <View><Text style={[s.modalTitle, { fontSize: 24, fontWeight: '900', color: C.text }]}>{student.name}</Text></View>
+                  <TouchableOpacity onPress={onClose} style={[s.themeBtn, { width: 40, height: 40, borderRadius: 20 }]}><Text style={{ color: C.text, fontSize: 24, lineHeight: 28 }}>×</Text></TouchableOpacity>
                 </View>
               </View>
-            )}
-            {subTab === 'marks' && (
-              <View style={{ gap: 12 }}>
-                {assessments.filter(a => normG(a.grade) === normG(student.grade) && !isConduct(a)).map((ass, idx) => {
-                  const mark = studentMarks.find(m => m.assessmentid === ass.id);
-                  const perc = mark ? (Number(mark.score) / ass.maxscore) * 100 : 0;
-                  return (
-                    <View key={idx} style={[s.dashboardCard, { borderRadius: 16, padding: 16, borderStyle: mark ? 'solid' : 'dashed', borderColor: mark ? C.border : C.amber + '44' }]}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <View style={{ flex: 1 }}><Text style={{ color: C.text, fontWeight: '800', fontSize: 15 }}>{ass.name}</Text><Text style={{ color: C.muted, fontSize: 12 }}>{ass.subjectname}</Text></View>
-                        <View style={{ alignItems: 'flex-end' }}>{mark ? (<><Text style={{ color: C.accent, fontWeight: '900', fontSize: 18 }}>{mark.score}</Text><Text style={{ color: C.muted, fontSize: 11 }}>/ {ass.maxscore}</Text></>) : (<View style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}><Text style={{ color: C.amber, fontWeight: '900', fontSize: 12 }}>{t('profile.missing').toUpperCase()}</Text></View>)}</View>
-                      </View>
-                      {mark ? (<View style={{ height: 4, backgroundColor: C.border, borderRadius: 2 }}><View style={{ height: 4, backgroundColor: perc > 50 ? C.green : C.amber, borderRadius: 2, width: `${perc}%` }} /></View>) : null}
+              <View style={{ flexDirection: 'row', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                {sections.map(sec => (
+                  <TouchableOpacity key={sec.key} onPress={() => setSubTab(sec.key as any)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: subTab === sec.key ? 2 : 0, borderBottomColor: C.accent }}>
+                    {sec.icon}<Text style={{ color: subTab === sec.key ? C.accent : C.muted, fontSize: 11, fontWeight: subTab === sec.key ? '800' : '600', marginTop: 4 }}>{sec.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+                {subTab === 'overview' && (
+                  <View>
+                    <View style={[s.dashboardCard, { flexDirection: 'row', padding: 20, marginBottom: 20, borderRadius: 24 }]}>
+                      <View style={{ flex: 1, alignItems: 'center', borderRightWidth: 1, borderRightColor: C.border }}><Text style={{ color: C.green, fontSize: 28, fontWeight: '900' }}>{avg}%</Text><Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.average').toUpperCase()}</Text></View>
+                      <View style={{ flex: 1, alignItems: 'center' }}><Text style={{ color: C.accent, fontSize: 28, fontWeight: '900' }}>{student.grade}</Text><Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.grade').toUpperCase()}</Text></View>
                     </View>
-                  );
-                })}
-              </View>
-            )}
-            {subTab === 'cert' && (
-              <View style={{ alignItems: 'center' }}>
-                <View style={{ width: '100%', minHeight: 480, backgroundColor: '#fdfbf7', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: '#e8dfce' }}>
-                  <Text style={{ textAlign: 'center', color: '#2c1810', fontSize: 18, fontWeight: '900' }}>{t('cert.title', { lng: 'am' })}</Text>
-                  <Text style={{ textAlign: 'center', color: '#8b0000', fontSize: 14, fontWeight: '800', marginTop: 4 }}>{t('cert.title', { lng: 'en' })}</Text>
-                  <View style={{ marginTop: 24, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#e8dfce' }}>
-                     <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800' }}>NAME / ስም</Text>
-                     <Text style={{ fontSize: 20, color: '#2c1810', fontWeight: '700' }}>{student.name}</Text>
+                    <View style={{ gap: 16 }}>
+                       <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.baptismalName').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.baptismalname || t('profile.notProvided')}</Text></View>
+                       <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.contact').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.parentcontact || t('profile.notProvided')}</Text></View>
+                    </View>
                   </View>
-                  <View style={{ flex: 1, marginTop: 16 }}>
-                    {assessments.filter(a => String(a.grade) === String(student.grade) && !isConduct(a)).slice(0, 8).map((a, i) => {
-                      const m = marks.find(mark => mark.studentid === student.id && mark.assessmentid === a.id);
-                      const perc = m ? ((Number(m.score) / a.maxscore) * 100).toFixed(0) : null;
+                )}
+                {subTab === 'marks' && (
+                  <View style={{ gap: 12 }}>
+                    {assessments.filter(a => normG(a.grade) === normG(student.grade) && !isConduct(a)).map((ass, idx) => {
+                      const mark = studentMarks.find(m => m.assessmentid === ass.id);
+                      const perc = mark ? (Number(mark.score) / ass.maxscore) * 100 : 0;
                       return (
-                        <View key={i} style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e8dfce55' }}>
-                          <Text style={{ flex: 2, fontSize: 12, color: '#2c1810', fontWeight: '600' }}>{a.name}</Text>
-                          <Text style={{ flex: 1, fontSize: 12, color: '#5c4033', textAlign: 'center' }}>{m ? `${m.score}/${a.maxscore}` : '—'}</Text>
-                          <Text style={{ flex: 1, fontSize: 12, color: '#2c1810', textAlign: 'center', fontWeight: '800' }}>{perc ? `${perc}%` : '—'}</Text>
+                        <View key={idx} style={[s.dashboardCard, { borderRadius: 16, padding: 16, borderStyle: mark ? 'solid' : 'dashed', borderColor: mark ? C.border : C.amber + '44' }]}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <View style={{ flex: 1 }}><Text style={{ color: C.text, fontWeight: '800', fontSize: 15 }}>{ass.name}</Text><Text style={{ color: C.muted, fontSize: 12 }}>{ass.subjectname}</Text></View>
+                            <View style={{ alignItems: 'flex-end' }}>{mark ? (<><Text style={{ color: C.accent, fontWeight: '900', fontSize: 18 }}>{mark.score}</Text><Text style={{ color: C.muted, fontSize: 11 }}>/ {ass.maxscore}</Text></>) : (<View style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}><Text style={{ color: C.amber, fontWeight: '900', fontSize: 12 }}>{t('profile.missing').toUpperCase()}</Text></View>)}</View>
+                          </View>
+                          {mark ? (<View style={{ height: 4, backgroundColor: C.border, borderRadius: 2 }}><View style={{ height: 4, backgroundColor: perc > 50 ? C.green : C.amber, borderRadius: 2, width: `${perc}%` }} /></View>) : null}
                         </View>
                       );
                     })}
                   </View>
-                  <View style={{ marginTop: 24, paddingTop: 16, borderTopWidth: 2, borderTopColor: '#e8dfce', flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontWeight: '800' }}>AVG / አማካይ</Text><Text style={{ fontWeight: '900', color: '#8b0000' }}>{avg}%</Text>
+                )}
+                {subTab === 'cert' && (
+                  <View style={{ alignItems: 'center' }}>
+                    <View style={{ width: '100%', minHeight: 480, backgroundColor: '#fdfbf7', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: '#e8dfce' }}>
+                      <Text style={{ textAlign: 'center', color: '#2c1810', fontSize: 18, fontWeight: '900' }}>{t('cert.title', { lng: 'am' })}</Text>
+                      <Text style={{ textAlign: 'center', color: '#8b0000', fontSize: 14, fontWeight: '800', marginTop: 4 }}>{t('cert.title', { lng: 'en' })}</Text>
+                      <View style={{ marginTop: 24, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#e8dfce' }}>
+                         <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800' }}>NAME / ስም</Text>
+                         <Text style={{ fontSize: 20, color: '#2c1810', fontWeight: '700' }}>{student.name}</Text>
+                      </View>
+                      <View style={{ flex: 1, marginTop: 16 }}>
+                        {assessments.filter(a => String(a.grade) === String(student.grade) && !isConduct(a)).slice(0, 8).map((a, i) => {
+                          const m = marks.find(mark => mark.studentid === student.id && mark.assessmentid === a.id);
+                          const perc = m ? ((Number(m.score) / a.maxscore) * 100).toFixed(0) : null;
+                          return (
+                            <View key={i} style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e8dfce55' }}>
+                              <Text style={{ flex: 2, fontSize: 12, color: '#2c1810', fontWeight: '600' }}>{a.name}</Text>
+                              <Text style={{ flex: 1, fontSize: 12, color: '#5c4033', textAlign: 'center' }}>{m ? `${m.score}/${a.maxscore}` : '—'}</Text>
+                              <Text style={{ flex: 1, fontSize: 12, color: '#2c1810', textAlign: 'center', fontWeight: '800' }}>{perc ? `${perc}%` : '—'}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                      <View style={{ marginTop: 24, paddingTop: 16, borderTopWidth: 2, borderTopColor: '#e8dfce', flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontWeight: '800' }}>AVG / አማካይ</Text><Text style={{ fontWeight: '900', color: '#8b0000' }}>{avg}%</Text>
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </View>
-            )}
-            {subTab === 'attendance' && (
-              <View style={{ alignItems: 'center', marginTop: 40 }}><CalendarCheck size={48} color={C.accent + '44'} /><Text style={{ color: C.muted, textAlign: 'center', marginTop: 16, fontWeight: '600' }}>Coming Soon</Text></View>
-            )}
-          </ScrollView>
+                )}
+                {subTab === 'attendance' && (
+                  <View style={{ alignItems: 'center', marginTop: 40 }}><CalendarCheck size={48} color={C.accent + '44'} /><Text style={{ color: C.muted, textAlign: 'center', marginTop: 16, fontWeight: '600' }}>Coming Soon</Text></View>
+                )}
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
