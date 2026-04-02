@@ -18,7 +18,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import {
   Home, Users, CalendarCheck, BarChart3, AlertTriangle, Settings, LogOut, Moon, Sun, Languages, RefreshCw, TrendingUp, Info, BookOpen, Key, Phone,
-  Search, User, ArrowLeft, Eye, EyeOff, Trash2, FileText, Edit
+  Search, User, ArrowLeft, Eye, EyeOff, Trash2, FileText, Edit, ChevronDown, Check
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 
@@ -286,68 +286,60 @@ export default function App() {
         }
       }
 
+      // Parallelize Independent Queries
+      const [sRes, aRes, attRes, subRes, setRes] = await Promise.allSettled([
+        supabase.from('students').select('*').order('name'),
+        supabase.from('assessments').select('*').order('name'),
+        supabase.from('attendance').select('*').eq('date', dayjs().format('YYYY-MM-DD')),
+        supabase.from('subjects').select('*'),
+        supabase.from('settings').select('*')
+      ]);
+
       // 1. Students
-      try {
-        const { data: sRes, error: sErr } = await supabase.from('students').select('*').order('name');
-        if (sErr) throw sErr;
-        if (sRes) {
-          setStudents(sRes);
-          await AsyncStorage.setItem('cached_students', JSON.stringify(sRes));
-        }
-      } catch (e) { console.error('Sync students error', e); }
+      if (sRes.status === 'fulfilled' && sRes.value.data && !sRes.value.error) {
+        setStudents(sRes.value.data);
+        AsyncStorage.setItem('cached_students', JSON.stringify(sRes.value.data)).catch(console.error);
+      }
 
-      // 2. Assessments
+      // 2. Assessments & Marks
       let aIds: string[] = [];
-      try {
-        const { data: aRes, error: aErr } = await supabase.from('assessments').select('*').order('name');
-        if (aErr) throw aErr;
-        if (aRes) {
-          setAssessments(aRes);
-          await AsyncStorage.setItem('cached_assessments', JSON.stringify(aRes));
-          aIds = aRes.map(a => a.id);
-        }
-      } catch (e) { console.error('Sync assessments error', e); }
-
-      // 3. Marks
-      try {
+      if (aRes.status === 'fulfilled' && aRes.value.data && !aRes.value.error) {
+        setAssessments(aRes.value.data);
+        AsyncStorage.setItem('cached_assessments', JSON.stringify(aRes.value.data)).catch(console.error);
+        aIds = aRes.value.data.map(a => a.id);
+        
+        // Fetch marks now that we have assessment IDs
         if (aIds.length > 0) {
-          const { data: mRes, error: mErr } = await supabase.from('marks').select('*').in('assessmentid', aIds);
-          if (mErr) throw mErr;
-          if (mRes) {
-            setMarks(mRes);
-            await AsyncStorage.setItem('cached_marks', JSON.stringify(mRes));
+          try {
+            const { data: mData, error: mErr } = await supabase.from('marks').select('*').in('assessmentid', aIds);
+            if (!mErr && mData) {
+              setMarks(mData);
+              AsyncStorage.setItem('cached_marks', JSON.stringify(mData)).catch(console.error);
+            }
+          } catch (e) {
+            console.error('Sync marks error', e);
           }
         }
-      } catch (e) { console.error('Sync marks error', e); }
+      }
 
-      // 4. Attendance
-      try {
-        const { data: attRes, error: attErr } = await supabase
-          .from('attendance')
-          .select('*')
-          .eq('date', dayjs().format('YYYY-MM-DD'));
-        if (attErr) throw attErr;
-        if (attRes) {
-          setAttendance(attRes);
-          await AsyncStorage.setItem('cached_attendance', JSON.stringify(attRes));
-        }
-      } catch (e) { console.error('Sync attendance error', e); }
+      // 3. Attendance
+      if (attRes.status === 'fulfilled' && attRes.value.data && !attRes.value.error) {
+        setAttendance(attRes.value.data);
+        AsyncStorage.setItem('cached_attendance', JSON.stringify(attRes.value.data)).catch(console.error);
+      }
 
-      // 5. Subjects & Settings
-      try {
-        const { data: subRes } = await supabase.from('subjects').select('*');
-        const { data: setRes } = await supabase.from('settings').select('*');
-        if (subRes) {
-          setSubjects(subRes);
-          await AsyncStorage.setItem('cached_subjects', JSON.stringify(subRes));
-        }
-        if (setRes) {
-          const sMap: Record<string, string> = {};
-          setRes.forEach((r: any) => { sMap[r.key] = r.value; });
-          setSettings(sMap);
-          await AsyncStorage.setItem('cached_settings', JSON.stringify(sMap));
-        }
-      } catch (e) { console.error('Sync metadata error', e); }
+      // 4. Subjects & Settings
+      if (subRes.status === 'fulfilled' && subRes.value.data && !subRes.value.error) {
+        setSubjects(subRes.value.data);
+        AsyncStorage.setItem('cached_subjects', JSON.stringify(subRes.value.data)).catch(console.error);
+      }
+      
+      if (setRes.status === 'fulfilled' && setRes.value.data && !setRes.value.error) {
+        const sMap: Record<string, string> = {};
+        setRes.value.data.forEach((r: any) => { sMap[r.key] = r.value; });
+        setSettings(sMap);
+        AsyncStorage.setItem('cached_settings', JSON.stringify(sMap)).catch(console.error);
+      }
       
       // 6. Pull Remote Deletions
       try {
@@ -488,7 +480,19 @@ export default function App() {
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
       <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
         <Drawer.Navigator
-        drawerContent={(props) => (
+        drawerContent={(props) => {
+          const activeRoute = props.state.routes[props.state.index];
+          const activeName = activeRoute.name;
+          const nestedScreen = (activeRoute.params as any)?.screen;
+
+          const isDashboard = activeName === 'Main' && (nestedScreen === 'Dashboard' || !nestedScreen);
+          const isStudents = activeName === 'Main' && nestedScreen === 'Students';
+          const isMarks = activeName === 'Main' && nestedScreen === 'Marks';
+          const isAnalytics = activeName === 'Analytics';
+          const isUrgent = activeName === 'Urgent';
+          const isAssessments = activeName === 'AssessmentsMgmt';
+
+          return (
           <DrawerContentScrollView {...props} style={{ backgroundColor: C.bg }}>
             <View style={{ padding: 24, paddingBottom: 32, alignItems: 'center' }}>
               <View style={{ width: 100, height: 100, borderRadius: 24, padding: 4, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginBottom: 20 }}>
@@ -509,35 +513,53 @@ export default function App() {
             <View style={{ padding: 16, paddingBottom: 0 }}>
               <TouchableOpacity 
                 onPress={() => props.navigation.navigate('Main', { screen: 'Dashboard' })} 
-                style={[s.sidebarItem, props.state.index === 0 && props.state.routes[props.state.index].name === 'Main' && !props.state.routes[props.state.index].params?.screen && { backgroundColor: C.accent + '15' }]}
+                style={[s.sidebarItem, isDashboard && { backgroundColor: C.accent + '15' }]}
               >
-                <View style={[s.sidebarIcon, { backgroundColor: C.accent + '10' }]}><Home size={18} color={C.accent} /></View>
-                <Text style={[s.sidebarText, { color: C.accent, fontWeight: '700' }]}>{t('dashboard.title')}</Text>
+                <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isDashboard ? '20' : '10') }]}><Home size={18} color={isDashboard ? C.accent : C.slate} /></View>
+                <Text style={[s.sidebarText, isDashboard && { color: C.accent, fontWeight: '700' }]}>{t('dashboard.title')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 onPress={() => props.navigation.navigate('Main', { screen: 'Students' })} 
-                style={s.sidebarItem}
+                style={[s.sidebarItem, isStudents && { backgroundColor: C.accent + '15' }]}
               >
-                <View style={[s.sidebarIcon, { backgroundColor: C.accent + '10' }]}><Users size={18} color={C.accent} /></View>
-                <Text style={s.sidebarText}>{t('teacher.students')}</Text>
+                <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isStudents ? '20' : '10') }]}><Users size={18} color={isStudents ? C.accent : C.slate} /></View>
+                <Text style={[s.sidebarText, isStudents && { color: C.accent, fontWeight: '700' }]}>{t('teacher.students')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
-                onPress={() => props.navigation.navigate('Main', { screen: 'Urgent' })} 
-                style={s.sidebarItem}
+                onPress={() => props.navigation.navigate('Analytics')} 
+                style={[s.sidebarItem, isAnalytics && { backgroundColor: C.accent + '15' }]}
               >
-                <View style={[s.sidebarIcon, { backgroundColor: C.amber + '10' }]}><AlertTriangle size={18} color={C.amber} /></View>
-                <Text style={s.sidebarText}>{t('teacher.urgent')}</Text>
+                <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isAnalytics ? '20' : '10') }]}><TrendingUp size={18} color={isAnalytics ? C.accent : C.slate} /></View>
+                <Text style={[s.sidebarText, isAnalytics && { color: C.accent, fontWeight: '700' }]}>{t('teacher.analytics')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => props.navigation.navigate('Urgent')} 
+                style={[s.sidebarItem, isUrgent && { backgroundColor: C.amber + '15' }]}
+              >
+                <View style={[s.sidebarIcon, { backgroundColor: C.amber + (isUrgent ? '20' : '10') }]}><AlertTriangle size={18} color={isUrgent ? C.amber : C.slate} /></View>
+                <Text style={[s.sidebarText, isUrgent && { color: C.amber, fontWeight: '700' }]}>{t('teacher.urgent')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 onPress={() => props.navigation.navigate('Main', { screen: 'Marks' })} 
-                style={s.sidebarItem}
+                style={[s.sidebarItem, isMarks && { backgroundColor: C.green + '15' }]}
               >
-                <View style={[s.sidebarIcon, { backgroundColor: C.green + '10' }]}><BarChart3 size={18} color={C.green} /></View>
-                <Text style={s.sidebarText}>{t('teacher.marks')}</Text>
+                <View style={[s.sidebarIcon, { backgroundColor: C.green + (isMarks ? '20' : '10') }]}><BarChart3 size={18} color={isMarks ? C.green : C.slate} /></View>
+                <Text style={[s.sidebarText, isMarks && { color: C.green, fontWeight: '700' }]}>{t('teacher.marks')}</Text>
               </TouchableOpacity>
+
+              {!!(teacher?.cancreateassessments || teacher?.canCreateAssessments) && (
+                <TouchableOpacity 
+                  onPress={() => props.navigation.navigate('AssessmentsMgmt')} 
+                  style={[s.sidebarItem, isAssessments && { backgroundColor: C.accent + '15' }]}
+                >
+                  <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isAssessments ? '20' : '10') }]}><FileText size={18} color={isAssessments ? C.accent : C.slate} /></View>
+                  <Text style={[s.sidebarText, isAssessments && { color: C.accent, fontWeight: '700' }]}>Assessments</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={{ padding: 24, marginTop: 'auto', borderTopWidth: 1, borderTopColor: C.border }}>
@@ -560,7 +582,7 @@ export default function App() {
               </TouchableOpacity>
             </View>
           </DrawerContentScrollView>
-        )}
+        )}}
         screenOptions={{
           headerStyle: { 
             backgroundColor: C.bg, 
@@ -616,9 +638,6 @@ export default function App() {
                   if (route.name === 'Students') return <Users size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
                   if (route.name === 'Attendance') return <CalendarCheck size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
                   if (route.name === 'Marks') return <BarChart3 size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                  if (route.name === 'Analytics') return <TrendingUp size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                  if (route.name === 'Urgent') return <AlertTriangle size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                  if (route.name === 'AssessmentsMgmt') return <FileText size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
                   return null;
                 }
               })}
@@ -627,14 +646,20 @@ export default function App() {
               <Tab.Screen name="Students">{(props: any) => <StudentsTab {...props} teacher={teacher!} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
               <Tab.Screen name="Attendance">{(props: any) => <AttendanceTab {...props} teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={() => syncData()} C={C} s={s} showToast={showToast} settings={settings} />}</Tab.Screen>
               <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} showToast={showToast} settings={settings} subjects={subjects} />}</Tab.Screen>
-              <Tab.Screen name="Analytics">{(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} settings={settings} subjects={subjects} />}</Tab.Screen>
-              <Tab.Screen name="Urgent">{(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}</Tab.Screen>
-              {!!(teacher!.cancreateassessments || teacher!.canCreateAssessments) && (
-                <Tab.Screen name="AssessmentsMgmt" options={{ title: 'Assessments' }}>{(props: any) => <AssessmentManagementTab {...props} teacher={teacher!} assessments={assessments} subjects={subjects} settings={settings} C={C} s={s} showToast={showToast} onRefresh={() => syncData()} />}</Tab.Screen>
-              )}
             </Tab.Navigator>
           )}
         </Drawer.Screen>
+        <Drawer.Screen name="Analytics" options={{ title: t('dashboard.analytics'), drawerIcon: ({ color }) => <TrendingUp size={18} color={color} />, drawerLabel: t('dashboard.analytics') }}>
+          {(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} settings={settings} subjects={subjects} />}
+        </Drawer.Screen>
+        <Drawer.Screen name="Urgent" options={{ title: t('teacher.urgent'), drawerIcon: ({ color }) => <AlertTriangle size={18} color={color} />, drawerLabel: t('teacher.urgent') }}>
+          {(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}
+        </Drawer.Screen>
+        {!!(teacher!.cancreateassessments || teacher!.canCreateAssessments) && (
+          <Drawer.Screen name="AssessmentsMgmt" options={{ title: 'Assessments', drawerIcon: ({ color }) => <FileText size={18} color={color} />, drawerLabel: 'Assessments' }}>
+            {(props: any) => <AssessmentManagementTab {...props} teacher={teacher!} assessments={assessments} subjects={subjects} settings={settings} C={C} s={s} showToast={showToast} onRefresh={() => syncData()} />}
+          </Drawer.Screen>
+        )}
         </Drawer.Navigator>
       </NavigationContainer>
 
@@ -1614,6 +1639,69 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
 }
 
 // ═══════════════════════════════════════════════════════════════
+// PREMIUM DROPDOWN
+// ═══════════════════════════════════════════════════════════════
+function PremiumDropdown({ label, placeholder, items, selectedKey, onSelect, C, s }: {
+  label: string; placeholder: string; items: {key: string, label: string}[]; selectedKey: string | null; onSelect: (key: string) => void; C: any; s: any;
+}) {
+  const [modalVisible, setModalVisible] = useState(false);
+  const selectedItem = items.find(i => i.key === selectedKey);
+
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{label}</Text>
+      <TouchableOpacity 
+        onPress={() => setModalVisible(true)}
+        style={{
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          backgroundColor: C.card, borderWidth: 1, borderColor: selectedKey ? C.accent : C.border,
+          paddingHorizontal: 16, height: 50, borderRadius: 12
+        }}
+      >
+        <Text style={{ color: selectedItem ? C.text : C.muted, fontWeight: selectedItem ? '700' : '500', fontSize: 14 }} numberOfLines={1}>
+          {selectedItem ? selectedItem.label : placeholder}
+        </Text>
+        <ChevronDown size={18} color={selectedKey ? C.accent : C.muted} />
+      </TouchableOpacity>
+
+      <Modal visible={modalVisible} transparent={true} animationType="fade" onRequestClose={() => setModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+            <View style={{ flex: 1 }} />
+          </TouchableWithoutFeedback>
+          <View style={{ backgroundColor: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '60%' }}>
+            <View style={{ width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            <Text style={{ fontSize: 18, fontWeight: '800', color: C.text, marginBottom: 16 }}>{placeholder}</Text>
+            <FlatList
+              data={items}
+              keyExtractor={item => item.key}
+              renderItem={({ item }) => {
+                const isActive = item.key === selectedKey;
+                return (
+                  <TouchableOpacity
+                    onPress={() => { onSelect(item.key); setModalVisible(false); }}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                      paddingVertical: 14, paddingHorizontal: 16,
+                      backgroundColor: isActive ? C.accent + '15' : 'transparent',
+                      borderRadius: 12, marginBottom: 4
+                    }}
+                  >
+                    <Text style={{ color: isActive ? C.accent : C.text, fontWeight: isActive ? '700' : '500', fontSize: 15 }}>{item.label}</Text>
+                    {isActive && <Check size={18} color={C.accent} />}
+                  </TouchableOpacity>
+                );
+              }}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  MARKS TAB  (uses lowercase: studentid, assessmentid, etc.)
 // ═══════════════════════════════════════════════════════════════
 function MarksTab({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, showToast, settings, subjects }: {
@@ -1664,7 +1752,32 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const [predictDetails, setPredictDetails] = useState<{count: number, subject: string, students: any[]}>({ count: 0, subject: '', students: [] });
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [highlightEmptyData, setHighlightEmptyData] = useState(false);
+  const flatListRef = useRef<FlatList>(null); 
+  const lastRoutedAssessmentId = useRef<string | null>(null);
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
+
+  const gradeAssessments = myAssessments.filter((a) => normG(a.grade) === normG(selectedGrade));
+  // Subject chips come from the teacher-assigned subjects list (like desktop "Subjects:" block),
+  // without extra filtering (assessments list is filtered separately by grade/semester/subject).
+  const allowedSubjectKeyToLabel = new Map<string, string>();
+  (mySubjects || []).forEach((subj) => {
+    const key = normS(subj);
+    if (!key) return;
+    if (!allowedSubjectKeyToLabel.has(key)) allowedSubjectKeyToLabel.set(key, subj);
+  });
+
+  const gradeSubjects = [...allowedSubjectKeyToLabel.entries()]
+    .map(([key, label]) => ({ key, label }));
+
+  const selectedSubjectKey = normS(selectedSubject);
+  // If no subject is selected yet, show all assessments for the selected grade.
+  const filteredAssessments = selectedSubject
+    ? gradeAssessments.filter(a => normS(a.subjectname) === selectedSubjectKey)
+    : gradeAssessments;
+  
+  const gradeStudents = myStudents.filter((st) => normG(st.grade) === normG(selectedGrade));
+  const filteredStudents = gradeStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
 
   useEffect(() => {
     if (route.params?.assessmentId) {
@@ -1677,7 +1790,29 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     } else if (route.params?.grade) {
       setSelectedGrade(String(route.params.grade));
     }
-  }, [route.params, myAssessments]);
+    
+    if (route.params?.highlightEmpty && route.params?.assessmentId) {
+      if (lastRoutedAssessmentId.current === route.params.assessmentId) return;
+
+      setHighlightEmptyData(true);
+      // Disable pagination temporarily to show all students for scrolling
+      setPage(99); 
+      
+      setTimeout(() => {
+        // Scroll to first missing student
+        if (filteredStudents.length > 0) {
+          const firstMissingIndex = filteredStudents.findIndex(st => !marks[st.id] || marks[st.id] === '');
+          if (firstMissingIndex !== -1) {
+            flatListRef.current?.scrollToIndex({ index: firstMissingIndex, animated: true, viewPosition: 0 });
+            lastRoutedAssessmentId.current = route.params.assessmentId;
+          }
+        }
+      }, 800);
+
+      // Keep highlight for only 1.5 seconds to grab focus then clear
+      setTimeout(() => setHighlightEmptyData(false), 1500);
+    }
+  }, [route.params, myAssessments, marks, filteredStudents.length]); 
 
   useEffect(() => {
     const uniqueGrades = [...new Set(myStudents.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
@@ -1724,27 +1859,6 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     setMarkIds(idMap);
   }, [selectedAssessment, marksData]);
 
-  const gradeAssessments = myAssessments.filter((a) => normG(a.grade) === normG(selectedGrade));
-  // Subject chips come from the teacher-assigned subjects list (like desktop "Subjects:" block),
-  // without extra filtering (assessments list is filtered separately by grade/semester/subject).
-  const allowedSubjectKeyToLabel = new Map<string, string>();
-  (mySubjects || []).forEach((subj) => {
-    const key = normS(subj);
-    if (!key) return;
-    if (!allowedSubjectKeyToLabel.has(key)) allowedSubjectKeyToLabel.set(key, subj);
-  });
-
-  const gradeSubjects = [...allowedSubjectKeyToLabel.entries()]
-    .map(([key, label]) => ({ key, label }));
-
-  const selectedSubjectKey = normS(selectedSubject);
-  // If no subject is selected yet, show all assessments for the selected grade.
-  const filteredAssessments = selectedSubject
-    ? gradeAssessments.filter(a => normS(a.subjectname) === selectedSubjectKey)
-    : gradeAssessments;
-  
-  const gradeStudents = myStudents.filter((st) => normG(st.grade) === normG(selectedGrade));
-  const filteredStudents = gradeStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
 
   const saveMarksWithData = async (currentMarksData: Record<string, string>) => {
     if (!selectedAssessment) return;
@@ -1942,45 +2056,49 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       <View style={{ padding: 16, paddingBottom: 0 }}>
         <Text style={[s.sectionTitle, { marginBottom: 16 }]}>{t('teacher.marks')}</Text>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-          {grades.map((g) => (
-            <TouchableOpacity
-              key={g}
-              style={[s.gradeChip, selectedGrade === g && s.gradeChipActive]}
-              onPress={() => { setSelectedGrade(g); setSelectedSubject(''); setSelectedAssessment(null); }}
-            >
-              <Text style={[s.gradeChipText, selectedGrade === g && s.gradeChipTextActive]}>{fmtGrade(g)}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={{ marginBottom: 12 }}>
+          <PremiumDropdown 
+            label={t('profile.grade', 'Grade')} 
+            placeholder={t('common.selectGrade', 'Select Grade')}
+            items={grades.map(g => ({ key: g, label: fmtGrade(g) }))}
+            selectedKey={selectedGrade}
+            onSelect={(key) => { setSelectedGrade(key); setSelectedSubject(''); setSelectedAssessment(null); }}
+            C={C} s={s}
+          />
+        </View>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          {gradeSubjects.length > 0 && (
+            <View style={{ flex: 1 }}>
+              <PremiumDropdown 
+                label={t('assessment.subject', 'Subject')} 
+                placeholder={t('common.selectSubject', 'Select Subject')}
+                items={gradeSubjects}
+                selectedKey={selectedSubjectKey}
+                onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }}
+                C={C} s={s}
+              />
+            </View>
+          )}
 
-        {gradeSubjects.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-            {gradeSubjects.map((subj) => (
-              <TouchableOpacity
-                key={subj.key}
-                style={[s.gradeChip, selectedSubjectKey === subj.key && s.gradeChipActive]}
-                onPress={() => { setSelectedSubject(subj.key); setSelectedAssessment(null); }}
-              >
-                <Text style={[s.gradeChipText, selectedSubjectKey === subj.key && s.gradeChipTextActive]}>{subj.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        {filteredAssessments.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-            {filteredAssessments.map((a) => (
-              <TouchableOpacity
-                key={a.id}
-                style={[s.gradeChip, { borderRadius: 12, paddingHorizontal: 12 }, selectedAssessment?.id === a.id && s.gradeChipActive]}
-                onPress={() => { setSelectedAssessment(a); setSelectedSubject(normS(a.subjectname)); }}
-              >
-                <Text style={[s.gradeChipText, selectedAssessment?.id === a.id && s.gradeChipTextActive]}>{a.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
+          {filteredAssessments.length > 0 && (
+            <View style={{ flex: 1 }}>
+              <PremiumDropdown 
+                label={t('assessment.label', 'Assessment')} 
+                placeholder={t('common.selectAssessment', 'Select Assessment')}
+                items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))}
+                selectedKey={selectedAssessment?.id || null}
+                onSelect={(key) => {
+                  const a = filteredAssessments.find(ax => ax.id === key);
+                  if (a) {
+                    setSelectedAssessment(a);
+                    setSelectedSubject(normS(a.subjectname));
+                  }
+                }}
+                C={C} s={s}
+              />
+            </View>
+          )}
+        </View>
 
         <TextInput
           style={[s.searchInput, { margin: 0, marginBottom: 16 }]}
@@ -1992,9 +2110,16 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       </View>
 
       <FlatList
+        ref={flatListRef}
         data={paginate(filteredStudents, page)}
         keyExtractor={item => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
+        getItemLayout={(data, index) => (
+          { length: 80, offset: 80 * index, index }
+        )}
+        onScrollToIndexFailed={info => {
+          flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+        }}
         // Force refresh when selected assessment changes (header buttons) or marks map changes (row inputs).
         extraData={[selectedAssessment?.id, marks]}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
@@ -2021,8 +2146,11 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
             </View>
           </View>
         ) : null}
-        renderItem={({ item }) => (
-          <View style={[s.markRow, { padding: 12, borderRadius: 16 }]}>
+        renderItem={({ item }) => {
+          const isMissing = !marks[item.id] || marks[item.id] === '';
+          const shouldHighlight = highlightEmptyData && isMissing;
+          return (
+          <View style={[s.markRow, { padding: 12, borderRadius: 16 }, shouldHighlight ? { borderColor: C.accent, borderWidth: 2, backgroundColor: 'transparent' } : null]}>
             <View style={{ flex: 1 }}>
               <Text style={s.studentName}>{item.name}</Text>
               {item.baptismalname ? <Text style={s.studentSub}>{item.baptismalname}</Text> : null}
@@ -2044,7 +2172,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
               editable={!!selectedAssessment}
             />
           </View>
-        )}
+        )}}
         onEndReached={() => setPage(p => p + 1)}
         onEndReachedThreshold={0.5}
       />
@@ -2256,19 +2384,29 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
           {displayedAssessments.map(item => (
             <TouchableOpacity 
               key={item.assessment.id} 
-              style={[s.issueRow, { borderTopColor: C.border }]}
-              onPress={() => navigation.navigate('Marks', { assessmentId: item.assessment.id, grade: item.assessment.grade })}
+              style={[s.issueRow, { borderTopColor: C.border, flexDirection: 'column', alignItems: 'stretch' }]}
+              onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true } })}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={s.issueText}>{item.assessment.name}</Text>
-                <Text style={s.issueSub}>{item.assessment.subjectname} • {fmtGrade(item.assessment.grade)} • {t('urgent.missingCount', { count: item.count })}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.issueText}>{item.assessment.name}</Text>
+                  <Text style={s.issueSub}>{item.assessment.subjectname} • {fmtGrade(item.assessment.grade)} • {t('urgent.missingCount', { count: item.count })}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true } })}
+                  style={{ backgroundColor: C.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{t('urgent.fixNow')}</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Marks', { assessmentId: item.assessment.id, grade: item.assessment.grade })}
-                style={{ backgroundColor: C.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
-              >
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{t('urgent.fixNow')}</Text>
-              </TouchableOpacity>
+              {/* Show missing students */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                {item.students.map(st => (
+                  <View key={st.id} style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: C.amber + '30' }}>
+                    <Text style={{ fontSize: 11, color: C.amber, fontWeight: '700' }}>{st.name}</Text>
+                  </View>
+                ))}
+              </View>
             </TouchableOpacity>
           ))}
           {missingMarksByAssessment.length > PAGE_SIZE && (

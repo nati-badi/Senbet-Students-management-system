@@ -55,6 +55,9 @@ const resources = {
         "lightMode": "Light Mode",
         "darkMode": "Dark Mode",
         "proceed": "Proceed",
+        "selectGrade": "Select Grade",
+        "selectSubject": "Select Subject",
+        "selectAssessment": "Select Assessment",
       },
       "teacher": {
         "portalLogin": "Portal Login",
@@ -111,6 +114,7 @@ const resources = {
         "fixNow": "Fix Now",
       },
       "assessment": {
+        "label": "Assessment",
         "newTitle": "New Assessment",
         "subject": "Subject",
         "namePlaceholder": "Assessment name (e.g., Mid Term)",
@@ -218,6 +222,9 @@ const resources = {
         "lightMode": "ቀን (ብሩህ)",
         "darkMode": "ማታ (ጥቁር)",
         "proceed": "ቀጥል",
+        "selectGrade": "ክፍል ይምረጡ",
+        "selectSubject": "ትምህርት ይምረጡ",
+        "selectAssessment": "ምዘና ይምረጡ",
       },
       "teacher": {
         "portalLogin": "የመምህራን መግቢያ",
@@ -274,6 +281,7 @@ const resources = {
         "fixNow": "አሁን አስተካክል",
       },
       "assessment": {
+        "label": "ምዘና",
         "newTitle": "አዲስ ምዘና",
         "subject": "ትምህርት",
         "namePlaceholder": "የምዘናው ስም (ምሳሌ፡ አጋማሽ ፈተና)",

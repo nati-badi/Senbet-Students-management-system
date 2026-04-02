@@ -227,14 +227,14 @@ export default function TeacherUrgentMatters({ teacher }) {
                     className="rounded-2xl border-l-4 border-l-orange-500 shadow-sm"
                 >
                     <Paragraph type="secondary" className="mb-4">
-                        These assessments are missing marks for some students. Click "Fill Marks" to jump straight to that assessment.
+                        These assessments are missing marks for some students. Click "Fix Now" to jump straight to that assessment.
                     </Paragraph>
                     <List
                         dataSource={missingMarksByAssessment}
                         rowKey={item => item.assessment.id}
                         renderItem={({ assessment, count, students: ungradedStudents }) => (
                             <List.Item
-                                className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg"
+                                className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg items-start flex-col sm:flex-row sm:items-center"
                                 actions={[
                                     <Tooltip key="fill" title={`Jump to mark entry for ${assessment.name}`}>
                                         <Button
@@ -246,12 +246,13 @@ export default function TeacherUrgentMatters({ teacher }) {
                                                 navigate('/teacher/mark-entry', {
                                                     state: {
                                                         assessmentId: assessment.id,
-                                                        grade: assessment.grade
+                                                        grade: assessment.grade,
+                                                        highlightEmpty: true
                                                     }
                                                 });
                                             }}
                                         >
-                                            Fill Marks
+                                            Fix Now
                                         </Button>
                                     </Tooltip>
                                 ]}
@@ -261,26 +262,25 @@ export default function TeacherUrgentMatters({ teacher }) {
                                         <Avatar
                                             size={44}
                                             icon={<FormOutlined />}
-                                            style={avatarStyle('#fff7ed', '#c2410c', '#fdba74')}
+                                            style={avatarStyle('#fff7ed', '#c2410c', '#fed7aa')}
                                         />
                                     }
-                                    title={
-                                        <Space wrap>
-                                            <span className="font-bold">{assessment.name}</span>
-                                            <Tag color="blue">{assessment.subjectName}</Tag>
-                                            <Tag color="green">{formatGrade(assessment.grade)}</Tag>
-                                            <Tag color="gold">{currentSemester}</Tag>
-                                        </Space>
-                                    }
+                                    title={<span className="font-bold">{assessment.name}</span>}
                                     description={
-                                        <Text type="secondary">
-                                            <span className="font-semibold text-orange-500">{count} student{count !== 1 ? 's' : ''}</span> not yet graded
-                                            {ungradedStudents.length <= 3 && (
-                                                <span className="ml-2 text-slate-400">
-                                                    ({ungradedStudents.map(s => s.name).join(', ')})
-                                                </span>
-                                            )}
-                                        </Text>
+                                        <div className="flex flex-col gap-2 mt-1">
+                                            <div className="flex items-center gap-2">
+                                                <Tag color="orange">{assessment.subjectname}</Tag>
+                                                <Tag color="green">{formatGrade(assessment.grade)}</Tag>
+                                                <span className="text-orange-500 font-semibold">{count} students missing marks</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 mt-1">
+                                                {ungradedStudents.map(st => (
+                                                    <Tag key={st.id} bordered={false} className="bg-orange-100 text-orange-700 m-0 text-xs">
+                                                        {st.name}
+                                                    </Tag>
+                                                ))}
+                                            </div>
+                                        </div>
                                     }
                                 />
                             </List.Item>

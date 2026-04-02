@@ -197,6 +197,9 @@ export default function TeacherDashboard() {
 
     return (
         <div className="flex flex-col w-full gap-4 pt-4">
+            <div className="mb-2">
+                <EthiopicClockWidget />
+            </div>
             <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -302,7 +305,6 @@ export default function TeacherDashboard() {
                 </div>
 
                 <div className="flex-1 min-w-0 min-h-[600px] mt-4">
-                    <EthiopicClockWidget />
                     <Routes>
                         <Route path="/" element={<Navigate to="mark-entry" replace />} />
                         <Route path="/mark-entry" element={<SpeedEntryMarks teacher={activeTeacher} setProfileStudentId={setProfileStudentId} />} />
@@ -395,6 +397,8 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const [modifiedMarks, setModifiedMarks] = useState(new Set());
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const lastRoutedAssessmentId = useRef(null);
     const [modal, contextHolder] = Modal.useModal();
 
     // Keep sessionStorage in sync
@@ -505,6 +509,10 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const gradeOptions = hasTeacherAssignedGrades && allowedGrades.length > 0
         ? gradeOptionsUnrestricted.filter(o => allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(o.value)))
         : [];
+    const [highlightEmptyData, setHighlightEmptyData] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
     const studentsInGrade = teacherStudents
         .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
         .filter(s => {
@@ -523,6 +531,41 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 setSelectedGrade(String(ass.grade));
                 setSelectedSubject(normalizeSubject(ass.subjectName));
                 setSelectedAssessmentId(ass.id);
+            }
+            if (location.state?.highlightEmpty) {
+                if (lastRoutedAssessmentId.current === location.state.assessmentId) return;
+
+                setHighlightEmptyData(true);
+                
+                // Use a slightly longer timeout to ensure data and table are fully rendered
+                setTimeout(() => {
+                    // Find first missing student and scroll
+                    const firstMissingIndex = studentsInGrade.findIndex(s => !marks[s.id] || marks[s.id] === '');
+                    if (firstMissingIndex !== -1) {
+                        const targetPage = Math.floor(firstMissingIndex / pageSize) + 1;
+                        setCurrentPage(targetPage);
+                        const studentId = studentsInGrade[firstMissingIndex].id;
+                        setTimeout(() => {
+                            const el = document.getElementById(`row-${studentId}`);
+                            if (el) {
+                                const tableBody = el.closest('.ant-table-body');
+                                if (tableBody) {
+                                    const relativeTop = el.offsetTop;
+                                    tableBody.scrollTo({
+                                        top: relativeTop - 8, // Position at top with slight padding
+                                        behavior: 'smooth'
+                                    });
+                                } else {
+                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                                lastRoutedAssessmentId.current = location.state.assessmentId;
+                            }
+                        }, 1000);
+                    }
+                }, 800);
+
+                // Keep highlight for only 1.5 seconds to grab focus then clear
+                setTimeout(() => setHighlightEmptyData(false), 1500);
             }
         } else if (location.state?.grade) {
             setSelectedGrade(location.state.grade);
@@ -580,8 +623,6 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         }
         loadMarks();
     }, [selectedAssessmentId, syncKey]);
-
-    const [isSaving, setIsSaving] = useState(false);
 
     const handleMarkChange = (studentId, value) => {
         const score = parseFloat(value);
@@ -898,17 +939,24 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             key: 'score',
             align: 'right',
             width: 150,
-            render: (_, record) => (
+            render: (_, record) => {
+                const isMissing = marks[record.id] === undefined || marks[record.id] === null || marks[record.id] === '';
+                const shouldHighlight = highlightEmptyData && isMissing;
+                return (
                 <Input
                     type="number"
                     placeholder={selectedAssessment ? `0-${selectedAssessment.maxScore}` : ''}
-                    value={(marks[record.id] !== undefined && marks[record.id] !== null && marks[record.id] !== '') ? marks[record.id] : ''}
+                    value={!isMissing ? marks[record.id] : ''}
                     onChange={e => handleMarkChange(record.id, e.target.value)}
-                    style={{ textAlign: 'right' }}
+                    className={shouldHighlight ? 'pulse-focus' : ''}
+                    style={{ 
+                        textAlign: 'right',
+                        ...(shouldHighlight ? { border: '2px solid #3b82f6', backgroundColor: 'transparent' } : {})
+                    }}
                     max={selectedAssessment?.maxScore}
                     min={0}
                 />
-            )
+            )}
         },
         {
             title: t('common.actions'),
@@ -928,6 +976,17 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
     return (
         <div className="flex flex-col gap-6 w-full">
+            <style>{`
+                @keyframes pulse-border-blue {
+                    0% { border-color: #3b82f6; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+                    50% { border-color: #93c5fd; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
+                    100% { border-color: #3b82f6; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+                }
+                .pulse-focus {
+                    animation: pulse-border-blue 0.8s infinite;
+                    z-index: 10;
+                }
+            `}</style>
             <div>
                 <Title level={2}>{t('teacher.speedEntryMarks')}</Title>
                 <Text type="secondary">{t('teacher.enterMarksInfo')}</Text>
@@ -1098,8 +1157,16 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         columns={columns}
                         dataSource={studentsInGrade}
                         rowKey="id"
+                        onRow={(record) => ({
+                            id: `row-${record.id}`
+                        })}
                         pagination={{
-                            pageSize: 10,
+                            current: currentPage,
+                            pageSize: pageSize,
+                            onChange: (p, ps) => {
+                                setCurrentPage(p);
+                                setPageSize(ps);
+                            },
                             showSizeChanger: true,
                             pageSizeOptions: ['10', '20', '50', '100'],
                             showQuickJumper: true,
