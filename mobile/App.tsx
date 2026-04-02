@@ -15,10 +15,10 @@ import './i18n';
 // Premium Navigation
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
+import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem, DrawerToggleButton } from '@react-navigation/drawer';
 import {
   Home, Users, CalendarCheck, BarChart3, AlertTriangle, Settings, LogOut, Moon, Sun, Languages, RefreshCw, TrendingUp, Info, BookOpen, Key, Phone,
-  Search, User, ArrowLeft, Eye, EyeOff, Trash2, FileText, Edit, ChevronDown, Check, ChevronRight
+  Search, User, ArrowLeft, Eye, EyeOff, Trash2, FileText, Edit, ChevronDown, Check, ChevronRight, Plus
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 
@@ -443,8 +443,6 @@ export default function App() {
           const nestedScreen = (activeRoute.params as any)?.screen;
 
           const isDashboard = activeName === 'Main' && (nestedScreen === 'Dashboard' || !nestedScreen);
-          const isStudents = activeName === 'Main' && nestedScreen === 'Students';
-          const isMarks = activeName === 'Main' && nestedScreen === 'Marks';
           const isAnalytics = activeName === 'Analytics';
           const isUrgent = activeName === 'Urgent';
           const isAssessments = activeName === 'AssessmentsMgmt';
@@ -477,14 +475,6 @@ export default function App() {
               </TouchableOpacity>
 
               <TouchableOpacity 
-                onPress={() => props.navigation.navigate('Main', { screen: 'Students' })} 
-                style={[s.sidebarItem, isStudents && { backgroundColor: C.accent + '15' }]}
-              >
-                <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isStudents ? '20' : '10') }]}><Users size={18} color={isStudents ? C.accent : C.slate} /></View>
-                <Text style={[s.sidebarText, isStudents && { color: C.accent, fontWeight: '700' }]}>{t('teacher.students')}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
                 onPress={() => props.navigation.navigate('Analytics')} 
                 style={[s.sidebarItem, isAnalytics && { backgroundColor: C.accent + '15' }]}
               >
@@ -500,21 +490,13 @@ export default function App() {
                 <Text style={[s.sidebarText, isUrgent && { color: C.amber, fontWeight: '700' }]}>{t('teacher.urgent')}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                onPress={() => props.navigation.navigate('Main', { screen: 'Marks' })} 
-                style={[s.sidebarItem, isMarks && { backgroundColor: C.green + '15' }]}
-              >
-                <View style={[s.sidebarIcon, { backgroundColor: C.green + (isMarks ? '20' : '10') }]}><BarChart3 size={18} color={isMarks ? C.green : C.slate} /></View>
-                <Text style={[s.sidebarText, isMarks && { color: C.green, fontWeight: '700' }]}>{t('teacher.marks')}</Text>
-              </TouchableOpacity>
-
               {!!(teacher?.cancreateassessments || teacher?.canCreateAssessments) && (
                 <TouchableOpacity 
                   onPress={() => props.navigation.navigate('AssessmentsMgmt')} 
                   style={[s.sidebarItem, isAssessments && { backgroundColor: C.accent + '15' }]}
                 >
                   <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isAssessments ? '20' : '10') }]}><FileText size={18} color={isAssessments ? C.accent : C.slate} /></View>
-                  <Text style={[s.sidebarText, isAssessments && { color: C.accent, fontWeight: '700' }]}>Assessments</Text>
+                  <Text style={[s.sidebarText, isAssessments && { color: C.accent, fontWeight: '700' }]}>{t('teacher.assessments')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -522,7 +504,7 @@ export default function App() {
             <View style={{ padding: 24, marginTop: 'auto', borderTopWidth: 1, borderTopColor: C.border }}>
               <TouchableOpacity onPress={toggleLanguage} style={s.sidebarItem}>
                 <View style={[s.sidebarIcon, { backgroundColor: C.accent + '10' }]}><Languages size={18} color={C.accent} /></View>
-                <Text style={s.sidebarText}>{i18n.language === 'en' ? 'Amharic (አማርኛ)' : 'English'}</Text>
+                <Text style={s.sidebarText}>{i18n.language === 'en' ? 'አማርኛ (Amharic)' : 'እንግሊዝኛ (English)'}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleTheme} style={s.sidebarItem}>
                 <View style={[s.sidebarIcon, { backgroundColor: C.amber + '10' }]}>{isDark ? <Sun size={18} color={C.amber} /> : <Moon size={18} color={C.slate} />}</View>
@@ -540,7 +522,20 @@ export default function App() {
             </View>
           </DrawerContentScrollView>
         )}}
-        screenOptions={{
+        screenOptions={({ navigation, route }) => ({
+          headerLeft: () => {
+            if (route.name !== 'Main') {
+              return (
+                <TouchableOpacity 
+                   onPress={() => navigation.navigate('Main')} 
+                   style={{ marginLeft: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}
+                >
+                  <ArrowLeft size={20} color={C.accent} strokeWidth={3} />
+                </TouchableOpacity>
+              );
+            }
+            return <DrawerToggleButton tintColor={C.accent} />;
+          },
           headerStyle: { 
             backgroundColor: C.bg, 
             elevation: 0, 
@@ -562,7 +557,7 @@ export default function App() {
           drawerInactiveTintColor: C.muted,
           drawerLabelStyle: { fontWeight: '700', fontSize: 14 },
           drawerStyle: { width: 280, borderRightWidth: 0 },
-        }}
+        })}
       >
         <Drawer.Screen
           name="Main"
@@ -606,7 +601,7 @@ export default function App() {
             </Tab.Navigator>
           )}
         </Drawer.Screen>
-        <Drawer.Screen name="Analytics" options={{ title: t('dashboard.analytics'), drawerIcon: ({ color }) => <TrendingUp size={18} color={color} />, drawerLabel: t('dashboard.analytics') }}>
+        <Drawer.Screen name="Analytics" options={{ title: t('teacher.analytics'), drawerIcon: ({ color }) => <TrendingUp size={18} color={color} />, drawerLabel: t('teacher.analytics') }}>
           {(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} settings={settings} subjects={subjects} />}
         </Drawer.Screen>
         <Drawer.Screen name="Urgent" options={{ title: t('teacher.urgent'), drawerIcon: ({ color }) => <AlertTriangle size={18} color={color} />, drawerLabel: t('teacher.urgent') }}>
@@ -693,7 +688,6 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
     </View>
   );
 }
-
 function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }: { isDark: boolean, onBack: () => void, toggleTheme: () => void, toggleLanguage: () => void, isOnline: boolean }) {
   const { t, i18n } = useTranslation();
   const C = isDark ? THEMES.dark : THEMES.light;
@@ -1060,9 +1054,6 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  WIDGETS
-// ═══════════════════════════════════════════════════════════════
 const EthiopicClockWidget = ({ C }: { C: any }) => {
   const [timeObj, setTimeObj] = useState(new Date());
 
@@ -1095,7 +1086,6 @@ const EthiopicClockWidget = ({ C }: { C: any }) => {
       shadowOpacity: 0.1,
       shadowRadius: 4,
     }}>
-      {/* Visual Decorations - subtle hints */}
       <View style={{ 
         position: 'absolute', top: -40, right: -40, width: 140, height: 140, 
         borderRadius: 70, backgroundColor: C.accent, opacity: 0.05 
@@ -1120,10 +1110,6 @@ const EthiopicClockWidget = ({ C }: { C: any }) => {
     </View>
   );
 };
-
-// ═══════════════════════════════════════════════════════════════
-//  DASHBOARD TAB
-// ═══════════════════════════════════════════════════════════════
 function DashboardTab({ teacher, students: allStudents, assessments: allAssessments, marks, attendance, subjects, settings, C, s, setTab, onSync, isSyncing, isOnline, lastSync, showToast }: {
   teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], attendance: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, setTab: (t: any) => void, onSync: () => void, isSyncing: boolean, isOnline: boolean, lastSync: string | null, showToast?: (msg: string, type: 'success'|'error'|'info') => void
 }) {
@@ -1131,17 +1117,18 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
   const today = formatEthiopianDate(new Date());
   const [refreshing, setRefreshing] = useState(false);
 
-  // Filter data for THIS teacher's dashboard (Memoized to prevent infinite loops)
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
   const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
   const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
   const assignedSubjectsRaw = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects;
   const hasTeacherAssignedSubjects = Array.isArray(assignedSubjectsRaw) && assignedSubjectsRaw.length > 0;
   const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
+  
   const students = useMemo(() => 
     allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
+  
   const assessments = useMemo(() => 
     allAssessments.filter(a => {
       const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
@@ -1158,13 +1145,13 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
 
   const handleRefresh = async () => { setRefreshing(true); await onSync(); setRefreshing(false); };
 
-  // Dashboard missing marks: use same logic as Urgent Matters (all students * all assessments for their grade)
   const missingCount = students.reduce((acc, st) => {
     const stGrade = normG(st.grade);
     const stAsses = assessments.filter(a => normG(a.grade) === stGrade);
     const missing = stAsses.filter(a => !marks.some(m => m.studentid === st.id && m.assessmentid === a.id));
     return acc + missing.length;
   }, 0);
+  
   const stats = [
     { label: t('dashboard.totalStudents'), value: students.length, icon: <Users size={24} color={C.accent} stroke={C.accent} />, bg: C.accentMuted, target: 'Students' },
     { label: t('dashboard.attendanceToday'), value: attendance.filter(a => a.status === 'present' || a.status === 'late').length, icon: <CalendarCheck size={24} color={C.green} stroke={C.green} />, bg: C.green + '15', target: 'Attendance' },
@@ -1239,15 +1226,11 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  STUDENTS TAB
-// ═══════════════════════════════════════════════════════════════
 function StudentsTab({ route, navigation, teacher, students: allStudents, onRefresh, C, s, onStudentPress }: {
   route: any, navigation: any, teacher: Teacher, students: Student[], onRefresh: () => Promise<void>, C: any, s: any, onStudentPress: (s: Student) => void
 }) {
   const { t } = useTranslation();
   
-  // Filter for THIS teacher (Memoized)
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
   const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
   const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
@@ -1266,16 +1249,6 @@ function StudentsTab({ route, navigation, teacher, students: allStudents, onRefr
     setGrades(uniqueGrades);
     if (!selectedGrade && uniqueGrades.length > 0) setSelectedGrade(uniqueGrades[0]);
   }, [students, selectedGrade]);
-
-  useEffect(() => {
-    if (route.params?.search) {
-      setSearch(route.params.search);
-    }
-    if (route.params?.grade) {
-      setSelectedGrade(String(route.params.grade));
-    }
-  }, [route.params]);
-
 
   const [page, setPage] = useState(0);
   const handleRefresh = async () => {
@@ -1348,15 +1321,11 @@ function StudentsTab({ route, navigation, teacher, students: allStudents, onRefr
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  ATTENDANCE TAB  (uses lowercase: studentid)
-// ═══════════════════════════════════════════════════════════════
 function AttendanceTab({ route, navigation, teacher, students: allStudents, attendanceData, setAttendanceData, onRefresh, C, s, showToast, settings }: {
   route: any, navigation: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any
 }) {
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
-  // Filter for THIS teacher (Memoized)
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
   const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
   const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
@@ -1371,7 +1340,6 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
   const [date] = useState(dayjs().format('YYYY-MM-DD'));
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [attendanceIds, setAttendanceIds] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [scannerVisible, setScannerVisible] = useState(false);
@@ -1404,14 +1372,8 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
   useEffect(() => {
     const uniqueGrades = [...new Set(students.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
     setGrades(uniqueGrades);
-    // If assignments are present, make sure selection stays within allowed grades.
-    if (hasTeacherAssignedGrades) {
-      const isSelectedAllowed = selectedGrade && uniqueGrades.some(g => normG(g) === normG(selectedGrade));
-      if (!isSelectedAllowed) setSelectedGrade(uniqueGrades[0] || '');
-    } else {
-      if (!selectedGrade && uniqueGrades.length > 0) setSelectedGrade(uniqueGrades[0]);
-    }
-  }, [students, hasTeacherAssignedGrades, selectedGrade]);
+    if (!selectedGrade && uniqueGrades.length > 0) setSelectedGrade(uniqueGrades[0]);
+  }, [students, selectedGrade]);
 
   useEffect(() => {
     if (!selectedGrade) return;
@@ -1452,7 +1414,6 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
         updated_at: new Date().toISOString()
       }));
 
-      // Immediate local update for "persistence" feel
       const newAttendanceData = [...attendanceData];
       records.forEach(r => {
         const idx = newAttendanceData.findIndex(exist => exist.studentid === r.studentid && exist.date === r.date);
@@ -1567,7 +1528,6 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
               style={StyleSheet.absoluteFillObject}
               onBarcodeScanned={onBarcodeScanned}
             />
-            {/* Scanner Overlay UI */}
             <View style={StyleSheet.absoluteFillObject}>
               <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
               <View style={{ flexDirection: 'row' }}>
@@ -1603,9 +1563,6 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// PREMIUM DROPDOWN
-// ═══════════════════════════════════════════════════════════════
 function PremiumDropdown({ label, placeholder, items, selectedKey, onSelect, C, s, disabled = false }: {
   label: string; placeholder: string; items: {key: string, label: string}[]; selectedKey: string | null; onSelect: (key: string) => void; C: any; s: any; disabled?: boolean;
 }) {
@@ -1671,14 +1628,9 @@ function PremiumDropdown({ label, placeholder, items, selectedKey, onSelect, C, 
     </View>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  MARKS TAB  (uses lowercase: studentid, assessmentid, etc.)
-// ═══════════════════════════════════════════════════════════════
 function MarksTab({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, showToast, settings, subjects }: {
   route: any, navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any, subjects: any[]
 }) {
-  // Filter for THIS teacher (Memoized)
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
   const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
   const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
@@ -1713,7 +1665,6 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [marks, setMarks] = useState<Record<string, string>>({});
   const [markIds, setMarkIds] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [bulkVisible, setBulkVisible] = useState(false);
@@ -1730,8 +1681,6 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
   const gradeAssessments = myAssessments.filter((a) => normG(a.grade) === normG(selectedGrade));
-  // Subject chips come from the teacher-assigned subjects list (like desktop "Subjects:" block),
-  // without extra filtering (assessments list is filtered separately by grade/semester/subject).
   const allowedSubjectKeyToLabel = new Map<string, string>();
   (mySubjects || []).forEach((subj) => {
     const key = normS(subj);
@@ -1743,7 +1692,6 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     .map(([key, label]) => ({ key, label }));
 
   const selectedSubjectKey = normS(selectedSubject);
-  // If no subject is selected yet, show all assessments for the selected grade.
   const filteredAssessments = selectedSubject
     ? gradeAssessments.filter(a => normS(a.subjectname) === selectedSubjectKey)
     : gradeAssessments;
@@ -1779,23 +1727,16 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     
     if (route.params?.highlightEmpty && route.params?.assessmentId) {
       if (lastRoutedNonce.current === nonce) return;
-
-      // 1. Prepare: Render the full list (no pagination) first
       setPage(99); 
-      
-      // 2. Scroll: Wait for render then scroll
       setTimeout(() => {
         if (filteredStudents.length > 0) {
           const firstMissingIndex = filteredStudents.findIndex(st => !marks[st.id] || marks[st.id] === '');
           if (firstMissingIndex !== -1) {
             flatListRef.current?.scrollToIndex({ index: firstMissingIndex, animated: true, viewPosition: 0 });
             lastRoutedNonce.current = nonce;
-
-            // 3. Highlight: Wait for scroll animation (approx 500ms) then pulse
             setTimeout(() => {
               setHighlightEmptyData(true);
-              // 4. Cleanup: Clear pulse after 1.5s
-              setTimeout(() => setHighlightEmptyData(false), 2000); // Increased to 2s to match desktop
+              setTimeout(() => setHighlightEmptyData(false), 2000);
             }, 600);
           }
         }
@@ -1806,19 +1747,9 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   useEffect(() => {
     const uniqueGrades = [...new Set(myStudents.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
     setGrades(uniqueGrades);
-    if (hasTeacherAssignedGrades) {
-      const isSelectedAllowed = selectedGrade && uniqueGrades.some(g => normG(g) === normG(selectedGrade));
-      if (!isSelectedAllowed) {
-        setSelectedGrade(uniqueGrades[0] || '');
-        setSelectedSubject('');
-        setSelectedAssessment(null);
-      }
-    } else if (!selectedGrade && uniqueGrades.length > 0) {
-      setSelectedGrade(uniqueGrades[0]);
-    }
-  }, [myStudents, hasTeacherAssignedGrades, selectedGrade]);
+    if (!selectedGrade && uniqueGrades.length > 0) setSelectedGrade(uniqueGrades[0]);
+  }, [myStudents, selectedGrade]);
 
-  // Keep subject/assessment selection consistent when grade changes via navigation.
   useEffect(() => {
     if (selectedAssessment && normG(selectedAssessment.grade) !== normG(selectedGrade)) {
       setSelectedSubject('');
@@ -1847,7 +1778,6 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     setMarks(map);
     setMarkIds(idMap);
   }, [selectedAssessment, marksData]);
-
 
   const saveMarksWithData = async (currentMarksData: Record<string, string>) => {
     if (!selectedAssessment) return;
@@ -1881,7 +1811,6 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
         }
       });
 
-      // Immediate local update for "persistence" feel
       const newMarksData = [...marksData];
       recordsToProcess.forEach(r => {
         const idx = newMarksData.findIndex(exist => exist.studentid === r.studentid && exist.assessmentid === r.assessmentid);
@@ -1936,28 +1865,21 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     setMarks(updates);
     setBulkVisible(false);
     setBulkScore('');
-    
-    // Auto-save
     saveMarksWithData(updates);
   };
 
   const handleClearMarks = () => {
     if (!selectedAssessment) return;
-
-    // If everything is already cleared for the current assessment, don't show confirmation.
     const studentsWithMarks = gradeStudents.filter((s) => {
       const v = marks[s.id];
       if (v === undefined || v === '') return false;
-      // Guard against nullable scores mapping to strings like "null".
       const n = parseFloat(v);
       return v !== 'null' && !Number.isNaN(n);
     });
-
     if (studentsWithMarks.length === 0) {
       showToast?.(`ℹ️ ${t('teacher.alreadyCleared')}`, 'info');
       return;
     }
-
     setClearAllVisible(true);
   };
 
@@ -1983,10 +1905,8 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
     const studentsWithHistory = [];
     for (const student of studentsWithoutMarks) {
       const historyCount = marksData.filter(m => m.studentid === student.id).filter(m => {
-        // Use m.subject directly for robustness if available, or look up assessment
         const markSubject = m.subject ? normS(m.subject) : null;
         if (markSubject) return markSubject === targetSubject;
-        
         const a = myAssessments.find(ax => ax.id === m.assessmentid);
         return a && normS(a.subjectname) === targetSubject;
       }).length;
@@ -1998,23 +1918,17 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       return;
     }
 
-    setPredictDetails({ 
-      count: studentsWithHistory.length, 
-      subject: selectedAssessment.subjectname, 
-      students: studentsWithHistory 
-    });
+    setPredictDetails({ count: studentsWithHistory.length, subject: selectedAssessment.subjectname, students: studentsWithHistory });
     setPredictVisible(true);
   };
 
   const applyPrediction = () => {
     const updates = { ...marks };
-    let count = 0;
     for (const student of predictDetails.students) {
       const subjectMarks = marksData.filter(m => m.studentid === student.id).filter(m => {
         const a = myAssessments.find(ax => ax.id === m.assessmentid);
         return a && normS(a.subjectname) === normS(predictDetails.subject);
       });
-
       if (subjectMarks.length > 0) {
         let totalPercentage = 0;
         let validCount = 0;
@@ -2029,14 +1943,11 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
           const avgPercentage = totalPercentage / validCount;
           const predictedScore = Math.round(avgPercentage * selectedAssessment!.maxscore * 10) / 10;
           updates[student.id] = predictedScore.toString();
-          count++;
         }
       }
     }
     setMarks(updates);
     setPredictVisible(false);
-
-    // Auto-save
     saveMarksWithData(updates);
   };
 
@@ -2046,169 +1957,47 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
         <Text style={[s.sectionTitle, { marginBottom: 16 }]}>{t('teacher.marks')}</Text>
 
         <View style={{ marginBottom: 12 }}>
-          <PremiumDropdown 
-            label={t('profile.grade', 'Grade')} 
-            placeholder={t('common.selectGrade', 'Select Grade')}
-            items={grades.map(g => ({ key: g, label: fmtGrade(g) }))}
-            selectedKey={selectedGrade}
-            onSelect={(key) => { setSelectedGrade(key); setSelectedSubject(''); setSelectedAssessment(null); }}
-            C={C} s={s}
-          />
+          <PremiumDropdown label={t('profile.grade', 'Grade')} placeholder={t('common.selectGrade', 'Select Grade')} items={grades.map(g => ({ key: g, label: fmtGrade(g) }))} selectedKey={selectedGrade} onSelect={(key) => { setSelectedGrade(key); setSelectedSubject(''); setSelectedAssessment(null); }} C={C} s={s} />
         </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}>
-            <PremiumDropdown 
-              label={t('assessment.subject', 'Subject')} 
-              placeholder={t('common.selectSubject', 'Select Subject')}
-              items={gradeSubjects}
-              selectedKey={selectedSubjectKey}
-              onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }}
-              C={C} s={s}
-              disabled={!selectedGrade}
-            />
+            <PremiumDropdown label={t('assessment.subject', 'Subject')} placeholder={t('common.selectSubject', 'Select Subject')} items={gradeSubjects} selectedKey={selectedSubjectKey} onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }} C={C} s={s} disabled={!selectedGrade} />
           </View>
-
           <View style={{ flex: 1 }}>
-            <PremiumDropdown 
-              label={t('assessment.label', 'Assessment')} 
-              placeholder={t('common.selectAssessment', 'Select Assessment')}
-              items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))}
-              selectedKey={selectedAssessment?.id || null}
-              onSelect={(key) => {
-                const a = filteredAssessments.find(ax => ax.id === key);
-                if (a) {
-                  setSelectedAssessment(a);
-                  setSelectedSubject(normS(a.subjectname));
-                }
-              }}
-              C={C} s={s}
-              disabled={!selectedSubjectKey}
-            />
+            <PremiumDropdown label={t('assessment.label', 'Assessment')} placeholder={t('common.selectAssessment', 'Select Assessment')} items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))} selectedKey={selectedAssessment?.id || null} onSelect={(key) => { const a = filteredAssessments.find(ax => ax.id === key); if (a) { setSelectedAssessment(a); setSelectedSubject(normS(a.subjectname)); } }} C={C} s={s} disabled={!selectedSubjectKey} />
           </View>
         </View>
-
-        <TextInput
-          style={[s.searchInput, { margin: 0, marginBottom: 16 }]}
-          placeholder={t('common.searchStudents')}
-          placeholderTextColor={C.muted}
-          value={search}
-          onChangeText={setSearch}
-        />
+        <TextInput style={[s.searchInput, { margin: 0, marginBottom: 16 }]} placeholder={t('common.searchStudents')} placeholderTextColor={C.muted} value={search} onChangeText={setSearch} />
       </View>
 
-      <FlatList
-        ref={flatListRef}
-        data={paginate(filteredStudents, page)}
-        keyExtractor={item => item.id}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
-        getItemLayout={(data, index) => (
-          { length: 80, offset: 80 * index, index }
-        )}
-        onScrollToIndexFailed={info => {
-          flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
-        }}
-        // Force refresh when selected assessment changes (header buttons) or marks map changes (row inputs).
-        extraData={[selectedAssessment?.id, marks]}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        ListHeaderComponent={selectedAssessment ? (
-          <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16, padding: 16 }]}>
-            <Text style={{ color: C.accent, fontWeight: '800', textAlign: 'center', marginBottom: 12, fontSize: 16 }}>
-              {selectedAssessment.name} - {t('teacher.maxScoreLabel')}: {selectedAssessment.maxscore}
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'center' }}>
-              <TouchableOpacity onPress={handlePredictMarks} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}>
-                <TrendingUp size={18} color={C.accent} style={{ marginBottom: 4 }} />
-                <Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.predict')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleFillConstantMark} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}>
-                <Text style={{ fontSize: 16, marginBottom: 2 }}>📝</Text>
-                <Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.constant')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleClearMarks} style={{ flex: 1, backgroundColor: C.red + '11', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.red + '33' }}>
-                <Trash2 size={18} color={C.red} style={{ marginBottom: 4 }} />
-                <Text style={{ color: C.red, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.clearAll')}</Text>
-              </TouchableOpacity>
-            </View>
+      <FlatList ref={flatListRef} data={paginate(filteredStudents, page)} keyExtractor={item => item.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />} extraData={[selectedAssessment?.id, marks]} contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" ListHeaderComponent={selectedAssessment ? (
+        <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16, padding: 16 }]}>
+          <Text style={{ color: C.accent, fontWeight: '800', textAlign: 'center', marginBottom: 12, fontSize: 16 }}>{selectedAssessment.name} - {t('teacher.maxScoreLabel')}: {selectedAssessment.maxscore}</Text>
+          <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'center' }}>
+            <TouchableOpacity onPress={handlePredictMarks} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}><TrendingUp size={18} color={C.accent} style={{ marginBottom: 4 }} /><Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.predict')}</Text></TouchableOpacity>
+            <TouchableOpacity onPress={handleFillConstantMark} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}><Text style={{ fontSize: 16, marginBottom: 2 }}>📝</Text><Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.constant')}</Text></TouchableOpacity>
+            <TouchableOpacity onPress={handleClearMarks} style={{ flex: 1, backgroundColor: C.red + '11', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.red + '33' }}><Trash2 size={18} color={C.red} style={{ marginBottom: 4 }} /><Text style={{ color: C.red, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.clearAll')}</Text></TouchableOpacity>
           </View>
-        ) : null}
-        renderItem={({ item }) => {
-          const isMissing = !marks[item.id] || marks[item.id] === '';
-          const shouldHighlight = highlightEmptyData && isMissing;
-
-          const animatedBorderColor = pulseAnim.interpolate({
-             inputRange: [0, 1],
-             outputRange: [C.border, C.accent]
-          });
-
-          const animatedShadow = pulseAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 4]
-          });
-
-          return (
-          <Animated.View style={[
-            s.markRow, 
-            { padding: 12, borderRadius: 16 }, 
-            shouldHighlight ? { 
-              borderColor: animatedBorderColor, 
-              borderWidth: 2,
-              elevation: animatedShadow,
-              shadowColor: C.accent,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: pulseAnim,
-              shadowRadius: 10,
-              backgroundColor: C.card 
-            } : null
-          ]}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.studentName}>{item.name}</Text>
-              {item.baptismalname ? <Text style={s.studentSub}>{item.baptismalname}</Text> : null}
-            </View>
-            <TextInput
-              style={[s.markInput, { width: 80, height: 44, borderRadius: 10 }]}
-              keyboardType="numeric"
-              placeholder="0"
-              placeholderTextColor={C.muted}
-              value={marks[item.id] || ''}
-              onChangeText={(val) => {
-                const score = parseFloat(val);
-                if (val !== '' && !isNaN(score) && selectedAssessment && score > selectedAssessment.maxscore) {
-                  showToast?.(`❌ Max score is ${selectedAssessment.maxscore}`, 'error');
-                  return;
-                }
-                setMarks(prev => ({ ...prev, [item.id]: val }));
-              }}
-              editable={!!selectedAssessment}
-            />
+        </View>
+      ) : null} renderItem={({ item }) => {
+        const isMissing = !marks[item.id] || marks[item.id] === '';
+        const shouldHighlight = highlightEmptyData && isMissing;
+        return (
+          <Animated.View style={[s.markRow, { padding: 12, borderRadius: 16 }, shouldHighlight ? { borderColor: C.accent, borderWidth: 2, backgroundColor: C.card } : null]}>
+            <View style={{ flex: 1 }}><Text style={s.studentName}>{item.name}</Text>{item.baptismalname ? <Text style={s.studentSub}>{item.baptismalname}</Text> : null}</View>
+            <TextInput style={[s.markInput, { width: 80, height: 44, borderRadius: 10 }]} keyboardType="numeric" placeholder="0" placeholderTextColor={C.muted} value={marks[item.id] || ''} onChangeText={(val) => { const score = parseFloat(val); if (val !== '' && !isNaN(score) && selectedAssessment && score > selectedAssessment.maxscore) { showToast?.(`❌ Max score is ${selectedAssessment.maxscore}`, 'error'); return; } setMarks(prev => ({ ...prev, [item.id]: val })); }} editable={!!selectedAssessment} />
           </Animated.View>
-        )}}
-        onEndReached={() => setPage(p => p + 1)}
-        onEndReachedThreshold={0.5}
-      />
+        )}} onEndReached={() => setPage(p => p + 1)} onEndReachedThreshold={0.5} />
 
       <Modal visible={bulkVisible} transparent animationType="fade">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>{t('teacher.fillConstant')}</Text>
-            <Text style={s.modalSub}>{t('teacher.fillConstantDesc', 'Enter a score to fill for all currently ungraded students')} (Max: {selectedAssessment?.maxscore})</Text>
-            <TextInput
-              style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]}
-              keyboardType="numeric"
-              placeholder={`0 - ${selectedAssessment?.maxscore || 10}`}
-              placeholderTextColor={C.muted}
-              value={bulkScore}
-              onChangeText={setBulkScore}
-              autoFocus
-            />
+            <Text style={s.modalSub}>{t('teacher.fillConstantDesc')} (Max: {selectedAssessment?.maxscore})</Text>
+            <TextInput style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]} keyboardType="numeric" placeholder={`0 - ${selectedAssessment?.maxscore || 10}`} placeholderTextColor={C.muted} value={bulkScore} onChangeText={setBulkScore} autoFocus />
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.border }]}>
-                <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}>
-                <Text style={s.modalBtnText}>{t('common.apply', 'Apply')}</Text>
-              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}><Text style={s.modalBtnText}>{t('common.apply')}</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -2218,16 +2007,10 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>{t('teacher.predictMarks')}</Text>
-            <Text style={[s.modalSub, { marginBottom: 20 }]}>
-              {t('teacher.predictDesc', { count: predictDetails.count, subject: predictDetails.subject })}
-            </Text>
+            <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('teacher.predictDesc', { count: predictDetails.count, subject: predictDetails.subject })}</Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={() => setPredictVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}>
-                <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={applyPrediction} style={[s.modalBtn, { backgroundColor: C.accent }]}>
-                <Text style={[s.modalBtnText, { color: '#fff' }]}>{t('teacher.predict')}</Text>
-              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setPredictVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={applyPrediction} style={[s.modalBtn, { backgroundColor: C.accent }]}><Text style={[s.modalBtnText, { color: '#fff' }]}>{t('teacher.predict')}</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -2236,26 +2019,11 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       <Modal visible={clearAllVisible} transparent animationType="fade">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>{t('teacher.clearAllMarks', 'Clear All Marks?')}</Text>
-            <Text style={[s.modalSub, { marginBottom: 20 }]}>
-              {t(
-                'teacher.confirmClearAll',
-                'This will remove all marks for the current assessment. This cannot be undone once saved.'
-              )}
-            </Text>
+            <Text style={s.modalTitle}>{t('teacher.clearAllMarks')}</Text>
+            <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('teacher.confirmClearAll')}</Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity
-                onPress={() => setClearAllVisible(false)}
-                style={[s.modalBtn, { backgroundColor: C.border }]}
-              >
-                <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel', 'Cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={applyClearAllMarks}
-                style={[s.modalBtn, { backgroundColor: C.red + '33', borderColor: C.red + '66', borderWidth: 1 }]}
-              >
-                <Text style={[s.modalBtnText, { color: C.red, fontWeight: '800' }]}>{t('common.yes', 'Yes')}</Text>
-              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setClearAllVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+              <TouchableOpacity onPress={applyClearAllMarks} style={[s.modalBtn, { backgroundColor: C.red + '33', borderColor: C.red + '66', borderWidth: 1 }]}><Text style={[s.modalBtnText, { color: C.red, fontWeight: '800' }]}>{t('common.yes')}</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -2263,32 +2031,20 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
 
       {selectedAssessment && (
         <View style={{ position: 'absolute', bottom: 16, left: 16, right: 16 }}>
-          <TouchableOpacity
-            style={[s.loginBtn, { marginTop: 0 }]}
-            onPress={saveMarks}
-            disabled={saving}
-          >
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('teacher.saveMarks', 'Save Marks')}</Text>}
-          </TouchableOpacity>
+          <TouchableOpacity style={[s.loginBtn, { marginTop: 0 }]} onPress={saveMarks} disabled={saving}>{saving ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('teacher.saveMarks')}</Text>}</TouchableOpacity>
         </View>
       )}
     </KeyboardAvoidingView>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  URGENT MATTERS TAB
-// ═══════════════════════════════════════════════════════════════
 function UrgentMattersTab({ navigation, teacher, students: allStudents, assessments: allAssessments, marksData, subjects, settings, C, s, onRefresh }: {
   navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, onRefresh?: () => Promise<void> | void
 }) {
   const { t } = useTranslation();
-
-  // Filter for THIS teacher (Memoized)
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
   const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
   const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
-
   const assignedSubjectsRaw = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects;
   const hasTeacherAssignedSubjects = Array.isArray(assignedSubjectsRaw) && assignedSubjectsRaw.length > 0;
   const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
@@ -2301,11 +2057,9 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
     allAssessments.filter(a => {
       const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
       const isSubjectMatch = !hasTeacherAssignedSubjects || mySubjects.includes(a.subjectname);
-      
       const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
       const assessmentSemester = subject?.semester || 'Semester I';
       const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
-
       return isGradeMatch && isSubjectMatch && !isConduct(a) && isSemesterMatch;
     }),
     [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, mySubjects, subjects, settings.currentSemester]
@@ -2316,26 +2070,16 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
   const [showAllAssessments, setShowAllAssessments] = useState(false);
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
-  const currentSemester = settings.currentSemester || 'Semester I';
-
-  const myAssessments = assessments;
-
-  const missingMarksByAssessment = myAssessments.map(a => {
+  const missingMarksByAssessment = assessments.map(a => {
     const studentsForGrade = students.filter(st => normG(st.grade) === normG(a.grade));
-    const ungraded = studentsForGrade.filter(st => !marksData.some(m => 
-        (m.studentid === st.id || m.studentId === st.id) && 
-        (m.assessmentid === a.id || m.assessmentId === a.id)
-    ));
+    const ungraded = studentsForGrade.filter(st => !marksData.some(m => (m.studentid === st.id || m.studentId === st.id) && (m.assessmentid === a.id || m.assessmentId === a.id)));
     return { assessment: a, count: ungraded.length, students: ungraded };
   }).filter(item => item.count > 0);
 
   const studentsWithNoMarks = students.filter(st => {
-    const assessmentsForGrade = myAssessments.filter(a => normG(a.grade) === normG(st.grade));
+    const assessmentsForGrade = assessments.filter(a => normG(a.grade) === normG(st.grade));
     if (assessmentsForGrade.length === 0) return false;
-    return !marksData.some(m => 
-        (m.studentid === st.id || m.studentId === st.id) && 
-        assessmentsForGrade.some(a => a.id === (m.assessmentid || m.assessmentId))
-    );
+    return !marksData.some(m => (m.studentid === st.id || m.studentId === st.id) && assessmentsForGrade.some(a => a.id === (m.assessmentid || m.assessmentId)));
   });
 
   const PAGE_SIZE = 5;
@@ -2344,111 +2088,36 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
-      <View style={{ marginBottom: 24 }}>
-        <Text style={s.sectionTitle}>⚠️ {t('teacher.urgent')}</Text>
-        <Text style={{ color: C.muted, fontSize: 13 }}>{t('teacher.urgentSubtitle')}</Text>
-      </View>
+      <View style={{ marginBottom: 24 }}><Text style={s.sectionTitle}>⚠️ {t('teacher.urgent')}</Text><Text style={{ color: C.muted, fontSize: 13 }}>{t('teacher.urgentSubtitle')}</Text></View>
 
       {studentsWithNoMarks.length > 0 && (
         <View style={[s.issueCard, { borderRadius: 20, padding: 20 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-            <AlertTriangle size={20} color={C.red} stroke={C.red} />
-            <Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>{t('teacher.noMarksTitle')}</Text>
-            <View style={{ flex: 1 }} />
-            <View style={{ backgroundColor: C.red + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}>
-              <Text style={{ color: C.red, fontSize: 12, fontWeight: '800' }}>{studentsWithNoMarks.length}</Text>
-            </View>
-          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}><AlertTriangle size={20} color={C.red} stroke={C.red} /><Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>{t('teacher.noMarksTitle')}</Text><View style={{ flex: 1 }} /><View style={{ backgroundColor: C.red + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}><Text style={{ color: C.red, fontSize: 12, fontWeight: '800' }}>{studentsWithNoMarks.length}</Text></View></View>
           <Text style={s.issueSub}>{t('teacher.noMarksDesc')}</Text>
           {displayedStudents.map(st => (
-            <View key={st.id} style={[s.issueRow, { borderTopColor: C.border }]}>
-              <Users size={14} color={C.muted} stroke={C.muted} />
-              <Text style={[s.issueText, { marginLeft: 8 }]}>{st.name}</Text>
-              <View style={{ flex: 1 }} />
-              <View style={s.badge}><Text style={s.badgeText}>{fmtGrade(st.grade)}</Text></View>
-            </View>
+            <View key={st.id} style={[s.issueRow, { borderTopColor: C.border }]}><Users size={14} color={C.muted} stroke={C.muted} /><Text style={[s.issueText, { marginLeft: 8 }]}>{st.name}</Text><View style={{ flex: 1 }} /><View style={s.badge}><Text style={s.badgeText}>{fmtGrade(st.grade)}</Text></View></View>
           ))}
-          {studentsWithNoMarks.length > PAGE_SIZE && (
-            <TouchableOpacity
-              onPress={() => setShowAllStudents(!showAllStudents)}
-              style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.red + '12' }}
-            >
-              <Text style={{ color: C.red, fontWeight: '700', fontSize: 13 }}>
-                {showAllStudents ? t('urgent.showLess') : t('urgent.showAllStudents', { count: studentsWithNoMarks.length })}
-              </Text>
-            </TouchableOpacity>
-          )}
+          {studentsWithNoMarks.length > PAGE_SIZE && (<TouchableOpacity onPress={() => setShowAllStudents(!showAllStudents)} style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.red + '12' }}><Text style={{ color: C.red, fontWeight: '700', fontSize: 13 }}>{showAllStudents ? t('urgent.showLess') : t('urgent.showAllStudents', { count: studentsWithNoMarks.length })}</Text></TouchableOpacity>)}
         </View>
       )}
 
       {missingMarksByAssessment.length > 0 && (
         <View style={[s.issueCard, { borderRadius: 20, padding: 20, marginTop: 16 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-            <BarChart3 size={20} color={C.amber} stroke={C.amber} />
-            <Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>{t('urgent.incompleteAssessments')}</Text>
-            <View style={{ flex: 1 }} />
-            <View style={{ backgroundColor: C.amber + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}>
-              <Text style={{ color: C.amber, fontSize: 12, fontWeight: '800' }}>{missingMarksByAssessment.length}</Text>
-            </View>
-          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}><BarChart3 size={20} color={C.amber} stroke={C.amber} /><Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>{t('urgent.incompleteAssessments')}</Text><View style={{ flex: 1 }} /><View style={{ backgroundColor: C.amber + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}><Text style={{ color: C.amber, fontSize: 12, fontWeight: '800' }}>{missingMarksByAssessment.length}</Text></View></View>
           <Text style={s.issueSub}>{t('urgent.missingScoresDesc')}</Text>
           {displayedAssessments.map(item => (
-            <TouchableOpacity 
-              key={item.assessment.id} 
-              style={[s.issueRow, { borderTopColor: C.border, flexDirection: 'column', alignItems: 'stretch' }]}
-              onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.issueText}>{item.assessment.name}</Text>
-                  <Text style={s.issueSub}>{item.assessment.subjectname} • {fmtGrade(item.assessment.grade)} • {t('urgent.missingCount', { count: item.count })}</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })}
-                  style={{ backgroundColor: C.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{t('urgent.fixNow')}</Text>
-                </TouchableOpacity>
-              </View>
-              {/* Show missing students */}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                {item.students.map(st => (
-                  <View key={st.id} style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: C.amber + '30' }}>
-                    <Text style={{ fontSize: 11, color: C.amber, fontWeight: '700' }}>{st.name}</Text>
-                  </View>
-                ))}
-              </View>
-            </TouchableOpacity>
+            <TouchableOpacity key={item.assessment.id} style={[s.issueRow, { borderTopColor: C.border, flexDirection: 'column', alignItems: 'stretch' }]} onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text style={s.issueText}>{item.assessment.name}</Text><Text style={s.issueSub}>{item.assessment.subjectname} • {fmtGrade(item.assessment.grade)} • {t('urgent.missingCount', { count: item.count })}</Text></View><TouchableOpacity onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })} style={{ backgroundColor: C.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{t('urgent.fixNow')}</Text></TouchableOpacity></View><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>{item.students.map(st => (<View key={st.id} style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: C.amber + '30' }}><Text style={{ fontSize: 11, color: C.amber, fontWeight: '700' }}>{st.name}</Text></View>))}</View></TouchableOpacity>
           ))}
-          {missingMarksByAssessment.length > PAGE_SIZE && (
-            <TouchableOpacity
-              onPress={() => setShowAllAssessments(!showAllAssessments)}
-              style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.amber + '12' }}
-            >
-              <Text style={{ color: C.amber, fontWeight: '700', fontSize: 13 }}>
-                {showAllAssessments ? t('urgent.showLess') : t('urgent.showAllAssessments', { count: missingMarksByAssessment.length })}
-              </Text>
-            </TouchableOpacity>
-          )}
+          {missingMarksByAssessment.length > PAGE_SIZE && (<TouchableOpacity onPress={() => setShowAllAssessments(!showAllAssessments)} style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.amber + '12' }}><Text style={{ color: C.amber, fontWeight: '700', fontSize: 13 }}>{showAllAssessments ? t('urgent.showLess') : t('urgent.showAllAssessments', { count: missingMarksByAssessment.length })}</Text></TouchableOpacity>)}
         </View>
       )}
 
       {studentsWithNoMarks.length === 0 && missingMarksByAssessment.length === 0 && (
-        <View style={{ alignItems: 'center', marginTop: 100 }}>
-          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: C.green + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
-            <TrendingUp size={40} color={C.green} stroke={C.green} />
-          </View>
-          <Text style={[s.empty, { color: C.text, fontWeight: '700' }]}>{t('urgent.everyoneUpToDate')}</Text>
-          <Text style={{ color: C.muted, marginTop: 4 }}>{t('urgent.noUrgentMatters')}</Text>
-        </View>
+        <View style={{ alignItems: 'center', marginTop: 100 }}><View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: C.green + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}><TrendingUp size={40} color={C.green} stroke={C.green} /></View><Text style={[s.empty, { color: C.text, fontWeight: '700' }]}>{t('urgent.everyoneUpToDate')}</Text><Text style={{ color: C.muted, marginTop: 4 }}>{t('urgent.noUrgentMatters')}</Text></View>
       )}
     </ScrollView>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  ASSESSMENT MANAGEMENT TAB (Teacher)
-// ═══════════════════════════════════════════════════════════════
 function AssessmentManagementTab({ teacher, assessments: allAssessments, subjects, settings, C, s, showToast, onRefresh }: {
   teacher: Teacher, assessments: Assessment[], subjects: any[], settings: any, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void, onRefresh?: () => Promise<void> | void
 }) {
@@ -2461,6 +2130,7 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
     mySubjects.some((sub: string) => normS(sub) === normS(a.subjectname))
   );
 
+  const [modalVisible, setModalVisible] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [name, setName] = useState('');
@@ -2469,25 +2139,35 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
   useEffect(() => {
-    if (myGrades.length === 1 && !selectedGrade) {
-      setSelectedGrade(myGrades[0]);
-    }
-  }, [myGrades]);
-
-  useEffect(() => {
-    if (mySubjects.length === 1 && !selectedSubject) {
-      setSelectedSubject(mySubjects[0]);
-    }
-  }, [mySubjects]);
+    if (myGrades.length === 1 && !selectedGrade) setSelectedGrade(myGrades[0]);
+    if (mySubjects.length === 1 && !selectedSubject) setSelectedSubject(mySubjects[0]);
+  }, [myGrades, mySubjects]);
 
   const filteredAssessments = myAssessments.filter(a => {
     if (selectedGrade && normG(a.grade) !== normG(selectedGrade)) return false;
     if (selectedSubject && normS(a.subjectname) !== normS(selectedSubject)) return false;
     return true;
   });
+
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setName('');
+    setMaxScore('');
+    setModalVisible(true);
+  };
+
+  const handleEdit = (a: Assessment) => {
+    setSelectedGrade(a.grade);
+    setSelectedSubject(a.subjectname);
+    setName(a.name);
+    setMaxScore(String(a.maxscore));
+    setEditingId(a.id);
+    setModalVisible(true);
+  };
 
   const handleSave = async () => {
     if (!selectedGrade) { showToast?.('❌ Please select a grade', 'error'); return; }
@@ -2517,6 +2197,7 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
       if (error) throw error;
 
       showToast?.(editingId ? '✅ Assessment updated' : '✅ Assessment created', 'success');
+      setModalVisible(false);
       setName(''); setMaxScore(''); setEditingId(null);
       if (onRefresh) onRefresh();
     } catch (err: any) {
@@ -2538,164 +2219,167 @@ function AssessmentManagementTab({ teacher, assessments: allAssessments, subject
     }
   };
 
-  const handleEdit = (a: Assessment) => {
-    setSelectedGrade(a.grade);
-    setSelectedSubject(a.subjectname);
-    setName(a.name);
-    setMaxScore(String(a.maxscore));
-    setEditingId(a.id);
-  };
-
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-    <ScrollView 
-      style={{ flex: 1, backgroundColor: C.bg }} 
-      contentContainerStyle={{ padding: 16, paddingBottom: 100 }} 
-      keyboardShouldPersistTaps="handled" 
-      keyboardDismissMode="on-drag"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
-    >
-      <Text style={[s.sectionTitle, { marginBottom: 16 }]}>{t('assessment.manageTitle')}</Text>
-
-      {/* Create / Edit Form */}
-      <View style={[s.dashboardCard, { borderRadius: 20, padding: 16, marginBottom: 20 }]}>
-        <Text style={{ color: C.text, fontWeight: '800', fontSize: 15, marginBottom: 12 }}>
-          {editingId ? `✏️ ${t('common.save')}` : `➕ ${t('assessment.newTitle')}`}
-        </Text>
-
-        {/* Grade selector */}
-        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{t('profile.grade')}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-          {myGrades.map((g: string) => (
-            <TouchableOpacity
-              key={g}
-              style={[s.gradeChip, normG(selectedGrade) === normG(g) && s.gradeChipActive]}
-              onPress={() => { setSelectedGrade(g); setSelectedSubject(''); }}
-            >
-              <Text style={[s.gradeChipText, normG(selectedGrade) === normG(g) && s.gradeChipTextActive]}>{fmtGrade(g)}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Subject selector */}
-        {selectedGrade ? (
-          <>
-            <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{t('assessment.subject')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              {mySubjects.map((subName: string, i: number) => (
-                <TouchableOpacity
-                  key={`sub-${i}`}
-                  style={[s.gradeChip, normS(selectedSubject) === normS(subName) && s.gradeChipActive]}
-                  onPress={() => setSelectedSubject(subName)}
-                >
-                  <Text style={[s.gradeChipText, normS(selectedSubject) === normS(subName) && s.gradeChipTextActive]}>{subName}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </>
-        ) : null}
-
-        {/* Name & Max Score */}
-        <TextInput
-          style={[s.searchInput, { marginBottom: 10 }]}
-          placeholder={t('assessment.namePlaceholder')}
-          placeholderTextColor={C.muted}
-          value={name}
-          onChangeText={setName}
-        />
-        <TextInput
-          style={[s.searchInput, { marginBottom: 14 }]}
-          placeholder={t('assessment.maxScorePlaceholder')}
-          placeholderTextColor={C.muted}
-          value={maxScore}
-          onChangeText={setMaxScore}
-          keyboardType="numeric"
-        />
-
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {editingId && (
-            <TouchableOpacity
-              onPress={() => { setName(''); setMaxScore(''); setEditingId(null); }}
-              style={{ flex: 1, backgroundColor: C.border, padding: 12, borderRadius: 12, alignItems: 'center' }}
-            >
-              <Text style={{ color: C.text, fontWeight: '700' }}>{t('common.cancel')}</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            onPress={handleSave}
-            disabled={saving}
-            style={{ flex: 1, backgroundColor: C.accent, padding: 12, borderRadius: 12, alignItems: 'center', opacity: saving ? 0.6 : 1 }}
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ padding: 16, paddingBottom: 100 }} 
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <Text style={[s.sectionTitle, { marginBottom: 0 }]}>{t('assessment.manageTitle')}</Text>
+          <TouchableOpacity 
+            onPress={handleOpenCreate}
+            style={{ backgroundColor: C.accent, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
           >
-            {saving
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={{ color: '#fff', fontWeight: '800' }}>{editingId ? t('common.save') : t('common.save')}</Text>
-            }
+            <Plus size={18} color="#fff" strokeWidth={3} />
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{t('common.add')}</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Assessment List */}
-      <Text style={{ color: C.text, fontWeight: '800', fontSize: 15, marginBottom: 12 }}>
-        {t('assessment.yourAssessments', { count: filteredAssessments.length })}
-      </Text>
+        <View style={{ marginBottom: 16 }}>
+           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            <TouchableOpacity
+              style={[s.gradeChip, !selectedGrade && s.gradeChipActive]}
+              onPress={() => setSelectedGrade('')}
+            >
+              <Text style={[s.gradeChipText, !selectedGrade && s.gradeChipTextActive]}>{t('common.all')}</Text>
+            </TouchableOpacity>
+            {myGrades.map((g: string) => (
+              <TouchableOpacity
+                key={g}
+                style={[s.gradeChip, normG(selectedGrade) === normG(g) && s.gradeChipActive]}
+                onPress={() => setSelectedGrade(g)}
+              >
+                <Text style={[s.gradeChipText, normG(selectedGrade) === normG(g) && s.gradeChipTextActive]}>{fmtGrade(g)}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
-      {filteredAssessments.length === 0 && (
-        <Text style={[s.empty, { marginTop: 32 }]}>{t('assessment.noAssessments')}</Text>
-      )}
-
-      {filteredAssessments.map(a => (
-        <View key={a.id} style={[s.dashboardCard, { borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>{a.name}</Text>
-            <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{a.subjectname} • {fmtGrade(a.grade)} • Max: {a.maxscore}</Text>
+        {filteredAssessments.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 60, opacity: 0.5 }}>
+            <FileText size={48} color={C.muted} />
+            <Text style={[s.empty, { marginTop: 16 }]}>{t('assessment.noAssessments')}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleEdit(a)} style={{ padding: 8, marginRight: 4 }}>
-            <Edit size={18} color={C.accent} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setDeleteConfirmId(a.id)} style={{ padding: 8 }}>
-            <Trash2 size={18} color={C.red} />
-          </TouchableOpacity>
-        </View>
-      ))}
+        ) : (
+          filteredAssessments.map(a => (
+            <View key={a.id} style={[s.dashboardCard, { borderRadius: 16, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center' }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: C.text, fontWeight: '700', fontSize: 15 }}>{a.name}</Text>
+                <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{a.subjectname} • {fmtGrade(a.grade)} • Max: {a.maxscore}</Text>
+              </View>
+              <TouchableOpacity onPress={() => handleEdit(a)} style={{ padding: 10, marginRight: 4, backgroundColor: C.accent + '10', borderRadius: 10 }}>
+                <Edit size={18} color={C.accent} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setDeleteConfirmId(a.id)} style={{ padding: 10, backgroundColor: C.red + '10', borderRadius: 10 }}>
+                <Trash2 size={18} color={C.red} />
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </ScrollView>
 
-      {/* Delete confirmation modal */}
+      {/* CREATE / EDIT MODAL */}
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <BlurView intensity={20} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center' }}>
+            <View style={[s.modalCard, { padding: 24 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <Text style={[s.modalTitle, { marginBottom: 0 }]}>
+                  {editingId ? t('assessment.editTitle', 'Edit Assessment') : t('assessment.newTitle', 'New Assessment')}
+                </Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
+                  <Text style={{ color: C.muted, fontSize: 24 }}>×</Text>
+                </TouchableOpacity>
+              </View>
+
+              <PremiumDropdown 
+                label={t('profile.grade')} 
+                placeholder={t('common.selectGrade')} 
+                items={myGrades.map((g: string) => ({ key: g, label: fmtGrade(g) }))} 
+                selectedKey={selectedGrade} 
+                onSelect={setSelectedGrade} 
+                C={C} s={s} 
+              />
+
+              <PremiumDropdown 
+                label={t('assessment.subject')} 
+                placeholder={t('common.selectSubject')} 
+                items={mySubjects.map((sub: string) => ({ key: sub, label: sub }))} 
+                selectedKey={selectedSubject} 
+                onSelect={setSelectedSubject} 
+                C={C} s={s} 
+                disabled={!selectedGrade}
+              />
+
+              <Text style={s.inputLabel}>{t('assessment.assessmentName')}</Text>
+              <TextInput
+                style={[s.loginInput, { marginBottom: 16 }]}
+                placeholder={t('assessment.nameExample')}
+                placeholderTextColor={C.muted}
+                value={name}
+                onChangeText={setName}
+              />
+
+              <Text style={s.inputLabel}>{t('assessment.maxScore')}</Text>
+              <TextInput
+                style={[s.loginInput, { marginBottom: 24 }]}
+                placeholder={t('assessment.maxScoreExample')}
+                placeholderTextColor={C.muted}
+                value={maxScore}
+                onChangeText={setMaxScore}
+                keyboardType="numeric"
+              />
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setModalVisible(false)}
+                  style={[s.modalBtn, { backgroundColor: C.border }]}
+                >
+                  <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSave}
+                  disabled={saving}
+                  style={[s.modalBtn, { backgroundColor: C.accent, opacity: saving ? 0.6 : 1 }]}
+                >
+                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.modalBtnText}>{editingId ? t('common.save') : t('common.create')}</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
       <Modal visible={!!deleteConfirmId} transparent animationType="fade">
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>{t('assessment.confirmDelete')}</Text>
-            <Text style={[s.modalSub, { marginBottom: 20 }]}>
-              {t('assessment.deleteWarning')}
-            </Text>
+            <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('assessment.deleteWarning')}</Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity onPress={() => setDeleteConfirmId(null)} style={[s.modalBtn, { backgroundColor: C.border }]}>
-                <Text style={[s.modalBtnText, { color: C.text }]}>Cancel</Text>
+                <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => deleteConfirmId && handleDelete(deleteConfirmId)} style={[s.modalBtn, { backgroundColor: C.red }]}>
-                <Text style={[s.modalBtnText, { color: '#fff' }]}>Delete</Text>
+                <Text style={[s.modalBtnText, { color: '#fff' }]}>{t('common.delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
-
-// ═══════════════════════════════════════════════════════════════
-//  ANALYTICS TAB
-// ═══════════════════════════════════════════════════════════════
 function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessments, marks, C, s, onRefresh, settings, subjects }: {
   teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], C: any, s: any, onRefresh?: () => Promise<void> | void, settings: any, subjects: any[]
 }) {
   const { t } = useTranslation();
-  
-  // Filter for THIS teacher (Memoized)
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
   const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
   const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
-
   const assignedSubjectsRaw = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects;
   const hasTeacherAssignedSubjects = Array.isArray(assignedSubjectsRaw) && assignedSubjectsRaw.length > 0;
   const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
@@ -2708,14 +2392,11 @@ function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessme
     allAssessments.filter(a => {
       const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
       const isSubjectMatch = (!hasTeacherAssignedSubjects || mySubjects.includes(a.subjectname)) && !isConduct(a);
-      
       const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
       const assessmentSemester = subject?.semester || 'Semester I';
-      const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
-
-      return isGradeMatch && isSubjectMatch && isSemesterMatch;
+      return isGradeMatch && isSubjectMatch && assessmentSemester === (settings.currentSemester || 'Semester I');
     }),
-    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, mySubjects, subjects, settings.currentSemester]
+    [allAssessments, myGrades, mySubjects, subjects, settings.currentSemester]
   );
 
   const etYear = computeEthiopianYear();
@@ -2736,7 +2417,6 @@ function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessme
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
       <View style={{ marginBottom: 24 }}>
-        <Text style={s.sectionTitle}>{t('teacher.analytics')}</Text>
         <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600' }}>📅 {etYear} E.C. • {settings.currentSemester || 'Semester I'}</Text>
       </View>
 
@@ -2784,15 +2464,11 @@ function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessme
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  STUDENT PROFILE MODAL
-// ═══════════════════════════════════════════════════════════════
 function StudentProfileModal({ student, onClose, assessments, marks, allStudents, C, s }: {
   student: Student | null, onClose: () => void, assessments: Assessment[], marks: any[], allStudents: Student[], C: any, s: any
 }) {
   const { t } = useTranslation();
   const [subTab, setSubTab] = useState<'overview' | 'attendance' | 'marks' | 'cert'>('overview');
-
   if (!student) return null;
 
   const studentMarks = marks.filter(m => {
@@ -2800,51 +2476,36 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
     return m.studentid === student.id && ass && !isConduct(ass);
   });
   
-  // Rank Calculations
   const calculateRanks = () => {
-    if (!student || !allStudents || !marks || !assessments) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
-
-    const studentGradeNorm = String(student.grade);
-    const gradeAssesses = assessments.filter(a => 
-      String(a.grade) === studentGradeNorm && !isConduct(a)
-    );
-    if (gradeAssesses.length === 0) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
-    
-    const assessIds = gradeAssesses.map(a => a.id);
-    const pertinentMarks = marks.filter(m => assessIds.includes(m.assessmentid));
-
-    const studentsInGrade = allStudents.filter(s => String(s.grade) === studentGradeNorm);
-    
-    const rankings = studentsInGrade.map(s => {
-      let sTotalScore = 0;
-      let sTotalMax = 0;
-      
-      gradeAssesses.forEach(a => {
-        const mark = pertinentMarks.find(m => m.studentid === s.id && m.assessmentid === a.id);
-        if (mark) sTotalScore += Number(mark.score) || 0;
-        sTotalMax += a.maxscore;
+    const sGrade = String(student.grade);
+    const gAss = assessments.filter(a => String(a.grade) === sGrade && !isConduct(a));
+    if (gAss.length === 0) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
+    const aIds = gAss.map(a => a.id);
+    const gMarks = marks.filter(m => aIds.includes(m.assessmentid));
+    const gStudents = allStudents.filter(s => String(s.grade) === sGrade);
+    const rankings = gStudents.map(s => {
+      let score = 0, max = 0;
+      gAss.forEach(a => {
+        const m = gMarks.find(mx => mx.studentid === s.id && mx.assessmentid === a.id);
+        if (m) score += Number(m.score) || 0;
+        max += a.maxscore;
       });
-      
-      const sPercentage = sTotalMax > 0 ? (sTotalScore / sTotalMax) * 100 : 0;
-      return { id: s.id, grade: s.grade, percentage: sPercentage, hasData: sTotalMax > 0 };
-    }).filter(s => s.hasData);
+      return { id: s.id, grade: s.grade, perc: max > 0 ? (score / max) * 100 : 0, hasData: max > 0 };
+    }).filter(s => s.hasData).sort((a, b) => b.perc - a.perc);
 
-    rankings.sort((a, b) => b.percentage - a.percentage);
+    const overallIdx = rankings.findIndex(r => r.id === student.id);
+    const classRanks = rankings.filter(r => r.grade === student.grade);
+    const classIdx = classRanks.findIndex(r => r.id === student.id);
 
-    const overallRankIndex = rankings.findIndex(r => r.id === student.id);
-    const overallRank = overallRankIndex !== -1 ? overallRankIndex + 1 : 'N/A';
-    const totalInGrade = rankings.length;
-
-    const classRankings = rankings.filter(r => r.grade === student.grade);
-    const classRankIndex = classRankings.findIndex(r => r.id === student.id);
-    const classRank = classRankIndex !== -1 ? classRankIndex + 1 : 'N/A';
-    const totalInClass = classRankings.length;
-
-    return { classRank, overallRank, totalInClass, totalInGrade };
+    return { 
+      overallRank: overallIdx !== -1 ? overallIdx + 1 : 'N/A', 
+      totalInGrade: rankings.length,
+      classRank: classIdx !== -1 ? classIdx + 1 : 'N/A',
+      totalInClass: classRanks.length
+    };
   };
 
   const { classRank, overallRank, totalInClass, totalInGrade } = calculateRanks();
-
   const totalScore = studentMarks.reduce((acc, m) => acc + (Number(m.score) || 0), 0);
   const maxPossible = studentMarks.reduce((acc, m) => {
     const ass = assessments.find(a => a.id === m.assessmentid);
@@ -2853,10 +2514,10 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
   const avg = maxPossible > 0 ? ((totalScore / maxPossible) * 100).toFixed(1) : '0';
 
   const sections = [
-    { key: 'overview', label: t('profile.overview'), icon: <Info size={18} color={subTab === 'overview' ? C.accent : C.muted} stroke={subTab === 'overview' ? C.accent : C.muted} /> },
-    { key: 'attendance', label: t('profile.attendance'), icon: <CalendarCheck size={18} color={subTab === 'attendance' ? C.accent : C.muted} stroke={subTab === 'attendance' ? C.accent : C.muted} /> },
-    { key: 'marks', label: t('profile.marks'), icon: <TrendingUp size={18} color={subTab === 'marks' ? C.accent : C.muted} stroke={subTab === 'marks' ? C.accent : C.muted} /> },
-    { key: 'cert', label: t('profile.cert'), icon: <Users size={18} color={subTab === 'cert' ? C.accent : C.muted} stroke={subTab === 'cert' ? C.accent : C.muted} /> },
+    { key: 'overview', label: t('profile.overview'), icon: <Info size={18} color={subTab === 'overview' ? C.accent : C.muted} /> },
+    { key: 'attendance', label: t('profile.attendance'), icon: <CalendarCheck size={18} color={subTab === 'attendance' ? C.accent : C.muted} /> },
+    { key: 'marks', label: t('profile.marks'), icon: <TrendingUp size={18} color={subTab === 'marks' ? C.accent : C.muted} /> },
+    { key: 'cert', label: t('profile.cert'), icon: <Users size={18} color={subTab === 'cert' ? C.accent : C.muted} /> },
   ];
 
   return (
@@ -2866,142 +2527,58 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
         <View style={[s.modalCard, { height: '85%', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 0, overflow: 'hidden' }]}>
           <View style={{ padding: 24, paddingBottom: 16 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <View>
-                <Text style={[s.modalTitle, { fontSize: 24, fontWeight: '900', color: C.text }]}>{student.name}</Text>
-              </View>
-              <TouchableOpacity onPress={onClose} style={[s.themeBtn, { width: 40, height: 40, borderRadius: 20 }]}>
-                <Text style={{ color: C.text, fontSize: 24, lineHeight: 28 }}>×</Text>
-              </TouchableOpacity>
+              <View><Text style={[s.modalTitle, { fontSize: 24, fontWeight: '900', color: C.text }]}>{student.name}</Text></View>
+              <TouchableOpacity onPress={onClose} style={[s.themeBtn, { width: 40, height: 40, borderRadius: 20 }]}><Text style={{ color: C.text, fontSize: 24, lineHeight: 28 }}>×</Text></TouchableOpacity>
             </View>
           </View>
-
           <View style={{ flexDirection: 'row', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
             {sections.map(sec => (
-              <TouchableOpacity
-                key={sec.key}
-                onPress={() => setSubTab(sec.key as any)}
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: subTab === sec.key ? 2 : 0, borderBottomColor: C.accent }}
-              >
-                {sec.icon}
-                <Text style={{ color: subTab === sec.key ? C.accent : C.muted, fontSize: 11, fontWeight: subTab === sec.key ? '800' : '600', marginTop: 4 }}>
-                  {sec.label}
-                </Text>
+              <TouchableOpacity key={sec.key} onPress={() => setSubTab(sec.key as any)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: subTab === sec.key ? 2 : 0, borderBottomColor: C.accent }}>
+                {sec.icon}<Text style={{ color: subTab === sec.key ? C.accent : C.muted, fontSize: 11, fontWeight: subTab === sec.key ? '800' : '600', marginTop: 4 }}>{sec.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
-
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
             {subTab === 'overview' && (
               <View>
                 <View style={[s.dashboardCard, { flexDirection: 'row', padding: 20, marginBottom: 20, borderRadius: 24 }]}>
-                  <View style={{ flex: 1, alignItems: 'center', borderRightWidth: 1, borderRightColor: C.border }}>
-                    <Text style={{ color: C.green, fontSize: 28, fontWeight: '900' }}>{avg}%</Text>
-                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.average').toUpperCase()}</Text>
-                  </View>
-                  <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={{ color: C.accent, fontSize: 28, fontWeight: '900' }}>{student.grade}</Text>
-                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.grade').toUpperCase()}</Text>
-                  </View>
+                  <View style={{ flex: 1, alignItems: 'center', borderRightWidth: 1, borderRightColor: C.border }}><Text style={{ color: C.green, fontSize: 28, fontWeight: '900' }}>{avg}%</Text><Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.average').toUpperCase()}</Text></View>
+                  <View style={{ flex: 1, alignItems: 'center' }}><Text style={{ color: C.accent, fontSize: 28, fontWeight: '900' }}>{student.grade}</Text><Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.grade').toUpperCase()}</Text></View>
                 </View>
-
                 <View style={{ gap: 16 }}>
-                  <View>
-                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.baptismalName').toUpperCase()}</Text>
-                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.baptismalname || t('profile.notProvided')}</Text>
-                  </View>
-                  <View>
-                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.contact').toUpperCase()}</Text>
-                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.parentcontact || t('profile.notProvided')}</Text>
-                  </View>
+                   <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.baptismalName').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.baptismalname || t('profile.notProvided')}</Text></View>
+                   <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.contact').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.parentcontact || t('profile.notProvided')}</Text></View>
                 </View>
               </View>
             )}
-
             {subTab === 'marks' && (
               <View style={{ gap: 12 }}>
-                {assessments.filter(a => 
-                  normG(a.grade) === normG(student.grade) && !isConduct(a)
-                ).map((ass, idx) => {
+                {assessments.filter(a => normG(a.grade) === normG(student.grade) && !isConduct(a)).map((ass, idx) => {
                   const mark = studentMarks.find(m => m.assessmentid === ass.id);
                   const perc = mark ? (Number(mark.score) / ass.maxscore) * 100 : 0;
                   return (
                     <View key={idx} style={[s.dashboardCard, { borderRadius: 16, padding: 16, borderStyle: mark ? 'solid' : 'dashed', borderColor: mark ? C.border : C.amber + '44' }]}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: C.text, fontWeight: '800', fontSize: 15 }}>{ass.name}</Text>
-                          <Text style={{ color: C.muted, fontSize: 12 }}>{ass.subjectname}</Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          {mark ? (
-                            <>
-                              <Text style={{ color: C.accent, fontWeight: '900', fontSize: 18 }}>{mark.score}</Text>
-                              <Text style={{ color: C.muted, fontSize: 11 }}>/ {ass.maxscore}</Text>
-                            </>
-                          ) : (
-                            <View style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                              <Text style={{ color: C.amber, fontWeight: '900', fontSize: 12 }}>{t('profile.missing').toUpperCase()}</Text>
-                            </View>
-                          )}
-                        </View>
+                        <View style={{ flex: 1 }}><Text style={{ color: C.text, fontWeight: '800', fontSize: 15 }}>{ass.name}</Text><Text style={{ color: C.muted, fontSize: 12 }}>{ass.subjectname}</Text></View>
+                        <View style={{ alignItems: 'flex-end' }}>{mark ? (<><Text style={{ color: C.accent, fontWeight: '900', fontSize: 18 }}>{mark.score}</Text><Text style={{ color: C.muted, fontSize: 11 }}>/ {ass.maxscore}</Text></>) : (<View style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}><Text style={{ color: C.amber, fontWeight: '900', fontSize: 12 }}>{t('profile.missing').toUpperCase()}</Text></View>)}</View>
                       </View>
-                      {mark ? (
-                        <View style={{ height: 4, backgroundColor: C.border, borderRadius: 2 }}>
-                          <View style={{ height: 4, backgroundColor: perc > 50 ? C.green : C.amber, borderRadius: 2, width: `${perc}%` }} />
-                        </View>
-                      ) : null}
+                      {mark ? (<View style={{ height: 4, backgroundColor: C.border, borderRadius: 2 }}><View style={{ height: 4, backgroundColor: perc > 50 ? C.green : C.amber, borderRadius: 2, width: `${perc}%` }} /></View>) : null}
                     </View>
                   );
                 })}
               </View>
             )}
-
             {subTab === 'cert' && (
               <View style={{ alignItems: 'center' }}>
-                <View style={{ width: '100%', minHeight: 480, backgroundColor: '#fdfbf7', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: '#e8dfce', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20 }}>
-                  {/* Minimalist Corner Accents */}
-                  <View style={{ position: 'absolute', top: 16, left: 16, width: 32, height: 32, borderTopWidth: 1, borderLeftWidth: 1, borderColor: '#d4af37' }} />
-                  <View style={{ position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderTopWidth: 1, borderRightWidth: 1, borderColor: '#d4af37' }} />
-                  <View style={{ position: 'absolute', bottom: 16, left: 16, width: 32, height: 32, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: '#d4af37' }} />
-                  <View style={{ position: 'absolute', bottom: 16, right: 16, width: 32, height: 32, borderBottomWidth: 1, borderRightWidth: 1, borderColor: '#d4af37' }} />
-
-                  {/* Header - Amharic First */}
-                  <View style={{ alignItems: 'center', marginBottom: 24 }}>
-                    <EthiopianCross size={40} />
-                    <Text style={{ color: '#2c1810', fontSize: 18, fontWeight: '900', textAlign: 'center', marginTop: 12 }}>{t('cert.title', { lng: 'am' })}</Text>
-                    <Text style={{ color: '#5c4033', fontSize: 11, textAlign: 'center', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginTop: 4 }}>{t('cert.title', { lng: 'am' })}</Text>
-                    <View style={{ height: 1, width: 40, backgroundColor: '#d4af37', marginVertical: 12 }} />
-                    <Text style={{ color: '#8b0000', fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>{t('cert.title', { lng: 'en' })}</Text>
+                <View style={{ width: '100%', minHeight: 480, backgroundColor: '#fdfbf7', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: '#e8dfce' }}>
+                  <Text style={{ textAlign: 'center', color: '#2c1810', fontSize: 18, fontWeight: '900' }}>{t('cert.title', { lng: 'am' })}</Text>
+                  <Text style={{ textAlign: 'center', color: '#8b0000', fontSize: 14, fontWeight: '800', marginTop: 4 }}>{t('cert.title', { lng: 'en' })}</Text>
+                  <View style={{ marginTop: 24, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#e8dfce' }}>
+                     <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800' }}>NAME / ስም</Text>
+                     <Text style={{ fontSize: 20, color: '#2c1810', fontWeight: '700' }}>{student.name}</Text>
                   </View>
-
-                  {/* Student Info - Amharic/English Labels */}
-                  <View style={{ borderBottomWidth: 1, borderBottomColor: '#e8dfce', paddingBottom: 16, marginBottom: 24 }}>
-                    <View style={{ marginBottom: 16 }}>
-                      <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>{t('cert.name', { lng: 'am' })} / {t('cert.name', { lng: 'en' })}</Text>
-                      <Text style={{ fontSize: 20, color: '#2c1810', fontWeight: '700' }}>{student.name}</Text>
-                      {student.baptismalname ? <Text style={{ fontSize: 13, color: '#5c4033', fontStyle: 'italic', fontWeight: '500' }}>{student.baptismalname}</Text> : null}
-                    </View>
-
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <View>
-                        <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>{t('cert.grade', { lng: 'am' })} / {t('cert.grade', { lng: 'en' })}</Text>
-                        <Text style={{ fontSize: 16, color: '#2c1810', fontWeight: '700' }}>{fmtGrade(student.grade)}</Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>{t('cert.year', { lng: 'am' })} / {t('cert.year', { lng: 'en' })}</Text>
-                        <Text style={{ fontSize: 16, color: '#2c1810', fontWeight: '700' }}>{computeEthiopianYear()} E.C.</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Table - Amharic Headers First */}
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#d4af3733', paddingBottom: 10, marginBottom: 12 }}>
-                      <Text style={{ flex: 2, fontSize: 11, fontWeight: '800', color: '#8c7361' }}>{t('cert.subject', { lng: 'am' })} / {t('cert.subject', { lng: 'en' })}</Text>
-                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: '#8c7361', textAlign: 'center' }}>{t('cert.score', { lng: 'am' })} / {t('cert.score', { lng: 'en' })}</Text>
-                      <Text style={{ flex: 1, fontSize: 11, fontWeight: '800', color: '#8c7361', textAlign: 'center' }}>{t('cert.avg', { lng: 'am' })} / {t('cert.avg', { lng: 'en' })}</Text>
-                    </View>
-                    
-                    {assessments.filter(a => String(a.grade) === String(student.grade) && !isConduct(a)).slice(0, 7).map((a, i) => {
+                  <View style={{ flex: 1, marginTop: 16 }}>
+                    {assessments.filter(a => String(a.grade) === String(student.grade) && !isConduct(a)).slice(0, 8).map((a, i) => {
                       const m = marks.find(mark => mark.studentid === student.id && mark.assessmentid === a.id);
                       const perc = m ? ((Number(m.score) / a.maxscore) * 100).toFixed(0) : null;
                       return (
@@ -3012,44 +2589,15 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
                         </View>
                       );
                     })}
-
-                    <View style={{ marginTop: 24, paddingTop: 16, borderTopWidth: 2, borderTopColor: '#e8dfce' }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#2c1810' }}>{t('cert.total', { lng: 'am' })} / {t('cert.total', { lng: 'en' })}</Text>
-                        <Text style={{ fontSize: 18, fontWeight: '900', color: '#8b0000' }}>{avg}%</Text>
-                      </View>
-                      
-                      {totalInClass > 0 && (
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#5c4033' }}>ክፍል ደረጃ / Class Rank</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#2c1810' }}>{classRank} / {totalInClass}</Text>
-                        </View>
-                      )}
-                      
-                      {totalInGrade > 0 && (
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#5c4033' }}>አጠቃላይ ደረጃ / Grade Rank</Text>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#5c4033' }}>{overallRank} / {totalInGrade}</Text>
-                        </View>
-                      )}
-                    </View>
                   </View>
-
-                  {/* Status Banner */}
-                  <View style={{ marginTop: 24, backgroundColor: '#8b000010', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#8b000020' }}>
-                    <Text style={{ color: '#8b0000', fontSize: 10, textAlign: 'center', fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>
-                      Live Preview (Senbet Management System)
-                    </Text>
+                  <View style={{ marginTop: 24, paddingTop: 16, borderTopWidth: 2, borderTopColor: '#e8dfce', flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontWeight: '800' }}>AVG / አማካይ</Text><Text style={{ fontWeight: '900', color: '#8b0000' }}>{avg}%</Text>
                   </View>
                 </View>
               </View>
             )}
-
             {subTab === 'attendance' && (
-              <View style={{ alignItems: 'center', marginTop: 40 }}>
-                <CalendarCheck size={48} color={C.accent + '44'} stroke={C.accent + '44'} />
-                <Text style={{ color: C.muted, textAlign: 'center', marginTop: 16, fontWeight: '600' }}>Attendance history feature coming soon</Text>
-              </View>
+              <View style={{ alignItems: 'center', marginTop: 40 }}><CalendarCheck size={48} color={C.accent + '44'} /><Text style={{ color: C.muted, textAlign: 'center', marginTop: 16, fontWeight: '600' }}>Coming Soon</Text></View>
             )}
           </ScrollView>
         </View>
@@ -3058,134 +2606,58 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  STYLES
-// ═══════════════════════════════════════════════════════════════
 function makeStyles(C: any) {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg, paddingTop: Platform.OS === 'android' ? 36 : 0 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
-
   loginRoot: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', padding: 24 },
   loginTitle: { color: C.text, fontSize: 32, fontWeight: '800', textAlign: 'center' },
   loginSub: { color: C.accent, fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 32 },
   loginCard: { backgroundColor: C.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: C.border },
   inputLabel: { color: C.muted, fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 16 },
-  loginInput: {
-    backgroundColor: C.input, color: C.text, borderRadius: 12, padding: 14, fontSize: 16,
-    borderWidth: 1, borderColor: C.border
-  },
+  loginInput: { backgroundColor: C.input, color: C.text, borderRadius: 12, padding: 14, fontSize: 16, borderWidth: 1, borderColor: C.border },
   loginBtn: { backgroundColor: C.accent, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 32 },
   loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: C.border },
   headerTitle: { color: C.text, fontSize: 22, fontWeight: '800' },
   headerSub: { color: C.muted, fontSize: 13, marginTop: 2 },
   logoutBtn: { backgroundColor: C.red + '22', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: C.red },
   logoutBtnText: { color: C.red, fontSize: 16, fontWeight: '700' },
-
-  syncBtn: { backgroundColor: C.border, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  themeBtn: { backgroundColor: C.border, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  syncBtnText: { fontSize: 16 },
-
   dashboardCard: { backgroundColor: C.card, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: C.border },
-  dashboardAction: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, padding: 18,
-    borderRadius: 20, marginBottom: 14, borderWidth: 1, borderColor: C.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2
-  },
-
-  tabBar: {
-    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.card,
-    paddingVertical: 8, paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-  },
-  tabItem: { alignItems: 'center', gap: 2 },
-  tabIcon: { fontSize: 22, opacity: 0.5 },
-  tabIconActive: { opacity: 1 },
-  tabLabel: { fontSize: 11, color: C.muted, fontWeight: '600' },
-  tabLabelActive: { color: C.accent },
-
-  searchInput: {
-    margin: 16, marginBottom: 0, backgroundColor: C.card, color: C.text,
-    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15,
-    borderWidth: 1, borderColor: C.border,
-  },
-
-  studentCard: {
-    backgroundColor: C.card, borderRadius: 12, padding: 16, marginBottom: 10,
-    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border,
-  },
-  studentName: { color: C.text, fontSize: 16, fontWeight: '600' },
-  studentSub: { color: C.muted, fontSize: 13, marginTop: 2 },
-  badge: { backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  badgeText: { color: C.accent, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-
+  dashboardAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, padding: 18, borderRadius: 20, marginBottom: 14, borderWidth: 1, borderColor: C.border },
+  tabBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.card, paddingVertical: 8, paddingBottom: Platform.OS === 'ios' ? 24 : 8 },
+  searchInput: { margin: 16, marginBottom: 0, backgroundColor: C.card, color: C.text, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: C.border },
+  studentCard: { backgroundColor: C.card, borderRadius: 12, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border },
   sectionTitle: { color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 12 },
   empty: { color: C.muted, textAlign: 'center', marginTop: 40, fontSize: 15 },
-
-  gradeChip: {
-    backgroundColor: C.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
-    marginRight: 8, borderWidth: 1, borderColor: C.border,
-  },
+  gradeChip: { backgroundColor: C.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8, borderWidth: 1, borderColor: C.border },
   gradeChipActive: { backgroundColor: C.accent, borderColor: C.accent },
   gradeChipText: { color: C.muted, fontSize: 13, fontWeight: '600' },
   gradeChipTextActive: { color: '#fff' },
-
-  attendanceRow: {
-    backgroundColor: C.card, borderRadius: 12, padding: 14, marginBottom: 8,
-    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border,
-  },
-  statusBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1,
-  },
+  attendanceRow: { backgroundColor: C.card, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1 },
   statusText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-
-  markRow: {
-    backgroundColor: C.card, borderRadius: 12, padding: 14, marginBottom: 8,
-    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border,
-  },
-  markInput: {
-    backgroundColor: C.input, color: C.text, borderRadius: 8,
-    paddingHorizontal: 14, paddingVertical: 8, width: 100, textAlign: 'right',
-    fontSize: 16, fontWeight: '700', borderWidth: 1, borderColor: C.border,
-  },
-  markHistoryRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
-  infoLabel: { color: C.muted, fontSize: 14 },
-  infoValue: { color: C.text, fontSize: 14, fontWeight: '600' },
-  maxScoreBar: {
-    backgroundColor: C.accent + '15', borderRadius: 8, padding: 10,
-    marginBottom: 12, borderWidth: 1, borderColor: C.accent + '44',
-  },
-
-  saveBtn: {
-    backgroundColor: C.accent, borderRadius: 14, padding: 16,
-    alignItems: 'center', marginTop: 20,
-  },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
+  markRow: { backgroundColor: C.card, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  markInput: { backgroundColor: C.input, color: C.text, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, width: 100, textAlign: 'right', fontSize: 16, fontWeight: '700', borderWidth: 1, borderColor: C.border },
+  maxScoreBar: { backgroundColor: C.accent + '15', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: C.accent + '44' },
   issueCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border },
-  issueTitle: { color: C.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  issueSub: { color: C.muted, fontSize: 13, marginBottom: 16 },
   issueRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border },
   issueText: { color: C.text, fontSize: 14, fontWeight: '600' },
-
+  issueSub: { color: C.muted, fontSize: 13, marginBottom: 16 },
+  issueTitle: { color: C.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
   modalCard: { backgroundColor: C.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: C.border },
   modalTitle: { color: C.text, fontSize: 20, fontWeight: '800', marginBottom: 8 },
   modalSub: { color: C.muted, fontSize: 14, marginBottom: 20 },
   modalBtn: { flex: 1, backgroundColor: C.accent, borderRadius: 12, padding: 14, alignItems: 'center' },
   modalBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  sidebarItem: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16,
-    borderRadius: 12, marginBottom: 4
-  },
-  sidebarIcon: {
-    width: 36, height: 36, borderRadius: 10, backgroundColor: C.border + '33',
-    justifyContent: 'center', alignItems: 'center', marginRight: 12
-  },
+  sidebarItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, marginBottom: 4 },
+  sidebarIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.border + '33', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   sidebarText: { color: C.text, fontSize: 15, fontWeight: '600' },
+  badge: { backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  badgeText: { color: C.accent, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  studentName: { color: C.text, fontSize: 16, fontWeight: '600' },
+  studentSub: { color: C.muted, fontSize: 13, marginTop: 2 },
+  themeBtn: { backgroundColor: C.border, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   });
 }
