@@ -398,7 +398,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const lastRoutedAssessmentId = useRef(null);
+    const lastRoutedNonce = useRef(null);
     const [modal, contextHolder] = Modal.useModal();
 
     // Keep sessionStorage in sync
@@ -525,7 +525,8 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     useEffect(() => {
         if (!allAssessments || allAssessments.length === 0 || isLoading) return;
 
-        if (location.state?.assessmentId) {
+        const nonce = location.state?.nonce;
+        if (location.state?.assessmentId && lastRoutedNonce.current !== nonce) {
             const ass = allAssessments.find(a => a.id === location.state.assessmentId);
             if (ass) {
                 setSelectedGrade(String(ass.grade));
@@ -533,39 +534,39 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 setSelectedAssessmentId(ass.id);
             }
             if (location.state?.highlightEmpty) {
-                if (lastRoutedAssessmentId.current === location.state.assessmentId) return;
+                // 1. Prepare: Switch to the target page first
+                const firstMissingIndex = studentsInGrade.findIndex(s => !marks[s.id] || marks[s.id] === '');
+                if (firstMissingIndex !== -1) {
+                    const targetPage = Math.floor(firstMissingIndex / pageSize) + 1;
+                    setCurrentPage(targetPage);
+                    const studentId = studentsInGrade[firstMissingIndex].id;
 
-                setHighlightEmptyData(true);
-                
-                // Use a slightly longer timeout to ensure data and table are fully rendered
-                setTimeout(() => {
-                    // Find first missing student and scroll
-                    const firstMissingIndex = studentsInGrade.findIndex(s => !marks[s.id] || marks[s.id] === '');
-                    if (firstMissingIndex !== -1) {
-                        const targetPage = Math.floor(firstMissingIndex / pageSize) + 1;
-                        setCurrentPage(targetPage);
-                        const studentId = studentsInGrade[firstMissingIndex].id;
-                        setTimeout(() => {
-                            const el = document.getElementById(`row-${studentId}`);
-                            if (el) {
-                                const tableBody = el.closest('.ant-table-body');
-                                if (tableBody) {
-                                    const relativeTop = el.offsetTop;
-                                    tableBody.scrollTo({
-                                        top: relativeTop - 8, // Position at top with slight padding
-                                        behavior: 'smooth'
-                                    });
-                                } else {
-                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                }
-                                lastRoutedAssessmentId.current = location.state.assessmentId;
+                    // 2. Scroll: Wait for page/table render then scroll
+                    setTimeout(() => {
+                        const el = document.getElementById(`row-${studentId}`);
+                        if (el) {
+                            // Ensure the entire page centers on this row first
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                            const tableBody = el.closest('.ant-table-body');
+                            if (tableBody) {
+                                const relativeTop = el.offsetTop;
+                                tableBody.scrollTo({
+                                    top: relativeTop - 8, 
+                                    behavior: 'smooth'
+                                });
                             }
-                        }, 1000);
-                    }
-                }, 800);
+                            lastRoutedNonce.current = nonce;
 
-                // Keep highlight for only 1.5 seconds to grab focus then clear
-                setTimeout(() => setHighlightEmptyData(false), 1500);
+                            // 3. Highlight: Only pulse AFTER the scroll animation finishes (~600ms)
+                            setTimeout(() => {
+                                setHighlightEmptyData(true);
+                                // 4. Cleanup: Clear pulse after 2 seconds
+                                setTimeout(() => setHighlightEmptyData(false), 2000);
+                            }, 700);
+                        }
+                    }, 500);
+                }
             }
         } else if (location.state?.grade) {
             setSelectedGrade(location.state.grade);
@@ -576,7 +577,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 setSearchQuery('');
             }
         }
-    }, [location.state, allAssessments, isLoading]);
+    }, [location.state, allAssessments, isLoading, studentsInGrade.length]);
 
     useEffect(() => {
         if (!selectedAssessmentId) return;

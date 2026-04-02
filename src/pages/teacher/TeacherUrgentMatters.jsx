@@ -247,7 +247,8 @@ export default function TeacherUrgentMatters({ teacher }) {
                                                     state: {
                                                         assessmentId: assessment.id,
                                                         grade: assessment.grade,
-                                                        highlightEmpty: true
+                                                        highlightEmpty: true,
+                                                        nonce: Date.now()
                                                     }
                                                 });
                                             }}

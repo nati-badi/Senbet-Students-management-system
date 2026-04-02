@@ -18,7 +18,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import {
   Home, Users, CalendarCheck, BarChart3, AlertTriangle, Settings, LogOut, Moon, Sun, Languages, RefreshCw, TrendingUp, Info, BookOpen, Key, Phone,
-  Search, User, ArrowLeft, Eye, EyeOff, Trash2, FileText, Edit, ChevronDown, Check
+  Search, User, ArrowLeft, Eye, EyeOff, Trash2, FileText, Edit, ChevronDown, Check, ChevronRight
 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 
@@ -257,160 +257,117 @@ export default function App() {
     if (!isBackground) setSyncing(true);
 
     try {
-      // Fetch latest teacher data to keep assigned subjects/grades live
+      // 1. Fetch latest teacher data
       const { data: tRes, error: tErr } = await supabase
         .from('teachers')
-        .select('*')
+        .select('id, name, accesscode, assignedgrades, assignedsubjects, cancreateassessments')
         .eq('id', teacher.id)
         .maybeSingle();
 
       if (tErr) {
         console.warn('Teacher fetch error:', tErr);
       } else if (!tRes) {
-        // Teacher not found! Probably wiped from database.
-        console.warn('Teacher record not found in Supabase. They may have been deleted.');
+        console.warn('Teacher record not found in Supabase.');
         setTeacher(null);
         await AsyncStorage.removeItem('senbet_teacher_auth');
-        return; // Stop syncing since user is logged out
+        return;
       }
         
-      let activeTeacher = teacher;
-      if (tRes) {
-        activeTeacher = tRes;
-        
-        // Deep compare to prevent infinite render loops where the background sync triggers a state update,
-        // which triggers a re-render, which triggers another background sync.
-        if (JSON.stringify(tRes) !== JSON.stringify(teacher)) {
-          setTeacher(activeTeacher);
-          await AsyncStorage.setItem('senbet_teacher_auth', JSON.stringify(activeTeacher));
-        }
+      if (tRes && JSON.stringify(tRes) !== JSON.stringify(teacher)) {
+        setTeacher(tRes);
+        await AsyncStorage.setItem('senbet_teacher_auth', JSON.stringify(tRes));
       }
 
-      // Parallelize Independent Queries
-      const [sRes, aRes, attRes, subRes, setRes] = await Promise.allSettled([
-        supabase.from('students').select('*').order('name'),
-        supabase.from('assessments').select('*').order('name'),
-        supabase.from('attendance').select('*').eq('date', dayjs().format('YYYY-MM-DD')),
-        supabase.from('subjects').select('*'),
-        supabase.from('settings').select('*')
+      // 2. Parallelize All Queries (Incremental if possible)
+      const syncAnchor = lastSyncIso;
+      
+      const stQ = supabase.from('students').select('id, name, grade, baptismalname, parentcontact, academicyear, portalcode, updated_at');
+      const asQ = supabase.from('assessments').select('id, name, subjectname, grade, maxscore, date, updated_at');
+      const maQ = supabase.from('marks').select('id, score, subject, semester, studentid, assessmentid, assessmentdate, last_modified_by, updated_at');
+      const atQ = supabase.from('attendance').select('id, date, status, semester, studentid, last_modified_by, updated_at');
+      const suQ = supabase.from('subjects').select('id, name, semester, updated_at');
+      const seQ = supabase.from('settings').select('key, value, updated_at');
+      const deQ = supabase.from('deleted_records').select('*');
+
+      if (syncAnchor) {
+        stQ.gt('updated_at', syncAnchor); asQ.gt('updated_at', syncAnchor); maQ.gt('updated_at', syncAnchor);
+        atQ.gt('updated_at', syncAnchor); suQ.gt('updated_at', syncAnchor); seQ.gt('updated_at', syncAnchor);
+        deQ.gt('deleted_at', syncAnchor);
+      }
+
+      const [sRes, aRes, mRes, attRes, subRes, setRes, delRes] = await Promise.allSettled([
+        stQ.order('name'), asQ.order('name'), maQ, atQ, suQ, seQ, deQ
       ]);
 
-      // 1. Students
-      if (sRes.status === 'fulfilled' && sRes.value.data && !sRes.value.error) {
-        setStudents(sRes.value.data);
-        AsyncStorage.setItem('cached_students', JSON.stringify(sRes.value.data)).catch(console.error);
-      }
+      const merge = (oldData: any[], newData: any[] | null) => {
+        if (!newData || newData.length === 0) return oldData;
+        const map = new Map(oldData.map(item => [item.id || item.key, item]));
+        newData.forEach(item => map.set(item.id || item.key, item));
+        return Array.from(map.values());
+      };
 
-      // 2. Assessments & Marks
-      let aIds: string[] = [];
-      if (aRes.status === 'fulfilled' && aRes.value.data && !aRes.value.error) {
-        setAssessments(aRes.value.data);
-        AsyncStorage.setItem('cached_assessments', JSON.stringify(aRes.value.data)).catch(console.error);
-        aIds = aRes.value.data.map(a => a.id);
-        
-        // Fetch marks now that we have assessment IDs
-        if (aIds.length > 0) {
-          try {
-            const { data: mData, error: mErr } = await supabase.from('marks').select('*').in('assessmentid', aIds);
-            if (!mErr && mData) {
-              setMarks(mData);
-              AsyncStorage.setItem('cached_marks', JSON.stringify(mData)).catch(console.error);
-            }
-          } catch (e) {
-            console.error('Sync marks error', e);
-          }
-        }
-      }
-
-      // 3. Attendance
-      if (attRes.status === 'fulfilled' && attRes.value.data && !attRes.value.error) {
-        setAttendance(attRes.value.data);
-        AsyncStorage.setItem('cached_attendance', JSON.stringify(attRes.value.data)).catch(console.error);
-      }
-
-      // 4. Subjects & Settings
-      if (subRes.status === 'fulfilled' && subRes.value.data && !subRes.value.error) {
-        setSubjects(subRes.value.data);
-        AsyncStorage.setItem('cached_subjects', JSON.stringify(subRes.value.data)).catch(console.error);
-      }
+      // Calculate Merged States
+      let nextStudents = merge(students, (sRes.status === 'fulfilled' ? sRes.value.data : null));
+      let nextAssessments = merge(assessments, (aRes.status === 'fulfilled' ? aRes.value.data : null));
+      let nextMarks = merge(marks, (mRes.status === 'fulfilled' ? mRes.value.data : null));
+      let nextAttendance = merge(attendance, (attRes.status === 'fulfilled' ? attRes.value.data : null));
+      let nextSubjects = merge(subjects, (subRes.status === 'fulfilled' ? subRes.value.data : null));
       
-      if (setRes.status === 'fulfilled' && setRes.value.data && !setRes.value.error) {
-        const sMap: Record<string, string> = {};
-        setRes.value.data.forEach((r: any) => { sMap[r.key] = r.value; });
-        setSettings(sMap);
-        AsyncStorage.setItem('cached_settings', JSON.stringify(sMap)).catch(console.error);
+      let nextSettings = { ...settings };
+      if (setRes.status === 'fulfilled' && setRes.value.data) {
+        setRes.value.data.forEach((r: any) => { nextSettings[r.key] = r.value; });
       }
-      
-      // 6. Pull Remote Deletions
-      try {
-        // If no lastSyncIso, use a VERY recent anchor (effectively "now") to skip toxic history.
-        // This stops existing valid marks from being deleted by old "ghost" records.
-        const syncAnchor = lastSyncIso || new Date().toISOString();
-        
-        const { data: deletions } = await supabase
-          .from('deleted_records')
-          .select('*')
-          .gt('deleted_at', syncAnchor);
-          
-        if (deletions && deletions.length > 0) {
-          console.log(`Mobile: Syncing ${deletions.length} remote deletions...`);
-          // Note: Since mobile uses state/AsyncStorage, we need to filter out deleted records
-          // for each relevant local data set.
-          
-          let updatedStudents = [...students];
-          let updatedAssessments = [...assessments];
-          let updatedMarks = [...marks];
-          let updatedAttendance = [...attendance];
-          let changed = false;
 
-          for (const del of deletions) {
-            if (del.table_name === 'students') {
-              updatedStudents = updatedStudents.filter(r => r.id !== del.record_id);
-              changed = true;
-            } else if (del.table_name === 'assessments') {
-              updatedAssessments = updatedAssessments.filter(r => r.id !== del.record_id);
-              changed = true;
-            } else if (del.table_name === 'marks') {
-              updatedMarks = updatedMarks.filter(r => r.id !== del.record_id);
-              changed = true;
-            } else if (del.table_name === 'attendance') {
-              updatedAttendance = updatedAttendance.filter(r => r.id !== del.record_id);
-              changed = true;
-            }
-          }
-          
-          if (changed) {
-            setStudents(updatedStudents);
-            setAssessments(updatedAssessments);
-            setMarks(updatedMarks);
-            setAttendance(updatedAttendance);
-            await AsyncStorage.setItem('cached_students', JSON.stringify(updatedStudents));
-            await AsyncStorage.setItem('cached_assessments', JSON.stringify(updatedAssessments));
-            await AsyncStorage.setItem('cached_marks', JSON.stringify(updatedMarks));
-            await AsyncStorage.setItem('cached_attendance', JSON.stringify(updatedAttendance));
-          }
-        }
-      } catch (e) { console.warn('Sync deletions error', e); }
+      // Apply Deletions
+      if (delRes.status === 'fulfilled' && delRes.value.data && delRes.value.data.length > 0) {
+        const deletions = delRes.value.data;
+        deletions.forEach((del: any) => {
+          if (del.table_name === 'students') nextStudents = nextStudents.filter(r => r.id !== del.record_id);
+          else if (del.table_name === 'assessments') nextAssessments = nextAssessments.filter(r => r.id !== del.record_id);
+          else if (del.table_name === 'marks') nextMarks = nextMarks.filter(r => r.id !== del.record_id);
+          else if (del.table_name === 'attendance') nextAttendance = nextAttendance.filter(r => r.id !== del.record_id);
+        });
+      }
+
+      // Update State
+      setStudents(nextStudents);
+      setAssessments(nextAssessments);
+      setMarks(nextMarks);
+      setAttendance(nextAttendance);
+      setSubjects(nextSubjects);
+      setSettings(nextSettings);
 
       const now = formatEthiopianTime(new Date());
       const nowIso = new Date().toISOString();
       setLastSync(now);
       setLastSyncIso(nowIso);
-      await AsyncStorage.setItem('last_sync_time', now);
-      await AsyncStorage.setItem('last_sync_iso', nowIso);
 
-      if (!isBackground) showToast('✅ Sync complete — data updated', 'success');
+      // Async Persistent Storage
+      await Promise.all([
+        AsyncStorage.setItem('cached_students', JSON.stringify(nextStudents)),
+        AsyncStorage.setItem('cached_assessments', JSON.stringify(nextAssessments)),
+        AsyncStorage.setItem('cached_marks', JSON.stringify(nextMarks)),
+        AsyncStorage.setItem('cached_attendance', JSON.stringify(nextAttendance)),
+        AsyncStorage.setItem('cached_subjects', JSON.stringify(nextSubjects)),
+        AsyncStorage.setItem('cached_settings', JSON.stringify(nextSettings)),
+        AsyncStorage.setItem('last_sync_time', now),
+        AsyncStorage.setItem('last_sync_iso', nowIso)
+      ]);
+
+      if (!isBackground) showToast('✅ ' + t('common.syncComplete', 'Sync complete'), 'success');
     } catch (err: any) {
       console.error('Sync error', err);
-      if (!isBackground) showToast('⚠️ Sync failed — using offline data', 'error');
+      if (!isBackground) showToast('⚠️ ' + t('common.syncFailed', 'Sync failed'), 'error');
     } finally {
       if (!isBackground) setSyncing(false);
     }
-  }, [teacher, isOnline]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacher, isOnline, lastSyncIso, t, students, assessments, marks, attendance, subjects, settings]); 
 
   useEffect(() => {
     if (teacher) syncData(true);
-  }, [teacher, syncData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacher?.id]); // Only run on login or teacher change, NOT on syncData function change
 
   const handleLogin = async (t: Teacher) => {
     setTeacher(t);
@@ -1209,9 +1166,9 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
     return acc + missing.length;
   }, 0);
   const stats = [
-    { label: t('dashboard.totalStudents'), value: students.length, icon: <Users size={24} color={C.accent} stroke={C.accent} />, bg: C.accentMuted },
-    { label: t('dashboard.attendanceToday'), value: attendance.filter(a => a.status === 'present' || a.status === 'late').length, icon: <CalendarCheck size={24} color={C.green} stroke={C.green} />, bg: C.green + '15' },
-    { label: t('teacher.missingMarks'), value: missingCount, icon: <AlertTriangle size={24} color={C.red} stroke={C.red} />, bg: C.red + '15' },
+    { label: t('dashboard.totalStudents'), value: students.length, icon: <Users size={24} color={C.accent} stroke={C.accent} />, bg: C.accentMuted, target: 'Students' },
+    { label: t('dashboard.attendanceToday'), value: attendance.filter(a => a.status === 'present' || a.status === 'late').length, icon: <CalendarCheck size={24} color={C.green} stroke={C.green} />, bg: C.green + '15', target: 'Attendance' },
+    { label: t('teacher.missingMarks'), value: missingCount, icon: <AlertTriangle size={24} color={C.red} stroke={C.red} />, bg: C.red + '15', target: 'Urgent' },
   ];
 
   return (
@@ -1239,7 +1196,12 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         {stats.map((item, idx) => (
-          <View key={idx} style={[s.dashboardCard, { width: '48%', gap: 12 }]}>
+          <TouchableOpacity 
+            key={idx} 
+            onPress={() => setTab(item.target)}
+            activeOpacity={0.7}
+            style={[s.dashboardCard, { width: '48%', gap: 12, minHeight: 120 }]}
+          >
             <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: item.bg, justifyContent: 'center', alignItems: 'center' }}>
               {item.icon}
             </View>
@@ -1247,7 +1209,10 @@ function DashboardTab({ teacher, students: allStudents, assessments: allAssessme
               <Text style={{ color: C.text, fontSize: 24, fontWeight: '900' }}>{item.value}</Text>
               <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginTop: 2 }}>{item.label}</Text>
             </View>
-          </View>
+            <View style={{ position: 'absolute', top: 12, right: 12 }}>
+              <ChevronRight size={14} color={C.muted} opacity={0.5} />
+            </View>
+          </TouchableOpacity>
         ))}
       </View>
 
@@ -1641,27 +1606,33 @@ function AttendanceTab({ route, navigation, teacher, students: allStudents, atte
 // ═══════════════════════════════════════════════════════════════
 // PREMIUM DROPDOWN
 // ═══════════════════════════════════════════════════════════════
-function PremiumDropdown({ label, placeholder, items, selectedKey, onSelect, C, s }: {
-  label: string; placeholder: string; items: {key: string, label: string}[]; selectedKey: string | null; onSelect: (key: string) => void; C: any; s: any;
+function PremiumDropdown({ label, placeholder, items, selectedKey, onSelect, C, s, disabled = false }: {
+  label: string; placeholder: string; items: {key: string, label: string}[]; selectedKey: string | null; onSelect: (key: string) => void; C: any; s: any; disabled?: boolean;
 }) {
   const [modalVisible, setModalVisible] = useState(false);
   const selectedItem = items.find(i => i.key === selectedKey);
 
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: 12, opacity: disabled ? 0.6 : 1 }}>
       <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{label}</Text>
       <TouchableOpacity 
-        onPress={() => setModalVisible(true)}
+        onPress={() => !disabled && setModalVisible(true)}
+        disabled={disabled}
+        activeOpacity={disabled ? 1 : 0.7}
         style={{
           flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          backgroundColor: C.card, borderWidth: 1, borderColor: selectedKey ? C.accent : C.border,
+          backgroundColor: disabled ? C.bg : C.card, 
+          borderWidth: 1, 
+          borderColor: disabled ? C.border : (selectedKey ? C.accent : C.border),
           paddingHorizontal: 16, height: 50, borderRadius: 12
         }}
       >
         <Text style={{ color: selectedItem ? C.text : C.muted, fontWeight: selectedItem ? '700' : '500', fontSize: 14 }} numberOfLines={1}>
           {selectedItem ? selectedItem.label : placeholder}
         </Text>
-        <ChevronDown size={18} color={selectedKey ? C.accent : C.muted} />
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <ChevronDown size={18} color={selectedKey && !disabled ? C.accent : C.muted} />
+        </View>
       </TouchableOpacity>
 
       <Modal visible={modalVisible} transparent={true} animationType="fade" onRequestClose={() => setModalVisible(false)}>
@@ -1753,8 +1724,9 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [highlightEmptyData, setHighlightEmptyData] = useState(false);
+  const pulseAnim = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null); 
-  const lastRoutedAssessmentId = useRef<string | null>(null);
+  const lastRoutedNonce = useRef<number | null>(null);
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
   const gradeAssessments = myAssessments.filter((a) => normG(a.grade) === normG(selectedGrade));
@@ -1780,37 +1752,54 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const filteredStudents = gradeStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
 
   useEffect(() => {
-    if (route.params?.assessmentId) {
+    if (highlightEmptyData) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1, duration: 400, useNativeDriver: false }),
+          Animated.timing(pulseAnim, { toValue: 0, duration: 400, useNativeDriver: false })
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(0);
+    }
+  }, [highlightEmptyData]);
+
+  useEffect(() => {
+    const nonce = route.params?.nonce;
+    if (route.params?.assessmentId && lastRoutedNonce.current !== nonce) {
       const ass = myAssessments.find(a => a.id === route.params.assessmentId);
       if (ass) {
         setSelectedGrade(String(ass.grade));
         setSelectedSubject(normS(ass.subjectname));
         setSelectedAssessment(ass);
       }
-    } else if (route.params?.grade) {
+    } else if (route.params?.grade && !route.params.assessmentId) {
       setSelectedGrade(String(route.params.grade));
     }
     
     if (route.params?.highlightEmpty && route.params?.assessmentId) {
-      if (lastRoutedAssessmentId.current === route.params.assessmentId) return;
+      if (lastRoutedNonce.current === nonce) return;
 
-      setHighlightEmptyData(true);
-      // Disable pagination temporarily to show all students for scrolling
+      // 1. Prepare: Render the full list (no pagination) first
       setPage(99); 
       
+      // 2. Scroll: Wait for render then scroll
       setTimeout(() => {
-        // Scroll to first missing student
         if (filteredStudents.length > 0) {
           const firstMissingIndex = filteredStudents.findIndex(st => !marks[st.id] || marks[st.id] === '');
           if (firstMissingIndex !== -1) {
             flatListRef.current?.scrollToIndex({ index: firstMissingIndex, animated: true, viewPosition: 0 });
-            lastRoutedAssessmentId.current = route.params.assessmentId;
+            lastRoutedNonce.current = nonce;
+
+            // 3. Highlight: Wait for scroll animation (approx 500ms) then pulse
+            setTimeout(() => {
+              setHighlightEmptyData(true);
+              // 4. Cleanup: Clear pulse after 1.5s
+              setTimeout(() => setHighlightEmptyData(false), 2000); // Increased to 2s to match desktop
+            }, 600);
           }
         }
       }, 800);
-
-      // Keep highlight for only 1.5 seconds to grab focus then clear
-      setTimeout(() => setHighlightEmptyData(false), 1500);
     }
   }, [route.params, myAssessments, marks, filteredStudents.length]); 
 
@@ -2067,37 +2056,35 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
           />
         </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          {gradeSubjects.length > 0 && (
-            <View style={{ flex: 1 }}>
-              <PremiumDropdown 
-                label={t('assessment.subject', 'Subject')} 
-                placeholder={t('common.selectSubject', 'Select Subject')}
-                items={gradeSubjects}
-                selectedKey={selectedSubjectKey}
-                onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }}
-                C={C} s={s}
-              />
-            </View>
-          )}
+          <View style={{ flex: 1 }}>
+            <PremiumDropdown 
+              label={t('assessment.subject', 'Subject')} 
+              placeholder={t('common.selectSubject', 'Select Subject')}
+              items={gradeSubjects}
+              selectedKey={selectedSubjectKey}
+              onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }}
+              C={C} s={s}
+              disabled={!selectedGrade}
+            />
+          </View>
 
-          {filteredAssessments.length > 0 && (
-            <View style={{ flex: 1 }}>
-              <PremiumDropdown 
-                label={t('assessment.label', 'Assessment')} 
-                placeholder={t('common.selectAssessment', 'Select Assessment')}
-                items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))}
-                selectedKey={selectedAssessment?.id || null}
-                onSelect={(key) => {
-                  const a = filteredAssessments.find(ax => ax.id === key);
-                  if (a) {
-                    setSelectedAssessment(a);
-                    setSelectedSubject(normS(a.subjectname));
-                  }
-                }}
-                C={C} s={s}
-              />
-            </View>
-          )}
+          <View style={{ flex: 1 }}>
+            <PremiumDropdown 
+              label={t('assessment.label', 'Assessment')} 
+              placeholder={t('common.selectAssessment', 'Select Assessment')}
+              items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))}
+              selectedKey={selectedAssessment?.id || null}
+              onSelect={(key) => {
+                const a = filteredAssessments.find(ax => ax.id === key);
+                if (a) {
+                  setSelectedAssessment(a);
+                  setSelectedSubject(normS(a.subjectname));
+                }
+              }}
+              C={C} s={s}
+              disabled={!selectedSubjectKey}
+            />
+          </View>
         </View>
 
         <TextInput
@@ -2149,8 +2136,32 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
         renderItem={({ item }) => {
           const isMissing = !marks[item.id] || marks[item.id] === '';
           const shouldHighlight = highlightEmptyData && isMissing;
+
+          const animatedBorderColor = pulseAnim.interpolate({
+             inputRange: [0, 1],
+             outputRange: [C.border, C.accent]
+          });
+
+          const animatedShadow = pulseAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 4]
+          });
+
           return (
-          <View style={[s.markRow, { padding: 12, borderRadius: 16 }, shouldHighlight ? { borderColor: C.accent, borderWidth: 2, backgroundColor: 'transparent' } : null]}>
+          <Animated.View style={[
+            s.markRow, 
+            { padding: 12, borderRadius: 16 }, 
+            shouldHighlight ? { 
+              borderColor: animatedBorderColor, 
+              borderWidth: 2,
+              elevation: animatedShadow,
+              shadowColor: C.accent,
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: pulseAnim,
+              shadowRadius: 10,
+              backgroundColor: C.card 
+            } : null
+          ]}>
             <View style={{ flex: 1 }}>
               <Text style={s.studentName}>{item.name}</Text>
               {item.baptismalname ? <Text style={s.studentSub}>{item.baptismalname}</Text> : null}
@@ -2171,7 +2182,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
               }}
               editable={!!selectedAssessment}
             />
-          </View>
+          </Animated.View>
         )}}
         onEndReached={() => setPage(p => p + 1)}
         onEndReachedThreshold={0.5}
@@ -2385,7 +2396,7 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
             <TouchableOpacity 
               key={item.assessment.id} 
               style={[s.issueRow, { borderTopColor: C.border, flexDirection: 'column', alignItems: 'stretch' }]}
-              onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true } })}
+              onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ flex: 1 }}>
@@ -2393,7 +2404,7 @@ function UrgentMattersTab({ navigation, teacher, students: allStudents, assessme
                   <Text style={s.issueSub}>{item.assessment.subjectname} • {fmtGrade(item.assessment.grade)} • {t('urgent.missingCount', { count: item.count })}</Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true } })}
+                  onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })}
                   style={{ backgroundColor: C.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}
                 >
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{t('urgent.fixNow')}</Text>
