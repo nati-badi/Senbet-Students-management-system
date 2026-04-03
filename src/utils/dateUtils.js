@@ -24,9 +24,15 @@ export const formatEthiopianDate = (dateInput, forceAmharic = false) => {
             day: 'numeric'
         });
         let formatted = formatter.format(dateObj);
-        if (!isAmharic) {
+        
+        // Always ensure 'ዓ.ም' suffix for Amharic or as a replacement for 'E.C.'
+        if (isAmharic) {
+            // Remove any trailing ERA or extra spaces before adding ዓ.ም
+            formatted = formatted.replace(/(AM|PM|ERA1|ERA0)/gi, '').trim() + ' ዓ.ም';
+        } else {
             formatted = formatted.replace(/(AM|PM|ERA1|ERA0)/gi, '').trim() + ' E.C.';
         }
+        
         return formatted;
     } catch (e) {
         return dateInput || '—';
@@ -69,5 +75,21 @@ export const computeEthiopianYear = () => {
     const year = d.getFullYear();
     // Ethiopian New Year is in September (month index 8)
     const ethiopianYear = month >= 8 ? year - 7 : year - 8;
-    return `${ethiopianYear} E.C.`;
+    return `${ethiopianYear} ዓ.ም`;
+};
+
+/**
+ * Extracts the Ethiopian Year from a date string or Date object.
+ * @param {string|Date} dateInput
+ * @returns {string} The Ethiopian year with ዓ.ም suffix.
+ */
+export const getEthiopianYear = (dateInput) => {
+    const dateObj = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    if (!dateObj || isNaN(dateObj.getTime())) return '—';
+    
+    // Ethiopian New Year is in September
+    const month = dateObj.getMonth();
+    const year = dateObj.getFullYear();
+    const etYear = month >= 8 ? year - 7 : year - 8;
+    return `${etYear} ዓ.ም`;
 };

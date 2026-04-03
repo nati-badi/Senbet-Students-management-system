@@ -17,7 +17,9 @@ import {
     DeleteOutlined,
     SearchOutlined,
     BarChartOutlined,
-    WarningOutlined
+    WarningOutlined,
+    SyncOutlined,
+    CloudSyncOutlined
 } from '@ant-design/icons';
 import {
     Layout,
@@ -231,9 +233,20 @@ export default function TeacherDashboard() {
                             )}
                         </div>
                     </div>
-                    <Button danger onClick={handleTeacherLogout}>
-                        {t('common.logout', 'Logout')}
-                    </Button>
+                    <Space size="middle">
+                        <Button 
+                            icon={<SyncOutlined />} 
+                            onClick={() => {
+                                message.loading(t('common.syncing', 'Syncing...'), 0);
+                                window.dispatchEvent(new Event('triggerSync'));
+                            }}
+                        >
+                            {t('admin.syncNow', 'Sync Now')}
+                        </Button>
+                        <Button danger onClick={handleTeacherLogout}>
+                            {t('common.logout', 'Logout')}
+                        </Button>
+                    </Space>
                 </div>
             </Card>
             {/* Mobile Navigation */}
@@ -379,6 +392,27 @@ function TeacherLogin({ onLogin }) {
                         {t('common.login', 'Login')}
                     </Button>
                 </Form>
+                {teachers.length === 0 && (
+                    <div className="mt-8 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl">
+                        <Text type="warning" strong className="block mb-2 text-center">
+                            <WarningOutlined /> {t('teacher.noDataFound', 'No teacher data found locally.')}
+                        </Text>
+                        <Paragraph className="text-xs text-center text-slate-500 mb-4">
+                            You might need to sync with the cloud to download teacher accounts.
+                        </Paragraph>
+                        <Button 
+                            block 
+                            icon={<CloudSyncOutlined />} 
+                            onClick={async () => {
+                                message.loading('Syncing with cloud...', 1.5);
+                                await syncData();
+                                window.dispatchEvent(new Event('syncComplete'));
+                            }}
+                        >
+                            Sync From Cloud
+                        </Button>
+                    </div>
+                )}
             </Card>
         </div>
     );

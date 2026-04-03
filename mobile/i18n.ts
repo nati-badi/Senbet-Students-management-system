@@ -32,6 +32,9 @@ const resources = {
         "lates": "Lates",
         "recentHistory": "Recent History",
         "perfectAttendance": "Perfect attendance so far!",
+        "namePlaceholder": "e.g. Abebe Kebede",
+        "loginFieldsRequired": "Both Student Name and Access Code are required.",
+        "loginFailed": "Incorrect name or portal access code. Please try again.",
       },
       "common": {
         "save": "Save",
@@ -63,6 +66,12 @@ const resources = {
         "create": "Create",
         "english": "English",
         "amharic": "Amharic",
+        "active": "Active",
+        "yes": "Yes",
+        "offlineMessage": "Please check your internet connection and try again.",
+        "error": "Error",
+        "hardRefresh": "Hard Refresh",
+        "hardRefreshConfirm": "This will wipe your local cache and download everything fresh from the cloud. Proceed?",
       },
       "teacher": {
         "portalLogin": "Portal Login",
@@ -107,6 +116,9 @@ const resources = {
         "clearAll": "Clear All",
         "maxScoreLabel": "Max Score",
         "assessments": "Assessments",
+        "clearAllMarks": "Clear All Marks",
+        "confirmClearAll": "Are you sure you want to clear all marks for this assessment?",
+        "login": "Login",
       },
       "urgent": {
         "everyoneUpToDate": "Everything is up to date!",
@@ -176,6 +188,11 @@ const resources = {
         "registered": "Registered",
         "present": "Present",
         "ungraded": "Ungraded",
+      },
+      "auth": {
+        "missingInfo": "Name and access code are required.",
+        "invalidLogin": "Invalid name or access code.",
+        "loginFailed": "Login failed.",
       }
     }
   },
@@ -208,6 +225,9 @@ const resources = {
         "lates": "ዘግይተው የመጡ",
         "recentHistory": "የቅርብ ጊዜ ታሪክ",
         "perfectAttendance": "እስከ አሁን ድረስ መገኘቱ ፍጹም ነው!",
+        "namePlaceholder": "ምሳሌ፡ አበበ ከበደ",
+        "loginFieldsRequired": "የተማሪው ስም እና የመለያ ኮድ ያስፈልጋል።",
+        "loginFailed": "የተሳሳተ ስም ወይም የመግቢያ ኮድ። እባክዎ እንደገና ይሞክሩ።",
       },
       "common": {
         "save": "አስቀምጥ",
@@ -239,6 +259,12 @@ const resources = {
         "create": "ፍጠር",
         "english": "እንግሊዝኛ",
         "amharic": "አማርኛ",
+        "active": "ንቁ",
+        "yes": "አዎ",
+        "offlineMessage": "እባክዎ የበይነመረብ ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።",
+        "error": "ስህተት",
+        "hardRefresh": "ሙሉ ዳግም ማስጀመሪያ",
+        "hardRefreshConfirm": "ይህ የአካባቢዎን መረጃ ያጠፋል እና ሁሉንም መረጃዎች ከአዲሱ ዳግም ያወርዳል። መቀጠል ይፈልጋሉ?",
       },
       "teacher": {
         "portalLogin": "የመምህራን መግቢያ",
@@ -283,6 +309,9 @@ const resources = {
         "clearAll": "ሁሉንም አጥፋ",
         "maxScoreLabel": "ከፍተኛ ውጤት",
         "assessments": "ምዘናዎች",
+        "clearAllMarks": "ሁሉንም ውጤቶች አጥፋ",
+        "confirmClearAll": "ለዚህ ምዘና የተመዘገቡ ሁሉንም ውጤቶች ለማጥፋት እርግጠኛ ነዎት?",
+        "login": "ግባ",
       },
       "urgent": {
         "everyoneUpToDate": "ሁሉም ነገር ወቅታዊ ነው!",
@@ -352,6 +381,11 @@ const resources = {
         "registered": "የተመዘገቡ",
         "present": "የተገኙ",
         "ungraded": "ያልተመዘገቡ",
+      },
+      "auth": {
+        "missingInfo": "ስም እና የመግቢያ ኮድ ያስፈልጋል።",
+        "invalidLogin": "የተሳሳተ ስም ወይም የመግቢያ ኮድ።",
+        "loginFailed": "መግባት አልተሳካም።",
       }
     }
   }

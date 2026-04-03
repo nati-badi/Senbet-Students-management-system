@@ -16,7 +16,7 @@ import {
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
 import { useTranslation } from 'react-i18next';
-import { formatEthiopianDate } from '../utils/dateUtils';
+import { formatEthiopianDate, getEthiopianYear } from '../utils/dateUtils';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -196,7 +196,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             key: 'percentage',
             render: (p) => p ? <Tag color={p >= 50 ? 'green' : 'red'}>{p}%</Tag> : '-'
         },
-        { title: t('teacher.date'), dataIndex: 'date', key: 'date', render: t => <Text type="secondary" className="text-xs">{t}</Text> },
+        { title: t('teacher.date'), dataIndex: 'date', key: 'date', render: t => <Text type="secondary" className="text-xs">{formatEthiopianDate(t, true)}</Text> },
     ];
 
     // --- Sub-components for Tabs ---
@@ -479,29 +479,29 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                     <div className="flex flex-col items-center mb-10 text-center relative z-10">
                         <EthiopianCross className="w-12 h-12 text-[#d4af37] mb-4" />
                         <Title level={3} className="!mb-1 !text-[#2c1810] !font-serif tracking-wide">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
-                        <Text className="text-sm uppercase tracking-[0.2em] text-[#5c4033] font-bold">የተማሪዎች ውጤት መግለጫ</Text>
+                        <Text className="text-sm uppercase tracking-[0.2em] !text-[#5c4033] font-bold">የተማሪዎች ውጤት መግለጫ</Text>
                         <div className="w-12 h-px bg-[#d4af37] my-5" />
-                        <Text className="text-base uppercase tracking-widest text-[#8b0000] font-extrabold">Academic Transcript</Text>
+                        <Text className="text-base uppercase tracking-widest !text-[#8b0000] font-extrabold">Academic Transcript</Text>
                     </div>
 
                     {/* Student Info (Minimalist Grid) */}
                     <div className="w-full flex justify-between items-end border-b border-[#e8dfce] pb-4 mb-10 z-10">
                         <div className="flex flex-col gap-1">
-                            <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-bold">ሙሉ ስም / Name</Text>
+                            <Text className="uppercase text-[10px] tracking-widest !text-[#8c7361] font-bold">ሙሉ ስም / NAME</Text>
                             <Title level={4} className="!mb-0 !text-[#2c1810]">{student?.name}</Title>
-                            <Text className="text-sm italic text-[#5c4033] font-medium">{student?.baptismalName || 'N/A'}</Text>
+                            {!!student?.baptismalName && (
+                                <Text className="text-sm italic !text-[#5c4033] font-medium">የክርስትና ስም: {student.baptismalName}</Text>
+                            )}
                         </div>
                         <div className="flex gap-12 text-right">
                             <div className="flex flex-col gap-1">
-                                <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-bold">ክፍል / Grade</Text>
-                                <Text className="text-lg font-bold text-[#2c1810]">{formatGrade(student?.grade)}</Text>
+                                <Text className="uppercase text-[10px] tracking-widest !text-[#8c7361] font-bold">ክፍል / GRADE</Text>
+                                <Text className="text-lg font-bold !text-[#2c1810]">{formatGrade(student?.grade)}</Text>
                             </div>
                             <div className="flex flex-col gap-1">
-                                <Text className="uppercase text-[10px] tracking-widest text-[#8c7361] font-bold">ዓ.ም / Academic Year</Text>
-                                <Text className="text-lg font-bold text-[#2c1810]">
-                                    {String(student?.academicYear).includes('E.C.') 
-                                        ? student.academicYear 
-                                        : `${dayjs(student?.academicYear).format('YYYY')} E.C.`}
+                                <Text className="uppercase text-[10px] tracking-widest !text-[#8c7361] font-bold">ዓ.ም / YEAR</Text>
+                                <Text className="text-lg font-bold !text-[#2c1810]">
+                                    {getEthiopianYear(student?.academicYear || dayjs().toISOString())}
                                 </Text>
                             </div>
                         </div>

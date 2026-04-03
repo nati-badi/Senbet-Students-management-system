@@ -1,14 +1,19 @@
 import { db } from '../db/database';
 import { supabase } from './supabaseClient';
 
+const SYNC_LOG_PREFIX = '🔄 [Sync]';
+
 export const API_BASE = window.location.hostname === 'localhost' 
     ? 'http://localhost:5000/api' 
     : `http://${window.location.hostname}:5000/api`;
 
 async function processCloudData(tableName, cloudData, tableDb, tableStatus, pulledTotalRef) {
-    if (!cloudData || cloudData.length === 0) return;
+    if (!cloudData || cloudData.length === 0) {
+        console.log(`${SYNC_LOG_PREFIX} No new records to pull for ${tableName}`);
+        return;
+    }
     
-    console.log(`Pulled ${cloudData.length} records from ${tableName}. Filtering local conflicts...`);
+    console.log(`${SYNC_LOG_PREFIX} Pulling ${cloudData.length} updates for ${tableName}...`);
     
     // Fetch local unsynced records to detect conflicts
     // Bypass potential IndexedDB index corruption by filtering in-memory
@@ -359,7 +364,7 @@ export async function syncData({ force = false } = {}) {
                 }
 
                 // --- 2b. PULL PHASE ---
-                console.log(`Pulling updates for ${tableName}...`);
+                console.log(`${SYNC_LOG_PREFIX} Fetching ${tableName} from cloud (since ${lastSyncTime})...`);
                 const { data: cloudData, error: pullError } = await supabase
                     .from(tableName)
                     .select('*')

@@ -23,6 +23,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import StudentProfile from '../../components/StudentProfile';
 import { formatGrade } from '../../utils/gradeUtils';
+import { getEthiopianYear } from '../../utils/dateUtils';
+import dayjs from 'dayjs';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -517,7 +519,7 @@ function ProgressSection({ student, onLogout, onViewProfile }) {
                         <Col xs={24} sm={12} md={8}>
                             <Card size="small" className="bg-slate-50 dark:bg-slate-800/50 border-none rounded-2xl p-2">
                                 <Descriptions column={1} title={<span className="text-forest-600"><CalendarOutlined /> Quick Info</span>}>
-                                    <Descriptions.Item label="Academic Year">{student.academicYear ? (String(student.academicYear).includes('E.C.') ? student.academicYear : `${dayjs(student.academicYear).format('YYYY')} E.C.`) : '—'}</Descriptions.Item>
+                                    <Descriptions.Item label="Academic Year">{getEthiopianYear(student.academicYear || dayjs().toISOString())}</Descriptions.Item>
                                     <Descriptions.Item label="Contact">{student.parentContact || student.parentcontact || '—'}</Descriptions.Item>
                                     <Descriptions.Item label="Status"><Tag color="processing">Active</Tag></Descriptions.Item>
                                 </Descriptions>

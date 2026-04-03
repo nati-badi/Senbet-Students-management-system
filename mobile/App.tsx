@@ -71,17 +71,18 @@ const THEMES = {
   dark: {
     bg: '#0f172a',
     card: '#1e293b',
-    border: '#334155',
-    accent: '#3b82f6',
-    accentMuted: '#3b82f622',
+    border: 'transparent',
+    accent: '#6366f1', // Richer Indigo
+    accentMuted: 'rgba(99, 102, 241, 0.15)',
     green: '#10b981',
     amber: '#f59e0b',
     red: '#ef4444',
     slate: '#94a3b8',
     text: '#f8fafc',
-    muted: '#94a3b8',
-    input: '#0f172a',
-    glass: 'rgba(30, 41, 59, 0.8)',
+    muted: '#64748b',
+    input: '#1e293b', // Elevated background
+    glass: 'rgba(15, 23, 42, 0.7)',
+    isDark: true,
   },
   light: {
     bg: '#f8fafc',
@@ -97,6 +98,7 @@ const THEMES = {
     muted: '#64748b',
     input: '#f1f5f9',
     glass: 'rgba(255, 255, 255, 0.8)',
+    isDark: false,
   },
 };
 
@@ -370,6 +372,9 @@ export default function App() {
   }, [teacher?.id]); // Only run on login or teacher change, NOT on syncData function change
 
   const handleLogin = async (t: Teacher) => {
+    // Clear stale sync anchor so the first sync after login is always a FULL sync
+    setLastSyncIso(null);
+    await AsyncStorage.removeItem('last_sync_iso');
     setTeacher(t);
     await AsyncStorage.setItem('senbet_teacher_auth', JSON.stringify(t));
   };
@@ -386,9 +391,10 @@ export default function App() {
 
   const handleLogout = async () => {
     setTeacher(null);
-    setStudents([]); setAssessments([]); setMarks([]); setAttendance([]);
+    setStudents([]); setAssessments([]); setMarks([]); setAttendance([]); setSubjects([]); setSettings({});
+    setLastSync(null); setLastSyncIso(null);
     await AsyncStorage.multiRemove([
-      'senbet_teacher_auth', 'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'last_sync_time', 'cached_subjects', 'cached_settings'
+      'senbet_teacher_auth', 'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'last_sync_time', 'last_sync_iso', 'cached_subjects', 'cached_settings'
     ]);
   };
 
@@ -621,6 +627,8 @@ export default function App() {
         assessments={assessments}
         marks={marks}
         allStudents={students}
+        subjects={subjects}
+        settings={settings}
         C={C}
         s={s}
       />
@@ -697,6 +705,7 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
   const [accessCode, setAccessCode] = useState('');
   const [showCode, setShowCode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const accessCodeRef = useRef<any>(null);
   const [student, setStudent] = useState<Student | null>(null);
   const [marks, setMarks] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
@@ -781,11 +790,14 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
                  value={studentName}
                  onChangeText={setStudentName}
                  autoCorrect={false}
+                 returnKeyType="next"
+                 onSubmitEditing={() => accessCodeRef.current?.focus()}
                />
                
                <Text style={s.inputLabel}>{t('parent.portalAccessCode', 'Portal Access Code')}</Text>
                <View style={{ position: 'relative' }}>
                  <TextInput 
+                   ref={accessCodeRef}
                    style={[s.loginInput, { height: 56, paddingRight: 50 }]}
                    placeholder="------"
                    keyboardType="numeric"
@@ -794,6 +806,8 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
                    value={accessCode}
                    onChangeText={setAccessCode}
                    secureTextEntry={!showCode}
+                   returnKeyType="search"
+                   onSubmitEditing={doSearch}
                  />
                  <TouchableOpacity 
                    onPress={() => setShowCode(!showCode)} 
@@ -803,8 +817,8 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
                  </TouchableOpacity>
                </View>
 
-               <TouchableOpacity style={[s.loginBtn, { marginTop: 24, height: 56, borderRadius: 12 }]} onPress={doSearch} disabled={loading}>
-                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('parent.viewResults', 'View Student Results')}</Text>}
+               <TouchableOpacity style={[s.loginBtn, { marginTop: 24, height: 60, borderRadius: 16, shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 }]} onPress={doSearch} disabled={loading}>
+                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={[s.loginBtnText, { fontSize: 17 }]}>{t('parent.viewResults', 'View Student Results')}</Text>}
                </TouchableOpacity>
             </View>
           </ScrollView>
@@ -813,23 +827,23 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
             <View style={[s.dashboardCard, { marginBottom: 24, alignItems: 'center', padding: 24 }]}>
-               <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: C.accent + '33' }}>
-                 <User size={40} color={C.accent} />
+               <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+                 <User size={44} color={C.accent} />
                </View>
-               <Text style={{ color: C.text, fontSize: 22, fontWeight: '900', textAlign: 'center' }}>{student.name}</Text>
-               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 }}>
-                 <View style={{ backgroundColor: C.border, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 }}>
-                   <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>{fmtGrade(student.grade)}</Text>
+               <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', textAlign: 'center' }}>{student.name}</Text>
+               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 10 }}>
+                 <View style={{ backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}>
+                   <Text style={{ color: C.accent, fontSize: 13, fontWeight: '800' }}>{fmtGrade(student.grade)}</Text>
                  </View>
                  <Text style={{ color: C.muted }}>•</Text>
-                 <Text style={{ color: C.muted, fontWeight: '600' }}>ID: {student.portalcode || student.id.slice(0, 8)}</Text>
+                 <Text style={{ color: C.muted, fontWeight: '700', fontSize: 13 }}>ID: {student.portalcode || student.id.slice(0, 8)}</Text>
                </View>
                
                <TouchableOpacity 
-                 style={{ marginTop: 24, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: C.accent + '10', borderWidth: 1, borderColor: C.accent + '20' }} 
+                 style={{ marginTop: 28, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, backgroundColor: C.accent + '10' }} 
                  onPress={() => setStudent(null)}
                >
-                 <Text style={{ color: C.accent, fontWeight: '800', fontSize: 13 }}>{t('parent.searchAnother', 'Search Another Student')}</Text>
+                 <Text style={{ color: C.accent, fontWeight: '900', fontSize: 14 }}>{t('parent.searchAnother', 'Search Another Student')}</Text>
                </TouchableOpacity>
             </View>
             
@@ -907,9 +921,9 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
                         <View style={{ flex: 1 }}>
                           <Text style={[s.studentName, { fontSize: 15 }]}>{a.name}</Text>
                         </View>
-                        <View style={{ alignItems: 'flex-end', backgroundColor: C.bg, padding: 10, borderRadius: 12, minWidth: 60, borderWidth: 1, borderColor: C.border }}>
-                          <Text style={{ color: mark ? C.accent : C.muted, fontSize: 20, fontWeight: '900' }}>{mark ? mark.score : '-'}</Text>
-                          <Text style={{ color: C.muted, fontSize: 10, fontWeight: '600' }}>/ {a.maxscore}</Text>
+                         <View style={{ alignItems: 'flex-end', backgroundColor: C.bg, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, minWidth: 70 }}>
+                          <Text style={{ color: mark ? C.accent : C.muted, fontSize: 22, fontWeight: '900' }}>{mark ? mark.score : '-'}</Text>
+                          <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', marginTop: -4 }}>/ {a.maxscore}</Text>
                         </View>
                       </View>
                     );
@@ -918,9 +932,9 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
               ))
             )}
 
-            <View style={{ marginTop: 24, padding: 24, backgroundColor: C.card, borderRadius: 20, borderStyle: 'dashed', borderWidth: 2, borderColor: C.border, alignItems: 'center' }}>
-               <CalendarCheck size={32} color={C.muted} opacity={0.4} />
-               <Text style={{ color: C.muted, textAlign: 'center', marginTop: 12, fontWeight: '600', fontSize: 13 }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
+            <View style={{ marginTop: 24, padding: 24, backgroundColor: C.card, borderRadius: 24, alignItems: 'center' }}>
+               <CalendarCheck size={36} color={C.muted} opacity={0.3} />
+               <Text style={{ color: C.muted, textAlign: 'center', marginTop: 16, fontWeight: '700', fontSize: 14, lineHeight: 22 }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
             </View>
             <View style={{ height: 40 }} />
         </ScrollView>
@@ -938,6 +952,7 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
   const [showCode, setShowCode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const accessCodeRef = useRef<any>(null);
 
   const doLogin = async () => {
     setErrorMsg('');
@@ -999,18 +1014,18 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
             bounces={true}
           >
             <View style={{ alignItems: 'center', marginBottom: 32 }}>
-              <View style={{ width: 100, height: 100, borderRadius: 24, padding: 4, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginBottom: 20 }}>
+              <View style={{ width: 104, height: 104, borderRadius: 26, padding: 6, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 6, marginBottom: 20 }}>
                 {/* @ts-ignore */}
-                <RNImage source={require('./assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
+                <RNImage source={require('./assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 22 }} resizeMode="contain" />
               </View>
-              <Text style={s.loginTitle}>በግ/ደ/አ/ቅ/አርሴማ</Text>
-              <Text style={s.loginSub}>ፍኖተ ብርሃን ሰ/ቤት</Text>
+              <Text style={[s.loginTitle, { fontSize: 26 }]}>በግ/ደ/አ/ቅ/አርሴማ</Text>
+              <Text style={[s.loginSub, { fontSize: 16, marginTop: 4 }]}>ፍኖተ ብርሃን ሰ/ቤት</Text>
             </View>
 
             <View style={s.loginCard}>
               {errorMsg ? (
-                <View style={{ backgroundColor: '#fee2e2', padding: 12, borderRadius: 10, marginBottom: 20, borderWidth: 1, borderColor: '#fca5a5' }}>
-                   <Text style={{ color: '#ef4444', fontSize: 13, textAlign: 'center', fontWeight: 'bold' }}>{errorMsg}</Text>
+                <View style={{ backgroundColor: C.red + '15', padding: 14, borderRadius: 14, marginBottom: 24 }}>
+                   <Text style={{ color: C.red, fontSize: 13, textAlign: 'center', fontWeight: '800' }}>{errorMsg}</Text>
                 </View>
               ) : null}
 
@@ -1021,11 +1036,14 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
                 onChangeText={(text) => { setName(text); setErrorMsg(''); }}
                 placeholder="e.g. Abebe Kebede"
                 placeholderTextColor={C.muted}
+                returnKeyType="next"
+                onSubmitEditing={() => accessCodeRef.current?.focus()}
               />
 
               <Text style={s.inputLabel}>{t('teacher.accessCode', 'Access Code')}</Text>
               <View style={{ position: 'relative' }}>
                 <TextInput
+                  ref={accessCodeRef}
                   style={[s.loginInput, { paddingRight: 50 }]}
                   value={code}
                   onChangeText={(text) => { setCode(text); setErrorMsg(''); }}
@@ -1034,6 +1052,8 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
                   placeholderTextColor={C.muted}
                   keyboardType="numeric"
                   maxLength={6}
+                  returnKeyType="go"
+                  onSubmitEditing={doLogin}
                 />
                 <TouchableOpacity 
                   onPress={() => setShowCode(!showCode)} 
@@ -1043,8 +1063,8 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity style={s.loginBtn} onPress={doLogin} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('teacher.login', 'Login')}</Text>}
+              <TouchableOpacity style={[s.loginBtn, { marginTop: 32, height: 62, borderRadius: 18, shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 }]} onPress={doLogin} disabled={loading}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={[s.loginBtnText, { fontSize: 17, fontWeight: '800' }]}>{t('teacher.login', 'Login')}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -1677,7 +1697,16 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
   const [highlightEmptyData, setHighlightEmptyData] = useState(false);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null); 
+  const inputRefs = useRef<Record<string, any>>({});
   const lastRoutedNonce = useRef<number | null>(null);
+
+  const focusNext = (currentIndex: number) => {
+    const paginated = paginate(filteredStudents, page);
+    if (currentIndex < paginated.length - 1) {
+      const nextItem = paginated[currentIndex + 1];
+      inputRefs.current[nextItem.id]?.focus();
+    }
+  };
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
   const gradeAssessments = myAssessments.filter((a) => normG(a.grade) === normG(selectedGrade));
@@ -1917,7 +1946,6 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       showToast?.(`⚠️ ${t('teacher.noHistoryPoints')}`, 'info');
       return;
     }
-
     setPredictDetails({ count: studentsWithHistory.length, subject: selectedAssessment.subjectname, students: studentsWithHistory });
     setPredictVisible(true);
   };
@@ -1964,28 +1992,59 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
             <PremiumDropdown label={t('assessment.subject', 'Subject')} placeholder={t('common.selectSubject', 'Select Subject')} items={gradeSubjects} selectedKey={selectedSubjectKey} onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }} C={C} s={s} disabled={!selectedGrade} />
           </View>
           <View style={{ flex: 1 }}>
-            <PremiumDropdown label={t('assessment.label', 'Assessment')} placeholder={t('common.selectAssessment', 'Select Assessment')} items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))} selectedKey={selectedAssessment?.id || null} onSelect={(key) => { const a = filteredAssessments.find(ax => ax.id === key); if (a) { setSelectedAssessment(a); setSelectedSubject(normS(a.subjectname)); } }} C={C} s={s} disabled={!selectedSubjectKey} />
+            <PremiumDropdown label={t('assessment.label', 'Assessment')} placeholder={t('common.selectAssessment', 'Select Assessment')} items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))} selectedKey={selectedAssessment?.id || null} onSelect={(key) => { const a = filteredAssessments.find(ax => ax.id === key); if (a) { setSelectedSubject(normS(a.subjectname)); setSelectedAssessment(a); } }} C={C} s={s} disabled={!selectedSubjectKey} />
           </View>
         </View>
         <TextInput style={[s.searchInput, { margin: 0, marginBottom: 16 }]} placeholder={t('common.searchStudents')} placeholderTextColor={C.muted} value={search} onChangeText={setSearch} />
       </View>
 
-      <FlatList ref={flatListRef} data={paginate(filteredStudents, page)} keyExtractor={item => item.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />} extraData={[selectedAssessment?.id, marks]} contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" ListHeaderComponent={selectedAssessment ? (
-        <View style={[s.maxScoreBar, { borderRadius: 12, marginBottom: 16, padding: 16 }]}>
-          <Text style={{ color: C.accent, fontWeight: '800', textAlign: 'center', marginBottom: 12, fontSize: 16 }}>{selectedAssessment.name} - {t('teacher.maxScoreLabel')}: {selectedAssessment.maxscore}</Text>
-          <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'center' }}>
-            <TouchableOpacity onPress={handlePredictMarks} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}><TrendingUp size={18} color={C.accent} style={{ marginBottom: 4 }} /><Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.predict')}</Text></TouchableOpacity>
-            <TouchableOpacity onPress={handleFillConstantMark} style={{ flex: 1, backgroundColor: C.accent + '22', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.accent + '44' }}><Text style={{ fontSize: 16, marginBottom: 2 }}>📝</Text><Text style={{ color: C.accent, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.constant')}</Text></TouchableOpacity>
-            <TouchableOpacity onPress={handleClearMarks} style={{ flex: 1, backgroundColor: C.red + '11', padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.red + '33' }}><Trash2 size={18} color={C.red} style={{ marginBottom: 4 }} /><Text style={{ color: C.red, fontSize: 10, fontWeight: '700', textAlign: 'center' }}>{t('teacher.clearAll')}</Text></TouchableOpacity>
+      <FlatList ref={flatListRef} data={paginate(filteredStudents, page)} keyExtractor={item => item.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />} extraData={[selectedAssessment?.id, marks]} contentContainerStyle={{ padding: 16, paddingBottom: 120 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" ListHeaderComponent={selectedAssessment ? (
+        <View style={{ marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+             <View>
+                <Text style={{ color: C.text, fontWeight: '800', fontSize: 16 }}>{selectedAssessment.name}</Text>
+                <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600' }}>{t('teacher.maxScoreLabel')}: {selectedAssessment.maxscore}</Text>
+             </View>
+             <View style={{ backgroundColor: C.accent + '20', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                <Text style={{ color: C.accent, fontSize: 11, fontWeight: '800' }}>{t('common.active').toUpperCase()}</Text>
+             </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity onPress={handlePredictMarks} style={s.actionBtn}>
+              <TrendingUp size={18} color={C.accent} />
+              <Text style={s.actionBtnText}>{t('teacher.predict')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleFillConstantMark} style={s.actionBtn}>
+              <Edit size={18} color={C.accent} />
+              <Text style={s.actionBtnText}>{t('teacher.constant')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleClearMarks} style={[s.actionBtn, { backgroundColor: C.red + '11' }]}>
+              <Trash2 size={18} color={C.red} />
+              <Text style={[s.actionBtnText, { color: C.red }]}>{t('teacher.clearAll')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      ) : null} renderItem={({ item }) => {
+      ) : null} renderItem={({ item, index }) => {
         const isMissing = !marks[item.id] || marks[item.id] === '';
         const shouldHighlight = highlightEmptyData && isMissing;
         return (
-          <Animated.View style={[s.markRow, { padding: 12, borderRadius: 16 }, shouldHighlight ? { borderColor: C.accent, borderWidth: 2, backgroundColor: C.card } : null]}>
-            <View style={{ flex: 1 }}><Text style={s.studentName}>{item.name}</Text>{item.baptismalname ? <Text style={s.studentSub}>{item.baptismalname}</Text> : null}</View>
-            <TextInput style={[s.markInput, { width: 80, height: 44, borderRadius: 10 }]} keyboardType="numeric" placeholder="0" placeholderTextColor={C.muted} value={marks[item.id] || ''} onChangeText={(val) => { const score = parseFloat(val); if (val !== '' && !isNaN(score) && selectedAssessment && score > selectedAssessment.maxscore) { showToast?.(`❌ Max score is ${selectedAssessment.maxscore}`, 'error'); return; } setMarks(prev => ({ ...prev, [item.id]: val })); }} editable={!!selectedAssessment} />
+          <Animated.View style={[s.markRow, { padding: 12, borderRadius: 16 }, shouldHighlight ? { backgroundColor: C.accentMuted } : null]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.studentName, { fontSize: 15 }]}>{item.name}</Text>
+              {item.baptismalname ? <Text style={s.studentSub}>{item.baptismalname}</Text> : null}
+            </View>
+            <TextInput 
+              ref={el => { inputRefs.current[item.id] = el; }}
+              style={[s.markInput, { width: 80, height: 44, borderRadius: 12, backgroundColor: C.bg }]} 
+              keyboardType="numeric" 
+              placeholder="0" 
+              placeholderTextColor={C.muted} 
+              value={marks[item.id] || ''} 
+              onChangeText={(val) => { const score = parseFloat(val); if (val !== '' && !isNaN(score) && selectedAssessment && score > selectedAssessment.maxscore) { showToast?.(`❌ Max score is ${selectedAssessment.maxscore}`, 'error'); return; } setMarks(prev => ({ ...prev, [item.id]: val })); }} 
+              editable={!!selectedAssessment}
+              returnKeyType="next"
+              onSubmitEditing={() => focusNext(index)}
+            />
           </Animated.View>
         )}} onEndReached={() => setPage(p => p + 1)} onEndReachedThreshold={0.5} />
 
@@ -1998,7 +2057,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
                 <Text style={s.modalSub}>{t('teacher.fillConstantDesc')} (Max: {selectedAssessment?.maxscore})</Text>
                 <TextInput style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]} keyboardType="numeric" placeholder={`0 - ${selectedAssessment?.maxscore || 10}`} placeholderTextColor={C.muted} value={bulkScore} onChangeText={setBulkScore} autoFocus />
                 <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.card }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
                   <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}><Text style={s.modalBtnText}>{t('common.apply')}</Text></TouchableOpacity>
                 </View>
               </View>
@@ -2015,7 +2074,7 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
                 <Text style={s.modalTitle}>{t('teacher.predictMarks')}</Text>
                 <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('teacher.predictDesc', { count: predictDetails.count, subject: predictDetails.subject })}</Text>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <TouchableOpacity onPress={() => setPredictVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setPredictVisible(false)} style={[s.modalBtn, { backgroundColor: C.card }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
                   <TouchableOpacity onPress={applyPrediction} style={[s.modalBtn, { backgroundColor: C.accent }]}><Text style={[s.modalBtnText, { color: '#fff' }]}>{t('teacher.predict')}</Text></TouchableOpacity>
                 </View>
               </View>
@@ -2032,8 +2091,8 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
                 <Text style={s.modalTitle}>{t('teacher.clearAllMarks')}</Text>
                 <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('teacher.confirmClearAll')}</Text>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <TouchableOpacity onPress={() => setClearAllVisible(false)} style={[s.modalBtn, { backgroundColor: C.border }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={applyClearAllMarks} style={[s.modalBtn, { backgroundColor: C.red + '33', borderColor: C.red + '66', borderWidth: 1 }]}><Text style={[s.modalBtnText, { color: C.red, fontWeight: '800' }]}>{t('common.yes')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setClearAllVisible(false)} style={[s.modalBtn, { backgroundColor: C.bg }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={applyClearAllMarks} style={[s.modalBtn, { backgroundColor: C.red + '15' }]}><Text style={[s.modalBtnText, { color: C.red, fontWeight: '800' }]}>{t('common.yes')}</Text></TouchableOpacity>
                 </View>
               </View>
             </TouchableWithoutFeedback>
@@ -2042,9 +2101,16 @@ function MarksTab({ route, navigation, teacher, students: allStudents, assessmen
       </Modal>
 
       {selectedAssessment && (
-        <View style={{ position: 'absolute', bottom: 16, left: 16, right: 16 }}>
-          <TouchableOpacity style={[s.loginBtn, { marginTop: 0 }]} onPress={saveMarks} disabled={saving}>{saving ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('teacher.saveMarks')}</Text>}</TouchableOpacity>
-        </View>
+        <BlurView intensity={80} tint={C.isDark ? 'dark' : 'light'} style={[s.glassFooter, { backgroundColor: 'transparent' }]}>
+          <TouchableOpacity 
+            style={s.glassBtn} 
+            onPress={saveMarks} 
+            disabled={saving}
+            activeOpacity={0.8}
+          >
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.loginBtnText}>{t('teacher.saveMarks')}</Text>}
+          </TouchableOpacity>
+        </BlurView>
       )}
     </KeyboardAvoidingView>
   );
@@ -2484,12 +2550,34 @@ function AnalyticsTab({ teacher, students: allStudents, assessments: allAssessme
   );
 }
 
-function StudentProfileModal({ student, onClose, assessments, marks, allStudents, C, s }: {
-  student: Student | null, onClose: () => void, assessments: Assessment[], marks: any[], allStudents: Student[], C: any, s: any
+function StudentProfileModal({ student, onClose, assessments, marks, allStudents, subjects, settings, C, s }: {
+  student: Student | null, onClose: () => void, assessments: Assessment[], marks: any[], allStudents: Student[], subjects: any[], settings: any, C: any, s: any
 }) {
   const { t } = useTranslation();
   const [subTab, setSubTab] = useState<'overview' | 'attendance' | 'marks' | 'cert'>('overview');
   if (!student) return null;
+
+  const getEthiopianYear = (dateString: string | null | undefined): string => {
+    if (!dateString) return 'N/A';
+    if (String(dateString).includes('E.C.') || String(dateString).includes('ዓ.ም')) return dateString;
+    
+    // If it's an ISO date string
+    if (String(dateString).includes('-')) {
+      const d = new Date(dateString);
+      if (!isNaN(d.getTime())) {
+        const month = d.getMonth(); 
+        const year = d.getFullYear();
+        const ethiopianYear = month >= 8 ? year - 7 : year - 8;
+        return `${ethiopianYear} ዓ.ም`;
+      }
+    }
+    
+    // If it's already a 4-digit number like "2016"
+    const m = String(dateString).match(/^(\d{4})$/);
+    if (m) return `${m[1]} ዓ.ም`;
+    
+    return `${dateString} ዓ.ም`;
+  };
 
   const studentMarks = marks.filter(m => {
     const ass = assessments.find(a => a.id === m.assessmentid);
@@ -2533,6 +2621,66 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
   }, 0);
   const avg = maxPossible > 0 ? ((totalScore / maxPossible) * 100).toFixed(1) : '0';
 
+  const activeSemester = settings?.currentSemester || 'Semester I';
+  const gradeAssessments = assessments.filter(a => normG(a.grade) === normG(student.grade) && !isConduct(a));
+  
+  const subjectsList = [...new Set(gradeAssessments.map(a => a.subjectname))].sort() as string[];
+  const subjectRows = subjectsList.map(subject => {
+      const semIAssessments = gradeAssessments.filter(a => {
+          const subjObj = subjects.find(s => normS(s.name) === normS(a.subjectname));
+          return normS(a.subjectname) === normS(subject) && (subjObj?.semester || 'Semester I') === 'Semester I';
+      });
+      const semIIAssessments = gradeAssessments.filter(a => {
+          const subjObj = subjects.find(s => normS(s.name) === normS(a.subjectname));
+          return normS(a.subjectname) === normS(subject) && subjObj?.semester === 'Semester II';
+      });
+      
+      const semIEarned = semIAssessments.reduce((acc, a) => {
+          const m = marks.find(mark => mark.studentid === student.id && mark.assessmentid === a.id);
+          return acc + (m ? Number(m.score) : 0);
+      }, 0);
+      const semIMax = semIAssessments.reduce((acc, a) => acc + (Number(a.maxscore) || 0), 0);
+      const semIHasData = semIAssessments.some(a => marks.find(m => m.studentid === student.id && m.assessmentid === a.id));
+
+      const semIIEarned = semIIAssessments.reduce((acc, a) => {
+          const m = marks.find(mark => mark.studentid === student.id && mark.assessmentid === a.id);
+          return acc + (m ? Number(m.score) : 0);
+      }, 0);
+      const semIIMax = semIIAssessments.reduce((acc, a) => acc + (Number(a.maxscore) || 0), 0);
+      const semIIHasData = semIIAssessments.some(a => marks.find(m => m.studentid === student.id && m.assessmentid === a.id));
+
+      let totalMax = 0;
+      let totalEarned = 0;
+
+      if (activeSemester === 'Semester I') {
+          totalMax = semIMax;
+          totalEarned = semIEarned;
+      } else {
+          totalMax = semIMax + semIIMax;
+          totalEarned = semIEarned + semIIEarned;
+      }
+
+      const avgPct = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(0) : '-';
+
+      return {
+          subject,
+          semI: semIHasData ? `${semIEarned} / ${semIMax}` : (semIAssessments.length ? '—' : 'N/A'),
+          semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIAssessments.length ? '—' : 'N/A'),
+          avg: avgPct !== '-' ? `${avgPct}%` : '—',
+          rowMax: totalMax,
+          rowEarned: totalEarned
+      };
+  });
+
+  let liveTotalMax = 0;
+  let liveTotalEarned = 0;
+  subjectRows.forEach(row => {
+      liveTotalMax += row.rowMax;
+      liveTotalEarned += row.rowEarned;
+  });
+
+  const overallAvg = liveTotalMax > 0 ? ((liveTotalEarned / liveTotalMax) * 100).toFixed(1) : '0';
+
   const sections = [
     { key: 'overview', label: t('profile.overview'), icon: <Info size={18} color={subTab === 'overview' ? C.accent : C.muted} /> },
     { key: 'attendance', label: t('profile.attendance'), icon: <CalendarCheck size={18} color={subTab === 'attendance' ? C.accent : C.muted} /> },
@@ -2543,24 +2691,23 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
   return (
     <Modal visible={!!student} animationType="fade" transparent onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={s.modalOverlay}>
-          <BlurView intensity={20} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
+        <View style={[s.modalOverlay, { padding: 16 }]}>
           <TouchableWithoutFeedback>
-            <View style={[s.modalCard, { maxHeight: '90%', padding: 0, overflow: 'hidden' }]}>
-              <View style={{ padding: 24, paddingBottom: 16 }}>
+            <View style={[s.modalCard, { maxHeight: '92%', padding: 0, overflow: 'hidden', flex: 0 }]}>
+              <View style={{ padding: 20, paddingBottom: 16 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View><Text style={[s.modalTitle, { fontSize: 24, fontWeight: '900', color: C.text }]}>{student.name}</Text></View>
-                  <TouchableOpacity onPress={onClose} style={[s.themeBtn, { width: 40, height: 40, borderRadius: 20 }]}><Text style={{ color: C.text, fontSize: 24, lineHeight: 28 }}>×</Text></TouchableOpacity>
+                  <View style={{ flex: 1, marginRight: 12 }}><Text style={[s.modalTitle, { fontSize: 22, fontWeight: '900', color: C.text }]} numberOfLines={2}>{student.name}</Text></View>
+                  <TouchableOpacity onPress={onClose} style={[s.themeBtn, { width: 36, height: 36, borderRadius: 18 }]}><Text style={{ color: C.text, fontSize: 22, lineHeight: 26 }}>×</Text></TouchableOpacity>
                 </View>
               </View>
-              <View style={{ flexDirection: 'row', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+              <View style={{ flexDirection: 'row', paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
                 {sections.map(sec => (
-                  <TouchableOpacity key={sec.key} onPress={() => setSubTab(sec.key as any)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: subTab === sec.key ? 2 : 0, borderBottomColor: C.accent }}>
-                    {sec.icon}<Text style={{ color: subTab === sec.key ? C.accent : C.muted, fontSize: 11, fontWeight: subTab === sec.key ? '800' : '600', marginTop: 4 }}>{sec.label}</Text>
+                  <TouchableOpacity key={sec.key} onPress={() => setSubTab(sec.key as any)} style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: subTab === sec.key ? 2 : 0, borderBottomColor: C.accent }}>
+                    {sec.icon}<Text style={{ color: subTab === sec.key ? C.accent : C.muted, fontSize: 10, fontWeight: subTab === sec.key ? '800' : '600', marginTop: 3 }}>{sec.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+              <ScrollView style={{ flexGrow: 1, flexShrink: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
                 {subTab === 'overview' && (
                   <View>
                     <View style={[s.dashboardCard, { flexDirection: 'row', padding: 20, marginBottom: 20, borderRadius: 24 }]}>
@@ -2592,28 +2739,80 @@ function StudentProfileModal({ student, onClose, assessments, marks, allStudents
                 )}
                 {subTab === 'cert' && (
                   <View style={{ alignItems: 'center' }}>
-                    <View style={{ width: '100%', minHeight: 480, backgroundColor: '#fdfbf7', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: '#e8dfce' }}>
-                      <Text style={{ textAlign: 'center', color: '#2c1810', fontSize: 18, fontWeight: '900' }}>{t('cert.title', { lng: 'am' })}</Text>
-                      <Text style={{ textAlign: 'center', color: '#8b0000', fontSize: 14, fontWeight: '800', marginTop: 4 }}>{t('cert.title', { lng: 'en' })}</Text>
-                      <View style={{ marginTop: 24, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#e8dfce' }}>
-                         <Text style={{ fontSize: 10, color: '#8c7361', fontWeight: '800' }}>NAME / ስም</Text>
-                         <Text style={{ fontSize: 20, color: '#2c1810', fontWeight: '700' }}>{student.name}</Text>
+                    <View style={{ width: '100%', minHeight: 480, backgroundColor: '#fdfbf7', padding: 24, borderWidth: 1, borderColor: '#e8dfce', position: 'relative' }}>
+                      {/* Corner Accents */}
+                      <View style={{ position: 'absolute', top: 12, left: 12, width: 16, height: 16, borderTopWidth: 1, borderLeftWidth: 1, borderColor: '#d4af37' }} />
+                      <View style={{ position: 'absolute', top: 12, right: 12, width: 16, height: 16, borderTopWidth: 1, borderRightWidth: 1, borderColor: '#d4af37' }} />
+                      <View style={{ position: 'absolute', bottom: 12, left: 12, width: 16, height: 16, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: '#d4af37' }} />
+                      <View style={{ position: 'absolute', bottom: 12, right: 12, width: 16, height: 16, borderBottomWidth: 1, borderRightWidth: 1, borderColor: '#d4af37' }} />
+
+                      {/* Header */}
+                      <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                        <Text style={{ textAlign: 'center', color: '#2c1810', fontSize: 16, fontWeight: '900', marginBottom: 4 }}>በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Text>
+                        <Text style={{ textAlign: 'center', color: '#5c4033', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>የተማሪዎች ውጤት መግለጫ</Text>
+                        <View style={{ width: 40, height: 1, backgroundColor: '#d4af37', marginVertical: 12 }} />
+                        <Text style={{ textAlign: 'center', color: '#8b0000', fontSize: 12, fontWeight: '900', letterSpacing: 1 }}>ACADEMIC TRANSCRIPT</Text>
                       </View>
-                      <View style={{ flex: 1, marginTop: 16 }}>
-                        {assessments.filter(a => String(a.grade) === String(student.grade) && !isConduct(a)).slice(0, 8).map((a, i) => {
-                          const m = marks.find(mark => mark.studentid === student.id && mark.assessmentid === a.id);
-                          const perc = m ? ((Number(m.score) / a.maxscore) * 100).toFixed(0) : null;
-                          return (
-                            <View key={i} style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e8dfce55' }}>
-                              <Text style={{ flex: 2, fontSize: 12, color: '#2c1810', fontWeight: '600' }}>{a.name}</Text>
-                              <Text style={{ flex: 1, fontSize: 12, color: '#5c4033', textAlign: 'center' }}>{m ? `${m.score}/${a.maxscore}` : '—'}</Text>
-                              <Text style={{ flex: 1, fontSize: 12, color: '#2c1810', textAlign: 'center', fontWeight: '800' }}>{perc ? `${perc}%` : '—'}</Text>
+
+                      {/* Student Info */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', borderBottomWidth: 1, borderBottomColor: '#e8dfce', paddingBottom: 12, marginBottom: 24 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>ሙሉ ስም / NAME</Text>
+                          <Text style={{ fontSize: 16, color: '#2c1810', fontWeight: '800', marginTop: 2 }}>{student.name}</Text>
+                          {!!student.baptismalname && (
+                            <Text style={{ fontSize: 12, color: '#5c4033', fontStyle: 'italic', marginTop: 2 }}>የክርስትና ስም: {student.baptismalname}</Text>
+                          )}
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                           <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>ክፍል / GRADE</Text>
+                           <Text style={{ fontSize: 14, color: '#2c1810', fontWeight: '800', marginTop: 2, marginBottom: 8 }}>{student.grade}</Text>
+                           <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>ዓ.ም / YEAR</Text>
+                           <Text style={{ fontSize: 14, color: '#2c1810', fontWeight: '800', marginTop: 2 }}>{getEthiopianYear(student.academicyear)}</Text>
+                        </View>
+                      </View>
+
+                      {/* Table Header */}
+                      <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(212, 175, 55, 0.3)', paddingBottom: 8, marginBottom: 8 }}>
+                          <Text style={{ flex: 2, fontSize: 9, color: '#8c7361', fontWeight: '800' }}>የትምህርት አይነት / SUBJECT</Text>
+                          <Text style={{ flex: 1, fontSize: 8, color: '#8c7361', fontWeight: '800', textAlign: 'center' }}>፩ኛ መንፈቀ ዓመት / SEM I</Text>
+                          <Text style={{ flex: 1, fontSize: 8, color: '#8c7361', fontWeight: '800', textAlign: 'center' }}>፪ኛ መንፈቀ ዓመት / SEM II</Text>
+                          <Text style={{ flex: 1, fontSize: 9, color: '#8c7361', fontWeight: '800', textAlign: 'center' }}>አማካይ / AVG</Text>
+                      </View>
+
+                      {/* Marks List */}
+                      <View style={{ flex: 1 }}>
+                        {subjectRows.length === 0 ? (
+                            <Text style={{ textAlign: 'center', padding: 24, fontStyle: 'italic', color: '#8c7361', fontSize: 12 }}>No assessments defined.</Text>
+                        ) : (
+                          subjectRows.map((row, i) => (
+                            <View key={i} style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(232, 223, 206, 0.5)' }}>
+                              <Text style={{ flex: 2, fontSize: 11, color: '#2c1810', fontWeight: '600' }}>{row.subject}</Text>
+                              <Text style={{ flex: 1, fontSize: 11, color: '#5c4033', textAlign: 'center' }}>{row.semI}</Text>
+                              <Text style={{ flex: 1, fontSize: 11, color: '#5c4033', textAlign: 'center' }}>{row.semII}</Text>
+                              <Text style={{ flex: 1, fontSize: 11, color: '#2c1810', textAlign: 'center', fontWeight: '800' }}>{row.avg}</Text>
                             </View>
-                          );
-                        })}
+                          ))
+                        )}
                       </View>
-                      <View style={{ marginTop: 24, paddingTop: 16, borderTopWidth: 2, borderTopColor: '#e8dfce', flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontWeight: '800' }}>AVG / አማካይ</Text><Text style={{ fontWeight: '900', color: '#8b0000' }}>{avg}%</Text>
+
+                      {/* Footer Totals */}
+                      <View style={{ marginTop: 24 }}>
+                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#e8dfce' }}>
+                             <Text style={{ fontSize: 10, color: '#2c1810', fontWeight: '800', letterSpacing: 1 }}>አጠቃላይ ድምር / GRAND TOTAL</Text>
+                             <Text style={{ fontSize: 18, color: '#8b0000', fontWeight: '900' }}>{overallAvg}%</Text>
+                         </View>
+                         {totalInClass > 0 && (
+                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                                 <Text style={{ fontSize: 9, color: '#5c4033', fontWeight: '800', letterSpacing: 1 }}>ክፍል ደረጃ / CLASS RANK</Text>
+                                 <Text style={{ fontSize: 14, color: '#2c1810', fontWeight: '800' }}>{classRank} / {totalInClass}</Text>
+                             </View>
+                         )}
+                         {totalInGrade > 0 && (
+                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                                 <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>አጠቃላይ ደረጃ / GRADE RANK</Text>
+                                 <Text style={{ fontSize: 12, color: '#5c4033', fontWeight: '700' }}>{overallRank} / {totalInGrade}</Text>
+                             </View>
+                         )}
                       </View>
                     </View>
                   </View>
@@ -2637,31 +2836,35 @@ function makeStyles(C: any) {
   loginRoot: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', padding: 24 },
   loginTitle: { color: C.text, fontSize: 32, fontWeight: '800', textAlign: 'center' },
   loginSub: { color: C.accent, fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 32 },
-  loginCard: { backgroundColor: C.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: C.border },
-  inputLabel: { color: C.muted, fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 16 },
-  loginInput: { backgroundColor: C.input, color: C.text, borderRadius: 12, padding: 14, fontSize: 16, borderWidth: 1, borderColor: C.border },
+  loginCard: { backgroundColor: C.card, borderRadius: 24, padding: 24 },
+  inputLabel: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
+  loginInput: { backgroundColor: C.input, color: C.text, borderRadius: 12, padding: 14, fontSize: 16 },
   loginBtn: { backgroundColor: C.accent, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 32 },
   loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: C.border },
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
   headerTitle: { color: C.text, fontSize: 22, fontWeight: '800' },
   headerSub: { color: C.muted, fontSize: 13, marginTop: 2 },
-  logoutBtn: { backgroundColor: C.red + '22', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: C.red },
-  logoutBtnText: { color: C.red, fontSize: 16, fontWeight: '700' },
-  dashboardCard: { backgroundColor: C.card, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: C.border },
-  dashboardAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, padding: 18, borderRadius: 20, marginBottom: 14, borderWidth: 1, borderColor: C.border },
-  tabBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.card, paddingVertical: 8, paddingBottom: Platform.OS === 'ios' ? 24 : 8 },
-  searchInput: { margin: 16, marginBottom: 0, backgroundColor: C.card, color: C.text, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: C.border },
-  studentCard: { backgroundColor: C.card, borderRadius: 12, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  logoutBtn: { backgroundColor: C.red + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  logoutBtnText: { color: C.red, fontSize: 14, fontWeight: '700' },
+  dashboardCard: { backgroundColor: C.card, borderRadius: 20, padding: 20 },
+  dashboardAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, padding: 18, borderRadius: 20, marginBottom: 14 },
+  tabBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: C.card, paddingVertical: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 12 },
+  searchInput: { margin: 16, marginBottom: 0, backgroundColor: C.card, color: C.text, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15 },
+  studentCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
   sectionTitle: { color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 12 },
   empty: { color: C.muted, textAlign: 'center', marginTop: 40, fontSize: 15 },
-  gradeChip: { backgroundColor: C.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8, borderWidth: 1, borderColor: C.border },
-  gradeChipActive: { backgroundColor: C.accent, borderColor: C.accent },
+  gradeChip: { backgroundColor: C.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8 },
+  gradeChipActive: { backgroundColor: C.accent },
   gradeChipText: { color: C.muted, fontSize: 13, fontWeight: '600' },
   gradeChipTextActive: { color: '#fff' },
-  attendanceRow: { backgroundColor: C.card, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1 },
+  attendanceRow: { backgroundColor: C.card, borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   statusText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  markRow: { backgroundColor: C.card, borderRadius: 12, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  markRow: { backgroundColor: C.card, borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
+  glassFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 32 : 20, paddingTop: 16 },
+  glassBtn: { backgroundColor: C.accent, borderRadius: 16, padding: 18, alignItems: 'center', shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+  actionBtn: { flex: 1, backgroundColor: C.accentMuted, padding: 12, borderRadius: 12, alignItems: 'center', gap: 6 },
+  actionBtnText: { color: C.accent, fontSize: 12, fontWeight: '700' },
   markInput: { backgroundColor: C.input, color: C.text, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, width: 100, textAlign: 'right', fontSize: 16, fontWeight: '700', borderWidth: 1, borderColor: C.border },
   maxScoreBar: { backgroundColor: C.accent + '15', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: C.accent + '44' },
   issueCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border },
@@ -2673,8 +2876,8 @@ function makeStyles(C: any) {
   modalCard: { backgroundColor: C.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: C.border },
   modalTitle: { color: C.text, fontSize: 20, fontWeight: '800', marginBottom: 8 },
   modalSub: { color: C.muted, fontSize: 14, marginBottom: 20 },
-  modalBtn: { flex: 1, backgroundColor: C.accent, borderRadius: 12, padding: 14, alignItems: 'center' },
-  modalBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  modalBtn: { flex: 1, backgroundColor: C.accent, borderRadius: 14, padding: 16, alignItems: 'center', justifyContent: 'center' },
+  modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   sidebarItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, marginBottom: 4 },
   sidebarIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.border + '33', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   sidebarText: { color: C.text, fontSize: 15, fontWeight: '600' },

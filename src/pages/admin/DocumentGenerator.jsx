@@ -9,6 +9,7 @@ import html2canvas from 'html2canvas';
 import dayjs from 'dayjs';
 import { QRCodeCanvas } from 'qrcode.react';
 import { db } from '../../db/database';
+import { formatEthiopianDate, getEthiopianYear } from '../../utils/dateUtils';
 
 
 const { Title, Text } = Typography;
@@ -427,9 +428,7 @@ function IDCardTemplate({ student }) {
                         <div>
                             <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Year / ዘመን</span>
                             <div className="text-[9px] font-bold">
-                                {String(student.academicYear || dayjs().format('YYYY')).includes('E.C.') 
-                                    ? student.academicYear 
-                                    : `${dayjs(student.academicYear).format('YYYY')} E.C.`}
+                                {getEthiopianYear(student.academicYear || dayjs().toISOString())}
                             </div>
                         </div>
                     </div>
@@ -516,23 +515,23 @@ function CertificateTemplate({ student, marks, subjects = [], assessments = [] }
             {/* Student Info (Minimalist Grid) */}
             <div className="w-full flex justify-between items-end border-b border-[#e8dfce] pb-6 mb-12 z-10">
                 <div className="flex flex-col gap-1.5">
-                    <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ሙሉ ስም / {t('admin.name')}</Text>
+                    <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ሙሉ ስም / NAME</Text>
                     <Text className="text-2xl font-medium text-[#2c1810]">{student.name}</Text>
-                    <Text className="text-base italic text-[#5c4033]">{student.baptismalName || '-'}</Text>
+                    {!!student?.baptismalName && (
+                        <Text className="text-base italic text-[#5c4033]">የክርስትና ስም: {student.baptismalName}</Text>
+                    )}
                 </div>
                 <div className="flex gap-16 text-right">
                     <div className="flex flex-col gap-1.5">
-                        <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ክፍል / {t('admin.grade')}</Text>
+                        <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ክፍል / GRADE</Text>
                         <Text className="text-xl text-[#2c1810]">{student.grade}</Text>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                        <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ዓ.ም / Year</Text>
-                        <Text className="text-xl text-[#2c1810]">
-                            {String(student.academicYear || dayjs().format('YYYY')).includes('E.C.') 
-                                ? student.academicYear 
-                                : `${dayjs(student.academicYear).format('YYYY')} E.C.`}
-                        </Text>
-                    </div>
+                        <div className="flex flex-col gap-1.5">
+                            <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ዓ.ም / YEAR</Text>
+                            <Text className="text-xl text-[#2c1810]">
+                                {getEthiopianYear(student.academicYear || dayjs().toISOString())}
+                            </Text>
+                        </div>
                 </div>
             </div>
 
