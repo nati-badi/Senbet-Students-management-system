@@ -72,6 +72,10 @@ const resources = {
         "error": "Error",
         "hardRefresh": "Hard Refresh",
         "hardRefreshConfirm": "This will wipe your local cache and download everything fresh from the cloud. Proceed?",
+        "comingSoon": "Coming Soon",
+        "underDevelopment": "Feature under development. Stay tuned for updates!",
+        "underMaintenance": "UNDER MAINTENANCE",
+        "stayTuned": "STAY TUNED"
       },
       "teacher": {
         "portalLogin": "Portal Login",
@@ -265,6 +269,10 @@ const resources = {
         "error": "ስህተት",
         "hardRefresh": "ሙሉ ዳግም ማስጀመሪያ",
         "hardRefreshConfirm": "ይህ የአካባቢዎን መረጃ ያጠፋል እና ሁሉንም መረጃዎች ከአዲሱ ዳግም ያወርዳል። መቀጠል ይፈልጋሉ?",
+        "comingSoon": "በቅርቡ ይጠበቃል",
+        "underDevelopment": "ይህ አገልግሎት በመበልጸግ ላይ ነው። ለተጨማሪ መረጃ ይጠብቁ!",
+        "underMaintenance": "በማሻሻያ ላይ ነው",
+        "stayTuned": "ይጠብቁ"
       },
       "teacher": {
         "portalLogin": "የመምህራን መግቢያ",

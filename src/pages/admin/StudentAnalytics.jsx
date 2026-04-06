@@ -145,7 +145,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
             title: 'Attendance',
             dataIndex: 'attendanceRate',
             key: 'attendanceRate',
-            render: (val, r) => r.totalDays > 0 ? <span className="text-slate-500">{val.toFixed(0)}%</span> : <span className="text-slate-300">N/A</span>
+            render: () => <span className="coming-soon-content-blur text-slate-300">88%</span>
         }
     ];
 

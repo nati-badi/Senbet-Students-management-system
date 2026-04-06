@@ -136,3 +136,62 @@ input[type=number] {
     transition-delay: 0ms, 40ms, 40ms, 0ms;
   }
 }
+
+/* ============================================================
+   COMING SOON BLUR UTILITIES
+   ============================================================ */
+.coming-soon-blur-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.coming-soon-content-blur {
+  filter: blur(8px) grayscale(0.5);
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.6;
+}
+
+.coming-soon-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(2px);
+  z-index: 10;
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.dark .coming-soon-overlay {
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.coming-soon-badge {
+  background: #f59e0b; /* Orange-500 */
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  margin-bottom: 0.5rem;
+}
+
+.coming-soon-text {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.8);
+}
+
+.dark .coming-soon-text {
+  color: #f1f5f9;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}

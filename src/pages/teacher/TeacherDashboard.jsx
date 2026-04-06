@@ -60,7 +60,7 @@ import TeacherAssessmentManagement from './TeacherAssessmentManagement';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
 import { Navigate } from 'react-router-dom';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { Sider, Content } = Layout;
 
 
@@ -1554,11 +1554,13 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
     ];
 
     return (
-        <div className="flex flex-col gap-6 w-full">
-            <div>
-                <Title level={2}>{t('teacher.attendanceModule')}</Title>
-                <Text type="secondary">{t('teacher.recordAttendanceInfo')}</Text>
-            </div>
+        <div className="flex flex-col gap-6 w-full coming-soon-blur-container">
+            {/* Content to be blurred */}
+            <div className="coming-soon-content-blur">
+                <div>
+                    <Title level={2}>{t('teacher.attendanceModule')}</Title>
+                    <Text type="secondary">{t('teacher.recordAttendanceInfo')}</Text>
+                </div>
 
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Form layout="vertical">
@@ -1729,6 +1731,22 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                         locale={{ emptyText: <Empty description={selectedGrade ? t('teacher.noStudentsInGrade') : t('teacher.selectGrade')} /> }}
                     />
                 )}
+            </div>
+
+            {/* Close content-blur div */}
+            </div>
+
+            {/* Standardized "Coming Soon" Overlay */}
+            <div className="coming-soon-overlay">
+                <div className="coming-soon-badge">
+                    {t('common.comingSoon', 'Coming Soon')}
+                </div>
+                <div className="coming-soon-text">
+                    {t('teacher.attendanceModuleStatus', 'Attendance tracking will be enabled in a future update.')}
+                </div>
+                <div className="mt-2 text-slate-500 dark:text-slate-400 text-xs font-medium italic">
+                    Feature currently in development
+                </div>
             </div>
         </div>
     );

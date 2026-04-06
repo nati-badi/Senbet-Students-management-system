@@ -29,6 +29,7 @@
     "i18next": "^23.16.8",
     "intl-pluralrules": "^2.0.1",
     "lucide-react-native": "^0.577.0",
+    "puppeteer": "^24.40.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-i18next": "^14.1.3",

@@ -234,11 +234,12 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     );
 
     const renderAttendance = () => (
-        <div className="space-y-6 mt-4 relative">
-            <div className="coming-soon-blur pointer-events-none select-none">
+        <div className="space-y-6 mt-4 coming-soon-blur-container">
+            {/* Content to be blurred */}
+            <div className="coming-soon-content-blur">
                 <Title level={5} className="!mb-4"><Space><CalendarOutlined /> {t('teacher.attendanceStreak')}</Space></Title>
 
-                <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                <div className="p-4 bg-slate-100 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800">
                     <div className="flex flex-wrap gap-1.5 justify-start">
                         {heatmapDays.map((day, idx) => {
                             let colorClass = "bg-slate-200 dark:bg-slate-800"; // none
@@ -283,13 +284,17 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                 </Row>
             </div>
             
-            <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                <Tag color="orange" className="text-sm px-4 py-1.5 shadow-lg border-orange-200 font-bold uppercase tracking-widest">
+            {/* Standardized "Coming Soon" Overlay */}
+            <div className="coming-soon-overlay">
+                <div className="coming-soon-badge">
                     {t('common.comingSoon', 'Coming Soon')}
-                </Tag>
-                <Text type="secondary" className="mt-2 bg-white/80 dark:bg-slate-900/80 px-4 py-1 rounded-full backdrop-blur-sm text-xs">
+                </div>
+                <div className="coming-soon-text">
                     {t('teacher.attendanceModuleStatus', 'Attendance tracking will be enabled in a future update.')}
-                </Text>
+                </div>
+                <div className="mt-2 text-slate-500 dark:text-slate-400 text-xs font-medium italic">
+                    Feature currently in development
+                </div>
             </div>
         </div>
     );
@@ -461,110 +466,125 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
         return (
             <div className="mt-4 flex flex-col items-center bg-slate-100 dark:bg-slate-900 p-8 rounded-lg overflow-auto">
-                {/* Minimalist Ethiopian Orthodox Premium Theme */}
-                <div className="w-[190mm] min-h-[250mm] bg-[#fdfbf7] p-12 flex flex-col shadow-2xl relative font-serif text-[#2c1810] shrink-0 transform origin-top border border-[#e8dfce]" style={{ transform: 'scale(0.8)', marginBottom: '-10%' }}>
+                {/* Certificate Card — matching mobile design with generous spacing */}
+                <div className="w-full bg-[#fdfbf7] rounded-2xl shadow-xl border border-[#e8dfce] overflow-hidden font-serif text-[#2c1810]">
                     
-                    {/* Minimalist Corner Accents */}
-                    <div className="absolute top-6 left-6 w-8 h-8 border-t border-l border-[#d4af37]" />
-                    <div className="absolute top-6 right-6 w-8 h-8 border-t border-r border-[#d4af37]" />
-                    <div className="absolute bottom-6 left-6 w-8 h-8 border-b border-l border-[#d4af37]" />
-                    <div className="absolute bottom-6 right-6 w-8 h-8 border-b border-r border-[#d4af37]" />
-
-                    {/* Faint Background Emblem */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
-                        <EthiopianCross className="w-96 h-96 text-[#2c1810]" />
-                    </div>
-
                     {/* Header */}
-                    <div className="flex flex-col items-center mb-10 text-center relative z-10">
-                        <EthiopianCross className="w-12 h-12 text-[#d4af37] mb-4" />
-                        <Title level={3} className="!mb-1 !text-[#2c1810] !font-serif tracking-wide">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
-                        <Text className="text-sm uppercase tracking-[0.2em] !text-[#5c4033] font-bold">የተማሪዎች ውጤት መግለጫ</Text>
-                        <div className="w-12 h-px bg-[#d4af37] my-5" />
-                        <Text className="text-base uppercase tracking-widest !text-[#8b0000] font-extrabold">Academic Transcript</Text>
+                    <div className="flex flex-col items-center pt-12 pb-6 px-12 text-center">
+                        <h2 className="text-2xl font-bold text-[#2c1810] mb-2 tracking-wide" style={{ fontFamily: 'serif' }}>
+                            በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት
+                        </h2>
+                        <p className="text-sm text-[#5c4033] font-semibold tracking-widest uppercase mb-5">
+                            የተማሪዎች ውጤት መግለጫ
+                        </p>
+                        <div className="w-24 h-[2px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent mb-5" />
+                        <p className="text-base font-extrabold text-[#1a3a6b] tracking-[0.25em] uppercase">
+                            ACADEMIC TRANSCRIPT
+                        </p>
                     </div>
 
-                    {/* Student Info (Minimalist Grid) */}
-                    <div className="w-full flex justify-between items-end border-b border-[#e8dfce] pb-4 mb-10 z-10">
-                        <div className="flex flex-col gap-1">
-                            <Text className="uppercase text-[10px] tracking-widest !text-[#8c7361] font-bold">ሙሉ ስም / NAME</Text>
-                            <Title level={4} className="!mb-0 !text-[#2c1810]">{student?.name}</Title>
-                            {!!student?.baptismalName && (
-                                <Text className="text-sm italic !text-[#5c4033] font-medium">የክርስትና ስም: {student.baptismalName}</Text>
-                            )}
-                        </div>
-                        <div className="flex gap-12 text-right">
+                    {/* Student Info */}
+                    <div className="px-12 pb-10">
+                        <div className="flex justify-between items-end border-b border-[#e8dfce] pb-6 mb-10">
                             <div className="flex flex-col gap-1">
-                                <Text className="uppercase text-[10px] tracking-widest !text-[#8c7361] font-bold">ክፍል / GRADE</Text>
-                                <Text className="text-lg font-bold !text-[#2c1810]">{formatGrade(student?.grade)}</Text>
+                                <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">ሙሉ ስም / NAME</span>
+                                <span className="text-2xl font-bold text-[#2c1810] mt-1">{student?.name}</span>
+                                {!!(student?.baptismalName || student?.baptismalname) && (
+                                    <span className="text-sm italic text-[#5c4033] mt-1">
+                                        የክርስትና ስም: {student.baptismalName || student.baptismalname}
+                                    </span>
+                                )}
                             </div>
-                            <div className="flex flex-col gap-1">
-                                <Text className="uppercase text-[10px] tracking-widest !text-[#8c7361] font-bold">ዓ.ም / YEAR</Text>
-                                <Text className="text-lg font-bold !text-[#2c1810]">
-                                    {getEthiopianYear(student?.academicYear || dayjs().toISOString())}
-                                </Text>
+                            <div className="flex gap-16 text-right">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">ክፍል / GRADE</span>
+                                    <span className="text-2xl font-bold text-[#2c1810] mt-1">{student?.grade}</span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">ዓ.ም / YEAR</span>
+                                    <span className="text-2xl font-bold text-[#2c1810] mt-1">
+                                        {getEthiopianYear(student?.academicYear || dayjs().toISOString())}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Minimalist Data Table */}
-                    <div className="w-full mb-12 z-10">
-                        <table className="w-full border-collapse text-sm">
+                        {/* Subjects Table */}
+                        <table className="w-full border-collapse text-[15px] mb-8">
                             <thead>
-                                <tr>
-                                    <th className="p-3 text-left font-bold text-[#8c7361] uppercase tracking-wider text-[10px] border-b border-[#d4af37]/30">የትምህርት አይነት / Subject</th>
-                                    <th className="p-3 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[10px] border-b border-[#d4af37]/30">፩ኛ መንፈቀ ዓመት / SEM I</th>
-                                    <th className="p-3 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[10px] border-b border-[#d4af37]/30">፪ኛ መንፈቀ ዓመት / SEM II</th>
-                                    <th className="p-3 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[10px] border-b border-[#d4af37]/30">አማካይ / Average</th>
+                                <tr className="border-b-2 border-[#d4af37]/30">
+                                    <th className="py-3.5 px-4 text-left font-bold text-[#8c7361] uppercase tracking-wider text-[11px]">
+                                        የትምህርት አይነት / SUBJECT
+                                    </th>
+                                    <th className="py-3.5 px-4 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[11px]">
+                                        ፩ኛ መንፈቅ ዓመት /<br/>SEM I
+                                    </th>
+                                    <th className="py-3.5 px-4 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[11px]">
+                                        ፪ኛ መንፈቅ ዓመት /<br/>SEM II
+                                    </th>
+                                    <th className="py-3.5 px-4 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[11px]">
+                                        አማካይ / AVG
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {subjectRows.length === 0 ? (
-                                    <tr><td colSpan={4} className="text-center p-8 italic text-[#8c7361]">No assessments defined</td></tr>
+                                    <tr>
+                                        <td colSpan={4} className="text-center py-12 italic text-[#8c7361] text-base">
+                                            No assessments defined
+                                        </td>
+                                    </tr>
                                 ) : (
                                     subjectRows.map((row) => (
-                                        <tr key={row.subject} className="group hover:bg-[#faf8f5] transition-colors border-b border-[#e8dfce]/50">
-                                            <td className="p-3 text-[#2c1810]">{row.subject}</td>
-                                            <td className="p-3 text-center text-[#5c4033]">{row.semI}</td>
-                                            <td className="p-3 text-center text-[#5c4033]">{row.semII}</td>
-                                            <td className="p-3 text-center font-medium text-[#2c1810]">{row.avg}</td>
+                                        <tr key={row.subject} className="border-b border-[#e8dfce]/60 hover:bg-[#faf8f3] transition-colors">
+                                            <td className="py-3.5 px-4 text-[#2c1810] font-medium">{row.subject}</td>
+                                            <td className="py-3.5 px-4 text-center text-[#5c4033]">{row.semI}</td>
+                                            <td className="py-3.5 px-4 text-center text-[#5c4033]">{row.semII}</td>
+                                            <td className="py-3.5 px-4 text-center font-semibold text-[#2c1810]">{row.avg}</td>
                                         </tr>
                                     ))
                                 )}
                             </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td className="p-4 pt-8 text-[#2c1810] uppercase tracking-widest font-bold text-[11px]">አጠቃላይ ድምር / Grand Total</td>
-                                    <td colSpan={2}></td>
-                                    <td className="p-4 pt-8 text-center text-[#8b0000] font-black text-xl">{overallAvg}%</td>
-                                </tr>
-                                {totalInClass > 0 && (
-                                    <tr>
-                                        <td className="p-4 pt-2 pb-1 text-[#5c4033] uppercase tracking-widest font-bold text-[10px]">ክፍል ደረጃ / Class Rank</td>
-                                        <td colSpan={2}></td>
-                                        <td className="p-4 pt-2 pb-1 text-center font-bold text-lg text-[#2c1810]">{classRank} / {totalInClass}</td>
-                                    </tr>
-                                )}
-                                {totalInGrade > 0 && (
-                                    <tr>
-                                        <td className="p-4 pt-1 text-[#8c7361] uppercase tracking-widest font-bold text-[10px]">አጠቃላይ ደረጃ / Grade Rank</td>
-                                        <td colSpan={2}></td>
-                                        <td className="p-4 pt-1 text-center font-bold text-sm text-[#5c4033]">{overallRank} / {totalInGrade}</td>
-                                    </tr>
-                                )}
-                            </tfoot>
                         </table>
+
+                        {/* Grand Total & Ranks */}
+                        <div className="border-t-2 border-[#d4af37]/30 pt-6 mt-4 space-y-4">
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm font-bold text-[#2c1810] uppercase tracking-widest">
+                                    አጠቃላይ ድምር / GRAND TOTAL
+                                </span>
+                                <span className="text-3xl font-black text-[#8b0000]">{overallAvg}%</span>
+                            </div>
+
+                            {totalInClass > 0 && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[12px] font-bold text-[#5c4033] uppercase tracking-widest">
+                                        ክፍል ደረጃ / CLASS RANK
+                                    </span>
+                                    <span className="text-lg font-bold text-[#2c1810]">{classRank} / {totalInClass}</span>
+                                </div>
+                            )}
+
+                            {totalInGrade > 0 && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[12px] font-bold text-[#8c7361] uppercase tracking-widest">
+                                        አጠቃላይ ደረጃ / GRADE RANK
+                                    </span>
+                                    <span className="text-base font-bold text-[#5c4033]">{overallRank} / {totalInGrade}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Status Banners */}
+                    {/* Status Banner */}
                     {missingAssessments.length > 0 && (
-                        <div className="mt-auto border border-[#8b0000]/20 bg-[#8b0000]/5 text-[#8b0000] p-3 text-center text-xs font-semibold uppercase tracking-widest z-10">
+                        <div className="border-t border-[#8b0000]/20 bg-[#8b0000]/5 text-[#8b0000] py-3 text-center text-xs font-semibold uppercase tracking-widest">
                             <WarningOutlined className="mr-2" />
                             {t('teacher.incompleteTranscript', { count: missingAssessments.length })}
                         </div>
                     )}
                     {missingAssessments.length === 0 && gradeAssessments.length > 0 && (
-                        <div className="mt-auto border border-[#d4af37]/30 bg-[#d4af37]/5 text-[#5c4033] p-3 text-center text-xs font-semibold uppercase tracking-widest z-10">
+                        <div className="border-t border-[#d4af37]/30 bg-[#d4af37]/5 text-[#5c4033] py-3 text-center text-xs font-semibold uppercase tracking-widest">
                             <FileProtectOutlined className="mr-2 text-[#d4af37]" />
                             {t('teacher.readyForFinal')}
                         </div>
@@ -579,7 +599,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
         { 
             key: '2', 
             label: (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 opacity-60 filter blur-[0.5px]">
                     <span><CalendarOutlined /> {t('teacher.attendance')}</span>
                     <Tag color="orange" className="text-[10px] px-1 py-0 h-fit leading-none m-0">{t('common.comingSoon', 'Soon')}</Tag>
                 </div>
