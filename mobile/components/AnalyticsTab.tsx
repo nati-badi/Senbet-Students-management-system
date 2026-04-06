@@ -37,12 +37,18 @@ export const AnalyticsTab = React.memo(({ teacher, students: allStudents, assess
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
 
   const studentStats = useMemo(() => students.map(st => {
-    const sMarks = marks.filter(m => (m.studentid || m.studentId) === st.id);
+    const currentAssessmentIds = assessments.map(a => a.id);
+    const sMarks = marks.filter(m => 
+      (m.studentid || m.studentId) === st.id && 
+      currentAssessmentIds.includes(m.assessmentid || m.assessmentId)
+    );
+    
     const total = sMarks.reduce((acc, m) => acc + (Number(m.score) || 0), 0);
     const maxPoss = sMarks.reduce((acc, m) => {
       const ass = assessments.find(a => a.id === (m.assessmentid || m.assessmentId));
-      return acc + (ass?.maxscore || 100);
+      return acc + (ass?.maxscore || 0);
     }, 0);
+    
     const perc = maxPoss > 0 ? (total / maxPoss) * 100 : 0;
     return { name: st.name, perc, count: sMarks.length };
   }).filter(s => s.count > 0).sort((a, b) => b.perc - a.perc), [students, marks, assessments]);

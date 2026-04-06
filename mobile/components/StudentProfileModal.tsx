@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, TouchableWithoutFeedback, Pressable, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, TouchableWithoutFeedback, Pressable, Platform, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Info, CalendarCheck, TrendingUp, Users } from 'lucide-react-native';
 import { Student, Assessment, normG, normS, isConduct } from '../utils';
@@ -154,23 +154,22 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
 
   return (
     <Modal visible={!!student} animationType="fade" transparent onRequestClose={onClose}>
-      <Pressable 
-        style={[s.modalOverlay, { padding: 16, alignItems: 'center' }]} 
-        onPress={onClose}
-      >
+      <View style={[s.modalOverlay, { padding: 16, alignItems: 'center', justifyContent: 'center' }]}>
+        {/* Background Overlay - Sibling to the Card to prevent gesture hijacking */}
         <Pressable 
-          onPress={(e) => e.stopPropagation()} 
-          style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <View style={[s.modalCard, { 
-            maxHeight: '92%', 
-            minHeight: Platform.OS === 'web' ? 400 : 0,
-            padding: 0, 
-            overflow: 'hidden', 
-            flex: 0, 
-            width: Platform.OS === 'web' ? 600 : '100%', 
-            maxWidth: '100%' 
-          }]}>
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.7)' }]} 
+          onPress={onClose} 
+        />
+        
+        <View style={[s.modalCard, { 
+          maxHeight: '92%', 
+          minHeight: Platform.OS === 'web' ? 400 : 0,
+          padding: 0, 
+          overflow: 'hidden', 
+          flex: 0, 
+          width: Platform.OS === 'web' ? 600 : '100%', 
+          maxWidth: '100%' 
+        }]}>
               <View style={{ padding: 20, paddingBottom: 16 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View style={{ flex: 1, marginRight: 12 }}><Text style={[s.modalTitle, { fontSize: 22, fontWeight: '900', color: C.text }]} numberOfLines={2}>{student.name}</Text></View>
@@ -304,8 +303,7 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
                 )}
               </ScrollView>
             </View>
-        </Pressable>
-      </Pressable>
+      </View>
     </Modal>
   );
 });
