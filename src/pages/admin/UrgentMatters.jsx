@@ -179,61 +179,6 @@ export default function UrgentMatters() {
         }
     };
 
-    const handleWipeAllMarks = () => {
-        Modal.confirm({
-            title: <span className="text-red-600 font-bold">DANGEROUS: Wipe All Assessment Marks?</span>,
-            icon: <WarningOutlined className="text-red-500" />,
-            content: (
-                <div className="py-4">
-                    <Paragraph type="danger" strong>
-                        This will permanently delete every single mark for every student across all subjects and assessments in the entire system.
-                    </Paragraph>
-                    <Paragraph type="secondary" className="text-sm">
-                        Type <Text code strong className="text-red-600">RESET</Text> below to confirm this action:
-                    </Paragraph>
-                    <Input 
-                        placeholder="Type RESET here" 
-                        onChange={(e) => window._wipeConfirm = e.target.value}
-                    />
-                </div>
-            ),
-            okText: 'Wipe Everything',
-            okType: 'danger',
-            onOk: async () => {
-                if (window._wipeConfirm !== 'RESET') {
-                    message.error("Incorrect confirmation text. Wipe cancelled.");
-                    return;
-                }
-                try {
-                    const allMarks = await db.marks.toArray();
-                    const allIds = allMarks.map(m => m.id);
-                    
-                    // Clear locally
-                    await db.marks.clear();
-                    
-                    // Queue for remote deletion
-                    if (allIds.length > 0) {
-                        for (const id of allIds) {
-                            await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'marks', recordId: id });
-                        }
-                        
-                        // Chunked Supabase Wipe (500 records at a time)
-                        for (let i = 0; i < allIds.length; i += 500) {
-                            const chunk = allIds.slice(i, i + 500);
-                            const { error: delError } = await supabase.from('marks').delete().in('id', chunk);
-                            if (delError) console.error("Wipe chunk error:", delError);
-                        }
-                    }
-                    
-                    message.success(`Successfully wiped ${allIds.length} marks from the system.`);
-                } catch (e) {
-                    message.error("Wipe failed: " + e.message);
-                } finally {
-                    delete window._wipeConfirm;
-                }
-            }
-        });
-    };
 
     const goToRegisterAndSearch = (name) => {
         navigate('/admin/register');
@@ -604,25 +549,6 @@ export default function UrgentMatters() {
                 </Card>
             )}
 
-            <Card className="rounded-2xl border-none shadow-sm bg-slate-50 dark:bg-slate-900/30 border-t-4 border-t-red-500">
-                <div className="flex justify-between items-center flex-wrap gap-4">
-                    <div>
-                        <Title level={4} style={{ margin: 0 }} className="text-red-600 flex items-center gap-2">
-                             <AlertOutlined /> Dangerous Data Actions
-                        </Title>
-                        <Text type="secondary">Powerful tools for bulk data cleanup and system resets</Text>
-                    </div>
-                    <Button 
-                        danger 
-                        type="primary" 
-                        icon={<DeleteOutlined />} 
-                        onClick={handleWipeAllMarks}
-                        className="rounded-lg shadow-sm"
-                    >
-                        Wipe All Assessment Marks
-                    </Button>
-                </div>
-            </Card>
 
             <StudentProfile 
                 studentId={profileStudentId} 

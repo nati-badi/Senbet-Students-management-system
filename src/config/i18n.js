@@ -127,7 +127,20 @@ const resources = {
                 "autoCalculate": "Auto-Calculate",
                 "autoCalculateConfirm": "This will automatically calculate promotion actions based on the student's yearly average percentage. Students missing marks will be skipped and flagged. Do you want to continue?",
                 "missingMarks": "Missing Marks",
-                "validationWarning": "calculating..."
+                "validationWarning": "calculating...",
+                "dangerous": {
+                    "title": "Dangerous Data Actions",
+                    "desc": "Powerful tools for bulk data cleanup and system resets (Admin Only)",
+                    "wipeMarks": "Wipe All Assessment Marks",
+                    "confirmTitle": "DANGEROUS: Wipe All Assessment Marks?",
+                    "confirmDesc": "This will permanently delete every single mark for every student across all subjects and assessments in the entire system.",
+                    "confirmType": "Type RESET below to confirm this action:",
+                    "wipeEverything": "Wipe Everything",
+                    "wipingMarks": "Wiping marks...",
+                    "wrongConfirm": "Incorrect confirmation text. Wipe cancelled.",
+                    "wipeSuccess": "Successfully wiped {{count}} marks from the system.",
+                    "wipeFailed": "Wipe failed: {{error}}"
+                }
             },
             "teacher": {
                 "menu": "Teacher Menu",
@@ -384,7 +397,20 @@ const resources = {
                 "autoCalculate": "በራስ ሰር አስላ (Auto-Calculate)",
                 "autoCalculateConfirm": "ይህ እርምጃ በተማሪው አመታዊ አማካይ ውጤት ላይ በመመስረት የማሳለፊያ ውሳኔዎችን በራስ-ሰር ያሰላል። ያልተሟላ ውጤት ያላቸው ተማሪዎች ይታለፋሉ። መቀጠል ይፈልጋሉ?",
                 "missingMarks": "ያልተሟላ ውጤት",
-                "validationWarning": "በማስላት ላይ..."
+                "validationWarning": "በማስላት ላይ...",
+                "dangerous": {
+                    "title": "አደገኛ የውሂብ እርምጃዎች",
+                    "desc": "ለጅምላ ውሂብ ማጽዳት እና የስርዓት መልሶ ማግኛ መሳሪያዎች (ለአስተዳዳሪ ብቻ)",
+                    "wipeMarks": "ሁሉንም የምዘና ውጤቶች ሰርዝ",
+                    "confirmTitle": "አደገኛ፡ ሁሉንም የምዘና ውጤቶች ይጥፉ?",
+                    "confirmDesc": "ይህ በስርዓቱ ውስጥ ያሉትን ሁሉንም የትምህርት ዓይነቶች እና ምዘናዎች የተማሪዎችን ውጤት በቋሚነት ያጠፋል።",
+                    "confirmType": "ይህን እርምጃ ለማረጋገጥ ከታች RESET ብለው ይተይቡ:",
+                    "wipeEverything": "ሁሉንም ሰርዝ",
+                    "wipingMarks": "ውጤቶችን በማጥፋት ላይ...",
+                    "wrongConfirm": "የተሳሳተ የማረጋገጫ ጽሑፍ። መሰረዙ ተሰርዟል።",
+                    "wipeSuccess": "{{count}} ውጤቶች በተሳካ ሁኔታ ከስርዓቱ ተሰርዘዋል።",
+                    "wipeFailed": "መሰረዙ አልተሳካም፡ {{error}}"
+                }
             },
             "teacher": {
                 "menu": "የመምህራን ምናሌ",

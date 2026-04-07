@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, message, Row, Col, Select, DatePicker, Tag } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, message, Row, Col, Select, DatePicker, Tag, Modal } from 'antd';
+import { EditOutlined, DeleteOutlined, WarningOutlined, AlertOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import dayjs from 'dayjs';
 import { db } from '../../db/database';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
+import { supabase } from '../../utils/supabaseClient';
+import { syncData } from '../../utils/sync';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 export default function AssessmentManagement() {
     const { t } = useTranslation();
+    const [modal, contextHolder] = Modal.useModal();
     const [form] = Form.useForm();
     const [editingId, setEditingId] = useState(null);
     const selectedGrade = Form.useWatch('grade', form);
@@ -76,6 +79,65 @@ export default function AssessmentManagement() {
         }
     };
 
+    const handleWipeAllMarks = () => {
+        modal.confirm({
+            title: <span className="text-red-600 dark:text-red-400 font-bold">{t('admin.dangerous.confirmTitle')}</span>,
+            icon: <WarningOutlined className="text-red-500" />,
+            content: (
+                <div className="py-4">
+                    <Paragraph type="danger" strong>
+                        {t('admin.dangerous.confirmDesc')}
+                    </Paragraph>
+                    <Paragraph type="secondary" className="text-sm">
+                        {t('admin.dangerous.confirmType')} <Text code strong className="text-red-600 dark:text-red-400">RESET</Text>
+                    </Paragraph>
+                    <Input 
+                        placeholder="Type RESET here" 
+                        className="dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                        onChange={(e) => window._wipeConfirm = e.target.value}
+                    />
+                </div>
+            ),
+            okText: t('admin.dangerous.wipeEverything'),
+            okType: 'danger',
+            onOk: async () => {
+                if (window._wipeConfirm !== 'RESET') {
+                    message.error(t('admin.dangerous.wrongConfirm'));
+                    return;
+                }
+                const hide = message.loading(t('admin.dangerous.wipingMarks'), 0);
+                try {
+                    const allMarks = await db.marks.toArray();
+                    const allIds = allMarks.map(m => m.id);
+                    
+                    // Clear locally
+                    await db.marks.clear();
+                    
+                    // Queue for remote deletion
+                    if (allIds.length > 0) {
+                        for (const id of allIds) {
+                            await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'marks', recordId: id });
+                        }
+                        
+                        // Chunked Supabase Wipe (500 records at a time)
+                        for (let i = 0; i < allIds.length; i += 500) {
+                            const chunk = allIds.slice(i, i + 500);
+                            const { error: delError } = await supabase.from('marks').delete().in('id', chunk);
+                            if (delError) console.error("Wipe chunk error:", delError);
+                        }
+                    }
+                    
+                    message.success(t('admin.dangerous.wipeSuccess', { count: allIds.length }));
+                } catch (e) {
+                    message.error(t('admin.dangerous.wipeFailed', { error: e.message }));
+                } finally {
+                    hide();
+                    delete window._wipeConfirm;
+                }
+            }
+        });
+    };
+
     const columns = [
         { title: t('admin.name'), dataIndex: 'name', key: 'name' },
         { title: t('admin.subjects'), dataIndex: 'subjectName', key: 'subjectName' },
@@ -119,6 +181,7 @@ export default function AssessmentManagement() {
 
     return (
         <div className="flex flex-col gap-6">
+            {contextHolder}
             <div>
                 <Title level={2}>{t('admin.assessments')}</Title>
                 <Text type="secondary">{t('admin.manageAssessments')}</Text>
@@ -227,6 +290,25 @@ export default function AssessmentManagement() {
                 }}
                 className="shadow-sm rounded-xl overflow-hidden"
             />
+            <Card className="rounded-2xl border-none shadow-sm bg-red-50/50 dark:bg-red-900/10 border-t-4 border-t-red-500 mt-12 transition-all duration-300">
+                <div className="flex justify-between items-center flex-wrap gap-4">
+                    <div>
+                        <Title level={4} style={{ margin: 0 }} className="text-red-600 dark:text-red-400 flex items-center gap-2">
+                             <AlertOutlined /> {t('admin.dangerous.title')}
+                        </Title>
+                        <Text type="secondary" className="dark:text-slate-400">{t('admin.dangerous.desc')}</Text>
+                    </div>
+                    <Button 
+                        danger 
+                        type="primary" 
+                        icon={<DeleteOutlined />} 
+                        onClick={handleWipeAllMarks}
+                        className="rounded-lg shadow-sm font-bold border-none"
+                    >
+                        {t('admin.dangerous.wipeMarks')}
+                    </Button>
+                </div>
+            </Card>
         </div>
     );
 }
