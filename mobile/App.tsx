@@ -335,61 +335,89 @@ export default function App() {
       const merge = (oldData: any[], newData: any[] | null) => {
         if (!newData || newData.length === 0) return oldData;
         const map = new Map(oldData.map(item => [item.id || item.key, item]));
-        newData.forEach(item => map.set(item.id || item.key, item));
+        newData.forEach(item => {
+          const id = item.id || item.key;
+          const existing = map.get(id);
+          // Only overwrite if strictly newer or no existing record
+          if (!existing || !existing.updated_at || (item.updated_at && item.updated_at > existing.updated_at)) {
+            map.set(id, item);
+          }
+        });
         return Array.from(map.values());
       };
 
-      // Calculate Merged States
-      let nextStudents = merge(students, (sRes.status === 'fulfilled' ? sRes.value.data : null));
-      let nextAssessments = merge(assessments, (aRes.status === 'fulfilled' ? aRes.value.data : null));
-      let nextMarks = merge(marks, (mRes.status === 'fulfilled' ? mRes.value.data : null));
-      let nextAttendance = merge(attendance, (attRes.status === 'fulfilled' ? attRes.value.data : null));
-      let nextSubjects = merge(subjects, (subRes.status === 'fulfilled' ? subRes.value.data : null));
-      
-      console.log('[SYNC-DEBUG] After merge: students=', nextStudents.length, 'assessments=', nextAssessments.length);
+      const deletions = (delRes.status === 'fulfilled' ? delRes.value.data : []) || [];
 
-      let nextSettings = { ...settings };
+      const applySync = (prev: any[], newData: any[] | null, tableName: string) => {
+        let merged = merge(prev, newData);
+        if (deletions.length > 0) {
+          const tableDeletions = deletions.filter((d: any) => d.table_name === tableName);
+          if (tableDeletions.length > 0) {
+            const delIds = new Set(tableDeletions.map((d: any) => d.record_id));
+            merged = merged.filter(r => !delIds.has(r.id));
+          }
+        }
+        return merged;
+      };
+
+      // 1. Process and update all states functionally to avoid closure race conditions
+      setStudents(prev => {
+        const next = applySync(prev, (sRes.status === 'fulfilled' ? sRes.value.data : null), 'students');
+        AsyncStorage.setItem('cached_students', JSON.stringify(next));
+        return next;
+      });
+      setAssessments(prev => {
+        const next = applySync(prev, (aRes.status === 'fulfilled' ? aRes.value.data : null), 'assessments');
+        AsyncStorage.setItem('cached_assessments', JSON.stringify(next));
+        return next;
+      });
+      setMarks(prev => {
+        const next = applySync(prev, (mRes.status === 'fulfilled' ? mRes.value.data : null), 'marks');
+        AsyncStorage.setItem('cached_marks', JSON.stringify(next));
+        return next;
+      });
+      setAttendance(prev => {
+        const next = applySync(prev, (attRes.status === 'fulfilled' ? attRes.value.data : null), 'attendance');
+        AsyncStorage.setItem('cached_attendance', JSON.stringify(next));
+        return next;
+      });
+      setSubjects(prev => {
+        const next = applySync(prev, (subRes.status === 'fulfilled' ? subRes.value.data : null), 'subjects');
+        AsyncStorage.setItem('cached_subjects', JSON.stringify(next));
+        return next;
+      });
+
       if (setRes.status === 'fulfilled' && setRes.value.data) {
-        setRes.value.data.forEach((r: any) => { nextSettings[r.key] = r.value; });
-      }
-
-      // Apply Deletions
-      if (delRes.status === 'fulfilled' && delRes.value.data && delRes.value.data.length > 0) {
-        const deletions = delRes.value.data;
-        console.log('[SYNC-DEBUG] Applying', deletions.length, 'deletions. Student deletions:', deletions.filter((d: any) => d.table_name === 'students').length);
-        deletions.forEach((del: any) => {
-          if (del.table_name === 'students') nextStudents = nextStudents.filter(r => r.id !== del.record_id);
-          else if (del.table_name === 'assessments') nextAssessments = nextAssessments.filter(r => r.id !== del.record_id);
-          else if (del.table_name === 'marks') nextMarks = nextMarks.filter(r => r.id !== del.record_id);
-          else if (del.table_name === 'attendance') nextAttendance = nextAttendance.filter(r => r.id !== del.record_id);
+        setSettings(prev => {
+          const next = { ...prev };
+          setRes.value.data.forEach((r: any) => { next[r.key] = r.value; });
+          AsyncStorage.setItem('cached_settings', JSON.stringify(next));
+          return next;
         });
-        console.log('[SYNC-DEBUG] After deletions: students=', nextStudents.length);
       }
 
-      // Update State
-      setStudents(nextStudents);
-      setAssessments(nextAssessments);
-      setMarks(nextMarks);
-      setAttendance(nextAttendance);
-      setSubjects(nextSubjects);
-      setSettings(nextSettings);
+      // Calculate next sync anchor based on the max timestamp received
+      const allNew = [
+        ...(sRes.status === 'fulfilled' ? sRes.value.data || [] : []),
+        ...(aRes.status === 'fulfilled' ? aRes.value.data || [] : []),
+        ...(mRes.status === 'fulfilled' ? mRes.value.data || [] : []),
+        ...(attRes.status === 'fulfilled' ? attRes.value.data || [] : []),
+        ...(subRes.status === 'fulfilled' ? subRes.value.data || [] : []),
+        ...(setRes.status === 'fulfilled' ? setRes.value.data || [] : []),
+      ];
+      
+      let nextAnchor = lastSyncIso;
+      if (allNew.length > 0) {
+        const maxAt = allNew.reduce((max, r) => (r.updated_at && r.updated_at > max) ? r.updated_at : max, '');
+        if (maxAt) nextAnchor = maxAt;
+      }
+      if (!nextAnchor) nextAnchor = new Date().toISOString();
 
       const now = formatEthiopianTime(new Date());
-      const nowIso = new Date().toISOString();
       setLastSync(now);
-      setLastSyncIso(nowIso);
-
-      // Async Persistent Storage
-      await Promise.all([
-        AsyncStorage.setItem('cached_students', JSON.stringify(nextStudents)),
-        AsyncStorage.setItem('cached_assessments', JSON.stringify(nextAssessments)),
-        AsyncStorage.setItem('cached_marks', JSON.stringify(nextMarks)),
-        AsyncStorage.setItem('cached_attendance', JSON.stringify(nextAttendance)),
-        AsyncStorage.setItem('cached_subjects', JSON.stringify(nextSubjects)),
-        AsyncStorage.setItem('cached_settings', JSON.stringify(nextSettings)),
-        AsyncStorage.setItem('last_sync_time', now),
-        AsyncStorage.setItem('last_sync_iso', nowIso)
-      ]);
+      setLastSyncIso(nextAnchor);
+      await AsyncStorage.setItem('last_sync_time', now);
+      await AsyncStorage.setItem('last_sync_iso', nextAnchor);
 
       if (!isBackground) showToast('✅ ' + t('common.syncComplete', 'Sync complete'), 'success');
     } catch (err: any) {
