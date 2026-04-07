@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Users, CalendarCheck, AlertTriangle, RefreshCw, TrendingUp, ChevronRight, Clock, BarChart3 } from 'lucide-react-native';
 import { formatEthiopianDate, formatEthiopianTime } from '../dateUtils';
 import { Teacher, Student, Assessment, normG, normS } from '../utils';
+import { useToast } from './ToastContext';
 
 export const EthiopicClockWidget = React.memo(({ C }: { C: any }) => {
   const [timeObj, setTimeObj] = useState(new Date());
@@ -62,10 +63,11 @@ export const EthiopicClockWidget = React.memo(({ C }: { C: any }) => {
   );
 });
 
-export const DashboardTab = React.memo(({ teacher, students: allStudents, assessments: allAssessments, marks, attendance, subjects, settings, C, s, setTab, onSync, isSyncing, isOnline, lastSync, showToast }: {
-  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], attendance: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, setTab: (t: any) => void, onSync: () => void, isSyncing: boolean, isOnline: boolean, lastSync: string | null, showToast?: (msg: string, type: 'success'|'error'|'info') => void
+export const DashboardTab = React.memo(({ teacher, students: allStudents, assessments: allAssessments, marks, attendance, subjects, settings, C, s, setTab, onSync, isSyncing, isOnline, lastSync }: {
+  teacher: Teacher, students: Student[], assessments: Assessment[], marks: any[], attendance: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, setTab: (t: any) => void, onSync: () => void, isSyncing: boolean, isOnline: boolean, lastSync: string | null
 }) => {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
 
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;

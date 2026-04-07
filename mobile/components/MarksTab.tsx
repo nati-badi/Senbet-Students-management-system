@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, RefreshControl, Modal, TouchableWithoutFeedback, Animated, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, FlatList, TouchableOpacity, RefreshControl, Modal, TouchableWithoutFeedback, Animated, KeyboardAvoidingView, Platform, ActivityIndicator, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { TrendingUp, Edit, Trash2, ChevronRight, Clock } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../supabase';
 import { Student, Assessment, Teacher, normG, normS, isConduct, generateUUID, fmtGrade, paginate } from '../utils';
 import { PremiumDropdown } from './PremiumDropdown';
+import { useToast } from './ToastContext';
 
-export const MarksTab = React.memo(({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, showToast, settings, subjects }: {
-  route: any, navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any, subjects: any[]
+export const MarksTab = React.memo(({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, settings, subjects }: {
+  route: any, navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, settings: any, subjects: any[]
 }) => {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
   const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
@@ -53,6 +55,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
   const [clearAllVisible, setClearAllVisible] = useState(false);
   const [predictDetails, setPredictDetails] = useState<{count: number, subject: string, students: any[]}>({ count: 0, subject: '', students: [] });
   const [page, setPage] = useState(0);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [highlightEmptyData, setHighlightEmptyData] = useState(false);
   
@@ -246,13 +249,15 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       showToast?.('ℹ️ All students already have marks', 'info');
       return;
     }
+    setModalError(null);
     setBulkVisible(true);
   };
 
   const applyBulkFill = () => {
+    setModalError(null);
     const val = parseFloat(bulkScore);
     if (isNaN(val) || val < 0 || val > selectedAssessment!.maxscore) {
-      showToast?.(`❌ ${t('teacher.validScore')}: 0–${selectedAssessment!.maxscore}`, 'error');
+      setModalError(`❌ ${t('teacher.validScore')}: 0–${selectedAssessment!.maxscore}`);
       return;
     }
     const gradeStudents = myStudents.filter((st) => normG(st.grade) === normG(selectedGrade));
@@ -317,6 +322,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       showToast?.(`⚠️ ${t('teacher.noHistoryPoints')}`, 'info');
       return;
     }
+    setModalError(null);
     setPredictDetails({ count: studentsWithHistory.length, subject: selectedAssessment.subjectname, students: studentsWithHistory });
     setPredictVisible(true);
   };
@@ -442,11 +448,19 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       <Modal visible={bulkVisible} transparent animationType="fade" onRequestClose={() => { setBulkVisible(false); setBulkScore(''); }}>
         <TouchableWithoutFeedback onPress={() => { setBulkVisible(false); setBulkScore(''); }}>
           <View style={s.modalOverlay}>
+            <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
             <TouchableWithoutFeedback>
               <View style={s.modalCard}>
                 <Text style={s.modalTitle}>{t('teacher.fillConstant')}</Text>
                 <Text style={s.modalSub}>{t('teacher.fillConstantDesc')} (Max: {selectedAssessment?.maxscore})</Text>
-                <TextInput style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]} keyboardType="numeric" placeholder={`0 - ${selectedAssessment?.maxscore || 10}`} placeholderTextColor={C.muted} value={bulkScore} onChangeText={setBulkScore} autoFocus />
+
+                {modalError && (
+                  <View style={{ backgroundColor: C.red + '15', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: C.red + '30' }}>
+                    <Text style={{ color: C.red, fontSize: 13, fontWeight: '700', textAlign: 'center' }}>{modalError}</Text>
+                  </View>
+                )}
+
+                <TextInput style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]} keyboardType="numeric" placeholder={`0 - ${selectedAssessment?.maxscore || 10}`} placeholderTextColor={C.muted} value={bulkScore} onChangeText={(val) => { setBulkScore(val); setModalError(null); }} autoFocus />
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.card }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
                   <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}><Text style={s.modalBtnText}>{t('common.apply')}</Text></TouchableOpacity>
@@ -460,10 +474,17 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       <Modal visible={predictVisible} transparent animationType="fade" onRequestClose={() => setPredictVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setPredictVisible(false)}>
           <View style={s.modalOverlay}>
+            <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
             <TouchableWithoutFeedback>
               <View style={s.modalCard}>
                 <Text style={s.modalTitle}>{t('teacher.predictMarks')}</Text>
                 <Text style={[s.modalSub, { marginBottom: 20 }]}>{t('teacher.predictDesc', { count: predictDetails.count, subject: predictDetails.subject })}</Text>
+
+                {modalError && (
+                  <View style={{ backgroundColor: C.red + '15', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: C.red + '30' }}>
+                    <Text style={{ color: C.red, fontSize: 13, fontWeight: '700', textAlign: 'center' }}>{modalError}</Text>
+                  </View>
+                )}
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <TouchableOpacity onPress={() => setPredictVisible(false)} style={[s.modalBtn, { backgroundColor: C.card }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
                   <TouchableOpacity onPress={applyPrediction} style={[s.modalBtn, { backgroundColor: C.accent }]}><Text style={[s.modalBtnText, { color: '#fff' }]}>{t('teacher.predict')}</Text></TouchableOpacity>
@@ -477,6 +498,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       <Modal visible={clearAllVisible} transparent animationType="fade" onRequestClose={() => setClearAllVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setClearAllVisible(false)}>
           <View style={s.modalOverlay}>
+            <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
             <TouchableWithoutFeedback>
               <View style={s.modalCard}>
                 <Text style={s.modalTitle}>{t('teacher.clearAllMarks')}</Text>

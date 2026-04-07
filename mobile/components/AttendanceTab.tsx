@@ -7,11 +7,13 @@ import { useCameraPermissions } from 'expo-camera';
 import { formatEthiopianDate } from '../dateUtils';
 import { supabase } from '../supabase';
 import { Student, Teacher, normG, fmtGrade, generateUUID } from '../utils';
+import { useToast } from './ToastContext';
 
-export const AttendanceTab = React.memo(({ route, navigation, teacher, students: allStudents, attendanceData, setAttendanceData, onRefresh, C, s, showToast, settings }: {
-  route: any, navigation: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void, settings: any
+export const AttendanceTab = React.memo(({ route, navigation, teacher, students: allStudents, attendanceData, setAttendanceData, onRefresh, C, s, settings }: {
+  route: any, navigation: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, settings: any
 }) => {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
   
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;

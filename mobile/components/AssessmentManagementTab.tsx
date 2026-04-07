@@ -6,11 +6,13 @@ import { BlurView } from 'expo-blur';
 import { supabase } from '../supabase';
 import { Student, Assessment, Teacher, normG, normS, generateUUID, fmtGrade } from '../utils';
 import { PremiumDropdown } from './PremiumDropdown';
+import { useToast } from './ToastContext';
 
-export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAssessments, subjects, settings, C, s, showToast, onRefresh }: {
-  teacher: Teacher, assessments: Assessment[], subjects: any[], settings: any, C: any, s: any, showToast?: (msg: string, type: 'success'|'error'|'info') => void, onRefresh?: () => Promise<void> | void
+export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAssessments, subjects, settings, C, s, onRefresh }: {
+  teacher: Teacher, assessments: Assessment[], subjects: any[], settings: any, C: any, s: any, onRefresh?: () => Promise<void> | void
 }) => {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const myGrades = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades ?? [];
   const mySubjects = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects ?? [];
 
@@ -25,6 +27,7 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
   const [name, setName] = useState('');
   const [maxScore, setMaxScore] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,6 +49,7 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
     setEditingId(null);
     setName('');
     setMaxScore('');
+    setModalError(null);
     setModalVisible(true);
   };
 
@@ -55,18 +59,20 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
     setName(a.name);
     setMaxScore(String(a.maxscore));
     setEditingId(a.id);
+    setModalError(null);
     setModalVisible(true);
   };
 
   const handleSave = async () => {
-    if (!selectedGrade) { showToast?.('❌ Please select a grade', 'error'); return; }
-    if (!selectedSubject) { showToast?.('❌ Please select a subject', 'error'); return; }
-    if (!name.trim()) { showToast?.('❌ Please enter an assessment name', 'error'); return; }
-    if (!maxScore) { showToast?.('❌ Please enter a max score', 'error'); return; }
+    setModalError(null);
+    if (!selectedGrade) { setModalError('❌ Please select a grade'); return; }
+    if (!selectedSubject) { setModalError('❌ Please select a subject'); return; }
+    if (!name.trim()) { setModalError('❌ Please enter an assessment name'); return; }
+    if (!maxScore) { setModalError('❌ Please enter a max score'); return; }
 
     const ms = parseFloat(maxScore);
     if (isNaN(ms) || ms <= 0) {
-      showToast?.('❌ Max score must be a positive number', 'error');
+      setModalError('❌ Max score must be a positive number');
       return;
     }
 
@@ -85,12 +91,12 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
       const { error } = await supabase.from('assessments').upsert(record, { onConflict: 'id' });
       if (error) throw error;
 
-      showToast?.(editingId ? '✅ Assessment updated' : '✅ Assessment created', 'success');
+      showToast(editingId ? '✅ Assessment updated' : '✅ Assessment created', 'success');
       setModalVisible(false);
-      setName(''); setMaxScore(''); setEditingId(null);
+      setName(''); setMaxScore(''); setEditingId(null); setModalError(null);
       if (onRefresh) onRefresh();
     } catch (err: any) {
-      showToast?.('❌ ' + (err.message || 'Failed to save'), 'error');
+      setModalError('❌ ' + (err.message || 'Failed to save'));
     } finally {
       setSaving(false);
     }
@@ -100,11 +106,11 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
     try {
       const { error } = await supabase.from('assessments').delete().eq('id', id);
       if (error) throw error;
-      showToast?.(`🗑️ ${t('assessment.deletedSuccess')}`, 'success');
+      showToast(`🗑️ ${t('assessment.deletedSuccess')}`, 'success');
       setDeleteConfirmId(null);
       if (onRefresh) onRefresh();
     } catch (err: any) {
-      showToast?.(`❌ ${err.message || t('common.error')}`, 'error');
+      showToast(`❌ ${err.message || t('common.error')}`, 'error');
     }
   };
 
@@ -173,7 +179,7 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
       <Modal visible={modalVisible} animationType="fade" transparent onRequestClose={() => setModalVisible(false)}>
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
           <View style={s.modalOverlay}>
-            <BlurView intensity={20} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
+            <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center' }}>
               <TouchableWithoutFeedback>
                 <View style={[s.modalCard, { padding: 24 }]}>
@@ -185,6 +191,12 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
                       <Text style={{ color: C.muted, fontSize: 24 }}>×</Text>
                     </TouchableOpacity>
                   </View>
+
+                  {modalError && (
+                    <View style={{ backgroundColor: C.red + '15', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: C.red + '30' }}>
+                      <Text style={{ color: C.red, fontSize: 13, fontWeight: '700', textAlign: 'center' }}>{modalError}</Text>
+                    </View>
+                  )}
 
                   <PremiumDropdown 
                     label={t('profile.grade')} 

@@ -157,7 +157,7 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
       <View style={[s.modalOverlay, { padding: 16, alignItems: 'center', justifyContent: 'center' }]}>
         {/* Background Overlay - Sibling to the Card to prevent gesture hijacking */}
         <Pressable 
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.7)' }]} 
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} 
           onPress={onClose} 
         />
         

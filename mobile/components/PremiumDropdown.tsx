@@ -32,7 +32,7 @@ export const PremiumDropdown = React.memo(({ label, placeholder, items, selected
       </TouchableOpacity>
 
       <Modal visible={modalVisible} transparent={true} animationType="fade" onRequestClose={() => setModalVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
           <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
             <View style={{ flex: 1 }} />
           </TouchableWithoutFeedback>

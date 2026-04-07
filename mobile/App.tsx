@@ -70,7 +70,7 @@ interface Teacher {
 
 // ── Polyfills & Helpers ──────────────────────────────────────────
 const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
@@ -162,6 +162,9 @@ const EthiopianCross = ({ size = 48, color = '#d4af37', style }: { size?: number
   </View>
 );
 
+import { ToastProvider, useToast } from './components/ToastContext';
+import { Provider as PaperProvider } from 'react-native-paper';
+
 // ── Pagination helper ──────────────────────────────────────────
 const PAGE_SIZE = 15;
 const paginate = (data: any[], page: number) => data.slice(0, (page + 1) * PAGE_SIZE);
@@ -176,26 +179,26 @@ const WebSafeTouchable = ({ children }: any) => {
 };
 
 export default function App() {
+  const [isDark, setIsDark] = useState(true);
+
+  return (
+    <PaperProvider>
+      <ToastProvider themes={THEMES} isDark={isDark}>
+        <AppContent isDark={isDark} setIsDark={setIsDark} />
+      </ToastProvider>
+    </PaperProvider>
+  );
+}
+
+function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boolean) => void }) {
   const { t, i18n } = useTranslation();
+  const { showToast } = useToast();
+  
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [authMode, setAuthMode] = useState<'landing' | 'teacher_login' | 'parent_portal'>('landing');
   const [authLoading, setAuthLoading] = useState(true);
-  const [isDark, setIsDark] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
 
-  const [toast, setToast] = useState<{msg: string, type: 'success'|'error'|'info', visible: boolean}>({msg: '', type: 'success', visible: false});
-  const toastOp = useRef(new Animated.Value(0)).current;
-
-  const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ msg, type, visible: true });
-    Animated.sequence([
-      Animated.timing(toastOp, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.delay(2000),
-      Animated.timing(toastOp, { toValue: 0, duration: 300, useNativeDriver: true })
-    ]).start(() => setToast(prev => ({...prev, visible: false})));
-  }, [toastOp]);
-
-  // Data states
   const [students, setStudents] = useState<Student[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [marks, setMarks] = useState<any[]>([]);
@@ -211,8 +214,6 @@ export default function App() {
   const s = makeStyles(C);
 
   // Network listener
-  // On web, NetInfo.isInternetReachable is often `null` (unknown).
-  // Treat null as online (if the app loaded, the browser has connectivity).
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       const connected = !!state.isConnected;
@@ -243,10 +244,10 @@ export default function App() {
         if (savedStudents) setStudents(JSON.parse(savedStudents));
         if (savedAssessments) setAssessments(JSON.parse(savedAssessments));
         if (savedMarks) setMarks(JSON.parse(savedMarks));
-        
-        try { if (savedSubjects) setSubjects(JSON.parse(savedSubjects)); } catch(e){}
-        try { if (savedSettings) setSettings(JSON.parse(savedSettings)); } catch(e){}
-        
+
+        try { if (savedSubjects) setSubjects(JSON.parse(savedSubjects)); } catch (e) { }
+        try { if (savedSettings) setSettings(JSON.parse(savedSettings)); } catch (e) { }
+
         if (await AsyncStorage.getItem('cached_attendance')) setAttendance(JSON.parse(await AsyncStorage.getItem('cached_attendance') || '[]'));
         if (savedLastSync) setLastSync(savedLastSync);
         if (await AsyncStorage.getItem('last_sync_iso')) setLastSyncIso(await AsyncStorage.getItem('last_sync_iso'));
@@ -261,14 +262,12 @@ export default function App() {
 
   const toggleTheme = async () => {
     const next = !isDark;
-    console.log('Mobile: Toggling theme to', next ? 'dark' : 'light');
     setIsDark(next);
     await AsyncStorage.setItem('senbet_theme', next ? 'dark' : 'light');
   };
 
   const toggleLanguage = async () => {
     const next = i18n.language === 'en' ? 'am' : 'en';
-    console.log('Mobile: Toggling language to', next);
     await i18n.changeLanguage(next);
     await AsyncStorage.setItem('app_language', next);
   };
@@ -278,34 +277,25 @@ export default function App() {
     if (!isBackground) setSyncing(true);
 
     try {
-      // 1. Fetch latest teacher data
       const { data: tRes, error: tErr } = await supabase
         .from('teachers')
         .select('id, name, accesscode, assignedgrades, assignedsubjects, cancreateassessments')
         .eq('id', teacher.id)
         .maybeSingle();
 
-      if (tErr) {
-        console.warn('Teacher fetch error:', tErr);
-      } else if (!tRes) {
-        console.warn('Teacher record not found in Supabase.');
+      if (tErr) console.warn('Teacher fetch error:', tErr);
+      else if (!tRes) {
         setTeacher(null);
         await AsyncStorage.removeItem('senbet_teacher_auth');
         return;
       }
-        
+
       if (tRes && JSON.stringify(tRes) !== JSON.stringify(teacher)) {
         setTeacher(tRes);
         await AsyncStorage.setItem('senbet_teacher_auth', JSON.stringify(tRes));
       }
 
-      // 2. Parallelize All Queries (Incremental if possible)
-      // Safety: if we have a sync anchor but no cached students, the anchor is stale.
-      // A previous sync may have set the timestamp without actually fetching data.
-      // Force a full sync so we don't get stuck with 0 results forever.
       const syncAnchor = (lastSyncIso && students.length === 0) ? null : lastSyncIso;
-      console.log('[SYNC-DEBUG] syncAnchor:', syncAnchor, '| rawAnchor:', lastSyncIso, '| isOnline:', isOnline, '| existing students:', students.length);
-      
       const stQ = supabase.from('students').select('id, name, grade, baptismalname, parentcontact, academicyear, portalcode, updated_at');
       const asQ = supabase.from('assessments').select('id, name, subjectname, grade, maxscore, date, updated_at');
       const maQ = supabase.from('marks').select('id, score, subject, semester, studentid, assessmentid, assessmentdate, last_modified_by, updated_at');
@@ -315,22 +305,14 @@ export default function App() {
       const deQ = supabase.from('deleted_records').select('*');
 
       if (syncAnchor) {
-        console.log('[SYNC-DEBUG] Using INCREMENTAL sync since:', syncAnchor);
         stQ.gt('updated_at', syncAnchor); asQ.gt('updated_at', syncAnchor); maQ.gt('updated_at', syncAnchor);
         atQ.gt('updated_at', syncAnchor); suQ.gt('updated_at', syncAnchor); seQ.gt('updated_at', syncAnchor);
         deQ.gt('deleted_at', syncAnchor);
-      } else {
-        console.log('[SYNC-DEBUG] Using FULL sync (no anchor)');
       }
 
       const [sRes, aRes, mRes, attRes, subRes, setRes, delRes] = await Promise.allSettled([
         stQ.order('name'), asQ.order('name'), maQ, atQ, suQ, seQ, deQ
       ]);
-
-      // DIAGNOSTIC LOGGING
-      console.log('[SYNC-DEBUG] Students response:', sRes.status, sRes.status === 'fulfilled' ? `data=${sRes.value.data?.length}, error=${JSON.stringify(sRes.value.error)}` : (sRes as any).reason);
-      console.log('[SYNC-DEBUG] Assessments response:', aRes.status, aRes.status === 'fulfilled' ? `data=${aRes.value.data?.length}` : (aRes as any).reason);
-      console.log('[SYNC-DEBUG] Deleted records:', delRes.status, delRes.status === 'fulfilled' ? `data=${delRes.value.data?.length}` : (delRes as any).reason);
 
       const merge = (oldData: any[], newData: any[] | null) => {
         if (!newData || newData.length === 0) return oldData;
@@ -338,7 +320,6 @@ export default function App() {
         newData.forEach(item => {
           const id = item.id || item.key;
           const existing = map.get(id);
-          // Only overwrite if strictly newer or no existing record
           if (!existing || !existing.updated_at || (item.updated_at && item.updated_at > existing.updated_at)) {
             map.set(id, item);
           }
@@ -347,7 +328,6 @@ export default function App() {
       };
 
       const deletions = (delRes.status === 'fulfilled' ? delRes.value.data : []) || [];
-
       const applySync = (prev: any[], newData: any[] | null, tableName: string) => {
         let merged = merge(prev, newData);
         if (deletions.length > 0) {
@@ -360,7 +340,6 @@ export default function App() {
         return merged;
       };
 
-      // 1. Process and update all states functionally to avoid closure race conditions
       setStudents(prev => {
         const next = applySync(prev, (sRes.status === 'fulfilled' ? sRes.value.data : null), 'students');
         AsyncStorage.setItem('cached_students', JSON.stringify(next));
@@ -388,24 +367,24 @@ export default function App() {
       });
 
       if (setRes.status === 'fulfilled' && setRes.value.data) {
+        const settingsData = setRes.value.data;
         setSettings(prev => {
           const next = { ...prev };
-          setRes.value.data.forEach((r: any) => { next[r.key] = r.value; });
+          settingsData.forEach((r: any) => { next[r.key] = r.value; });
           AsyncStorage.setItem('cached_settings', JSON.stringify(next));
           return next;
         });
       }
 
-      // Calculate next sync anchor based on the max timestamp received
       const allNew = [
-        ...(sRes.status === 'fulfilled' ? sRes.value.data || [] : []),
-        ...(aRes.status === 'fulfilled' ? aRes.value.data || [] : []),
-        ...(mRes.status === 'fulfilled' ? mRes.value.data || [] : []),
-        ...(attRes.status === 'fulfilled' ? attRes.value.data || [] : []),
-        ...(subRes.status === 'fulfilled' ? subRes.value.data || [] : []),
-        ...(setRes.status === 'fulfilled' ? setRes.value.data || [] : []),
+        ...(sRes.status === 'fulfilled' && (sRes as any).value?.data ? (sRes as any).value.data : []),
+        ...(aRes.status === 'fulfilled' && (aRes as any).value?.data ? (aRes as any).value.data : []),
+        ...(mRes.status === 'fulfilled' && (mRes as any).value?.data ? (mRes as any).value.data : []),
+        ...(attRes.status === 'fulfilled' && (attRes as any).value?.data ? (attRes as any).value.data : []),
+        ...(subRes.status === 'fulfilled' && (subRes as any).value?.data ? (subRes as any).value.data : []),
+        ...(setRes.status === 'fulfilled' && (setRes as any).value?.data ? (setRes as any).value.data : []),
       ];
-      
+
       let nextAnchor = lastSyncIso;
       if (allNew.length > 0) {
         const maxAt = allNew.reduce((max, r) => (r.updated_at && r.updated_at > max) ? r.updated_at : max, '');
@@ -426,31 +405,18 @@ export default function App() {
     } finally {
       if (!isBackground) setSyncing(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teacher, isOnline, lastSyncIso, t, students, assessments, marks, attendance, subjects, settings]); 
+  }, [teacher, isOnline, lastSyncIso, t, students, assessments, marks, attendance, subjects, settings, showToast]);
 
   useEffect(() => {
     if (teacher) syncData(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teacher?.id]); // Only run on login or teacher change, NOT on syncData function change
+  }, [teacher?.id]);
 
   const handleLogin = async (t: Teacher) => {
-    // Clear stale sync anchor so the first sync after login is always a FULL sync
     setLastSyncIso(null);
     await AsyncStorage.removeItem('last_sync_iso');
     setTeacher(t);
     await AsyncStorage.setItem('senbet_teacher_auth', JSON.stringify(t));
   };
-
-  // Auto-sync every 5 minutes
-  useEffect(() => {
-    if (!teacher) return;
-    const interval = setInterval(() => {
-      console.log('Mobile: Running background auto-sync...');
-      syncData();
-    }, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [teacher]);
 
   const handleLogout = async () => {
     setTeacher(null);
@@ -461,36 +427,8 @@ export default function App() {
     ]);
   };
 
-  const handleHardRefresh = async () => {
-    Alert.alert(
-      t('common.hardRefresh', 'Hard Refresh'),
-      t('common.hardRefreshConfirm', 'This will wipe your local cache and download everything fresh from the cloud. Proceed?'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { 
-          text: t('common.proceed'), 
-          onPress: async () => {
-            setSyncing(true);
-            try {
-              await AsyncStorage.multiRemove([
-                'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'cached_subjects', 'cached_settings', 'last_sync_time'
-              ]);
-              setStudents([]); setAssessments([]); setMarks([]); setAttendance([]);
-              await syncData();
-              showToast('✨ Cache cleared and fresh data synced');
-            } catch (e) {
-              showToast('❌ Refresh failed', 'error');
-            } finally {
-              setSyncing(false);
-            }
-          }
-        }
-      ]
-    );
-  };
-
   if (authLoading) return <View style={[s.center, { backgroundColor: C.bg }]}><ActivityIndicator size="large" color={C.accent} /></View>;
-  
+
   if (!teacher) {
     if (authMode === 'parent_portal') {
       return <ParentPortal isDark={isDark} onBack={() => setAuthMode('landing')} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} isOnline={isOnline} />;
@@ -506,195 +444,196 @@ export default function App() {
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
       <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
         <Drawer.Navigator
-        drawerContent={(props) => {
-          const activeRoute = props.state.routes[props.state.index];
-          const activeName = activeRoute.name;
-          const nestedScreen = (activeRoute.params as any)?.screen;
+          drawerContent={(props) => {
+            const activeRoute = props.state.routes[props.state.index];
+            const activeName = activeRoute.name;
+            const nestedScreen = (activeRoute.params as any)?.screen;
 
-          const isDashboard = activeName === 'Main' && (nestedScreen === 'Dashboard' || !nestedScreen);
-          const isAnalytics = activeName === 'Analytics';
-          const isUrgent = activeName === 'Urgent';
-          const isAssessments = activeName === 'AssessmentsMgmt';
+            const isDashboard = activeName === 'Main' && (nestedScreen === 'Dashboard' || !nestedScreen);
+            const isAnalytics = activeName === 'Analytics';
+            const isUrgent = activeName === 'Urgent';
+            const isAssessments = activeName === 'AssessmentsMgmt';
 
-          return (
-          <DrawerContentScrollView {...props} style={{ backgroundColor: C.bg }}>
-            <View style={{ padding: 24, paddingBottom: 32, alignItems: 'center' }}>
-              <View style={{ width: 100, height: 100, borderRadius: 24, padding: 4, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginBottom: 20 }}>
-                <RNImage source={require('./assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
-              </View>
-              <Text style={{ color: C.text, fontWeight: '900', fontSize: 16, textAlign: 'center', lineHeight: 22 }}>{t('app.title')}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isOnline ? C.green : C.red, marginRight: 6 }} />
-                <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700' }}>{teacher.name}</Text>
-              </View>
-              <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ color: C.muted, fontSize: 10, fontWeight: '600' }}>
-                  {isOnline ? t('common.online') : t('common.offline')} • {t('common.lastSynced')}: {lastSync || t('common.never')}
-                </Text>
-              </View>
-            </View>
+            return (
+              <DrawerContentScrollView {...props} style={{ backgroundColor: C.bg }}>
+                <View style={{ padding: 24, paddingBottom: 32, alignItems: 'center' }}>
+                  <View style={{ width: 100, height: 100, borderRadius: 24, padding: 4, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, marginBottom: 20 }}>
+                    <RNImage source={require('./assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="contain" />
+                  </View>
+                  <Text style={{ color: C.text, fontWeight: '900', fontSize: 16, textAlign: 'center', lineHeight: 22 }}>{t('app.title')}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isOnline ? C.green : C.red, marginRight: 6 }} />
+                    <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700' }}>{teacher.name}</Text>
+                  </View>
+                  <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ color: C.muted, fontSize: 10, fontWeight: '600' }}>
+                      {isOnline ? t('common.online') : t('common.offline')} • {t('common.lastSynced')}: {lastSync || t('common.never')}
+                    </Text>
+                  </View>
+                </View>
 
-            <View style={{ padding: 16, paddingBottom: 0 }}>
-              <TouchableOpacity 
-                onPress={() => props.navigation.navigate('Main', { screen: 'Dashboard' })} 
-                style={[s.sidebarItem, isDashboard && { backgroundColor: C.accent + '15' }]}
-              >
-                <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isDashboard ? '20' : '10') }]}><Home size={18} color={isDashboard ? C.accent : C.slate} /></View>
-                <Text style={[s.sidebarText, isDashboard && { color: C.accent, fontWeight: '700' }]}>{t('dashboard.title')}</Text>
-              </TouchableOpacity>
+                <View style={{ padding: 16, paddingBottom: 0 }}>
+                  <TouchableOpacity
+                    onPress={() => props.navigation.navigate('Main', { screen: 'Dashboard' })}
+                    style={[s.sidebarItem, isDashboard && { backgroundColor: C.accent + '15' }]}
+                  >
+                    <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isDashboard ? '20' : '10') }]}><Home size={18} color={isDashboard ? C.accent : C.slate} /></View>
+                    <Text style={[s.sidebarText, isDashboard && { color: C.accent, fontWeight: '700' }]}>{t('dashboard.title')}</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity 
-                onPress={() => props.navigation.navigate('Analytics')} 
-                style={[s.sidebarItem, isAnalytics && { backgroundColor: C.accent + '15' }]}
-              >
-                <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isAnalytics ? '20' : '10') }]}><TrendingUp size={18} color={isAnalytics ? C.accent : C.slate} /></View>
-                <Text style={[s.sidebarText, isAnalytics && { color: C.accent, fontWeight: '700' }]}>{t('teacher.analytics')}</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => props.navigation.navigate('Analytics')}
+                    style={[s.sidebarItem, isAnalytics && { backgroundColor: C.accent + '15' }]}
+                  >
+                    <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isAnalytics ? '20' : '10') }]}><TrendingUp size={18} color={isAnalytics ? C.accent : C.slate} /></View>
+                    <Text style={[s.sidebarText, isAnalytics && { color: C.accent, fontWeight: '700' }]}>{t('teacher.analytics')}</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity 
-                onPress={() => props.navigation.navigate('Urgent')} 
-                style={[s.sidebarItem, isUrgent && { backgroundColor: C.amber + '15' }]}
-              >
-                <View style={[s.sidebarIcon, { backgroundColor: C.amber + (isUrgent ? '20' : '10') }]}><AlertTriangle size={18} color={isUrgent ? C.amber : C.slate} /></View>
-                <Text style={[s.sidebarText, isUrgent && { color: C.amber, fontWeight: '700' }]}>{t('teacher.urgent')}</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => props.navigation.navigate('Urgent')}
+                    style={[s.sidebarItem, isUrgent && { backgroundColor: C.amber + '15' }]}
+                  >
+                    <View style={[s.sidebarIcon, { backgroundColor: C.amber + (isUrgent ? '20' : '10') }]}><AlertTriangle size={18} color={isUrgent ? C.amber : C.slate} /></View>
+                    <Text style={[s.sidebarText, isUrgent && { color: C.amber, fontWeight: '700' }]}>{t('teacher.urgent')}</Text>
+                  </TouchableOpacity>
 
-              {!!(teacher?.cancreateassessments || teacher?.canCreateAssessments) && (
-                <TouchableOpacity 
-                  onPress={() => props.navigation.navigate('AssessmentsMgmt')} 
-                  style={[s.sidebarItem, isAssessments && { backgroundColor: C.accent + '15' }]}
-                >
-                  <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isAssessments ? '20' : '10') }]}><FileText size={18} color={isAssessments ? C.accent : C.slate} /></View>
-                  <Text style={[s.sidebarText, isAssessments && { color: C.accent, fontWeight: '700' }]}>{t('teacher.assessments')}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+                  {!!(teacher?.cancreateassessments || teacher?.canCreateAssessments) && (
+                    <TouchableOpacity
+                      onPress={() => props.navigation.navigate('AssessmentsMgmt')}
+                      style={[s.sidebarItem, isAssessments && { backgroundColor: C.accent + '15' }]}
+                    >
+                      <View style={[s.sidebarIcon, { backgroundColor: C.accent + (isAssessments ? '20' : '10') }]}><FileText size={18} color={isAssessments ? C.accent : C.slate} /></View>
+                      <Text style={[s.sidebarText, isAssessments && { color: C.accent, fontWeight: '700' }]}>{t('teacher.assessments')}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-            <View style={{ padding: 24, marginTop: 'auto', borderTopWidth: 1, borderTopColor: C.border }}>
-              <TouchableOpacity onPress={toggleLanguage} style={s.sidebarItem}>
-                <View style={[s.sidebarIcon, { backgroundColor: C.accent + '10' }]}><Languages size={18} color={C.accent} /></View>
-                <Text style={s.sidebarText}>{i18n.language === 'en' ? 'አማርኛ (Amharic)' : 'እንግሊዝኛ (English)'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={toggleTheme} style={s.sidebarItem}>
-                <View style={[s.sidebarIcon, { backgroundColor: C.amber + '10' }]}>{isDark ? <Sun size={18} color={C.amber} /> : <Moon size={18} color={C.slate} />}</View>
-                <Text style={s.sidebarText}>{isDark ? t('common.lightMode') : t('common.darkMode')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => { syncData(); props.navigation.closeDrawer(); }} style={s.sidebarItem}>
-                <View style={[s.sidebarIcon, { backgroundColor: C.green + '10' }]}><RefreshCw size={18} color={C.green} /></View>
-                <Text style={[s.sidebarText, { flex: 1 }]}>{t('common.sync')}</Text>
-                {syncing && <ActivityIndicator size="small" color={C.accent} />}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleLogout} style={[s.sidebarItem, { marginTop: 24 }]}>
-                <View style={[s.sidebarIcon, { backgroundColor: C.red + '10' }]}><LogOut size={18} color={C.red} /></View>
-                <Text style={[s.sidebarText, { color: C.red, fontWeight: '800' }]}>{t('common.logout')}</Text>
-              </TouchableOpacity>
-            </View>
-          </DrawerContentScrollView>
-        )}}
-        screenOptions={({ navigation, route }) => ({
-          headerLeft: () => {
-            if (route.name !== 'Main') {
-              return (
-                <TouchableOpacity 
-                   onPress={() => navigation.navigate('Main')} 
-                   style={{ marginLeft: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}
-                >
-                  <ArrowLeft size={20} color={C.accent} strokeWidth={3} />
-                </TouchableOpacity>
-              );
-            }
-            return <DrawerToggleButton tintColor={C.accent} />;
-          },
-          headerStyle: { 
-            backgroundColor: C.bg, 
-            elevation: 0, 
-            shadowOpacity: 0, 
-            borderBottomWidth: 1, 
-            borderBottomColor: C.border,
-            height: Platform.OS === 'android' ? 64 : undefined,
-          },
-          headerTitleStyle: { 
-            color: C.text, 
-            fontWeight: '900', 
-            fontSize: 18, 
-            letterSpacing: -0.5,
-            marginTop: Platform.OS === 'android' ? 8 : 0
-          },
-          headerTintColor: C.accent,
-          drawerActiveBackgroundColor: C.accent + '15',
-          drawerActiveTintColor: C.accent,
-          drawerInactiveTintColor: C.muted,
-          drawerLabelStyle: { fontWeight: '700', fontSize: 14 },
-          drawerStyle: { width: 280, borderRightWidth: 0 },
-        })}
-      >
-        <Drawer.Screen
-          name="Main"
-          options={{
-            title: t('app.title'),
-            drawerIcon: ({ color }) => <Home size={18} color={color} />,
-            drawerLabel: t('dashboard.title')
+                <View style={{ padding: 24, marginTop: 'auto', borderTopWidth: 1, borderTopColor: C.border }}>
+                  <TouchableOpacity onPress={toggleLanguage} style={s.sidebarItem}>
+                    <View style={[s.sidebarIcon, { backgroundColor: C.accent + '10' }]}><Languages size={18} color={C.accent} /></View>
+                    <Text style={s.sidebarText}>{i18n.language === 'en' ? 'አማርኛ (Amharic)' : 'እንግሊዝኛ (English)'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={toggleTheme} style={s.sidebarItem}>
+                    <View style={[s.sidebarIcon, { backgroundColor: C.amber + '10' }]}>{isDark ? <Sun size={18} color={C.amber} /> : <Moon size={18} color={C.slate} />}</View>
+                    <Text style={s.sidebarText}>{isDark ? t('common.lightMode') : t('common.darkMode')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { syncData(); props.navigation.closeDrawer(); }} style={s.sidebarItem}>
+                    <View style={[s.sidebarIcon, { backgroundColor: C.green + '10' }]}><RefreshCw size={18} color={C.green} /></View>
+                    <Text style={[s.sidebarText, { flex: 1 }]}>{t('common.sync')}</Text>
+                    {syncing && <ActivityIndicator size="small" color={C.accent} />}
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleLogout} style={[s.sidebarItem, { marginTop: 24 }]}>
+                    <View style={[s.sidebarIcon, { backgroundColor: C.red + '10' }]}><LogOut size={18} color={C.red} /></View>
+                    <Text style={[s.sidebarText, { color: C.red, fontWeight: '800' }]}>{t('common.logout')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </DrawerContentScrollView>
+            )
           }}
+          screenOptions={({ navigation, route }) => ({
+            headerLeft: () => {
+              if (route.name !== 'Main') {
+                return (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Main')}
+                    style={{ marginLeft: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    <ArrowLeft size={20} color={C.accent} strokeWidth={3} />
+                  </TouchableOpacity>
+                );
+              }
+              return <DrawerToggleButton tintColor={C.accent} />;
+            },
+            headerStyle: {
+              backgroundColor: C.bg,
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 1,
+              borderBottomColor: C.border,
+              height: Platform.OS === 'android' ? 64 : undefined,
+            },
+            headerTitleStyle: {
+              color: C.text,
+              fontWeight: '900',
+              fontSize: 18,
+              letterSpacing: -0.5,
+              marginTop: Platform.OS === 'android' ? 8 : 0
+            },
+            headerTintColor: C.accent,
+            drawerActiveBackgroundColor: C.accent + '15',
+            drawerActiveTintColor: C.accent,
+            drawerInactiveTintColor: C.muted,
+            drawerLabelStyle: { fontWeight: '700', fontSize: 14 },
+            drawerStyle: { width: 280, borderRightWidth: 0 },
+          })}
         >
-          {(props: any) => (
-            <Tab.Navigator
-              screenOptions={({ route }) => ({
-                headerShown: false,
-                tabBarStyle: { 
-                  borderTopWidth: 1, 
-                  borderTopColor: C.border,
-                  backgroundColor: C.card, 
-                  height: Platform.OS === 'ios' ? 88 : 64, 
-                  paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-                  paddingTop: 8,
-                  elevation: 0, 
-                  shadowOpacity: 0 
-                },
-                tabBarActiveTintColor: C.accent,
-                tabBarInactiveTintColor: C.muted,
-                tabBarShowLabel: false,
-                tabBarIcon: ({ color, focused }) => {
-                  const size = focused ? 24 : 20;
-                  if (route.name === 'Dashboard') return <Home size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                  if (route.name === 'Students') return <Users size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                  if (route.name === 'Attendance') return (
-                    <View style={{ opacity: 0.4 }}>
-                      <CalendarCheck size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
-                    </View>
-                  );
-                  if (route.name === 'Marks') return <BarChart3 size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                  return null;
-                }
-              })}
-            >
-              <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} subjects={subjects} settings={settings} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} isOnline={isOnline} lastSync={lastSync} showToast={showToast} />}</Tab.Screen>
-              <Tab.Screen name="Students">{(props: any) => <StudentsTab {...props} teacher={teacher!} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
-              <Tab.Screen 
-                name="Attendance"
-                listeners={{
-                  tabPress: (e) => {
-                    e.preventDefault();
-                    showToast('📅 ' + t('common.comingSoon', 'Coming Soon'), 'info');
+          <Drawer.Screen
+            name="Main"
+            options={{
+              title: t('app.title'),
+              drawerIcon: ({ color }) => <Home size={18} color={color} />,
+              drawerLabel: t('dashboard.title')
+            }}
+          >
+            {(props: any) => (
+              <Tab.Navigator
+                screenOptions={({ route }) => ({
+                  headerShown: false,
+                  tabBarStyle: {
+                    borderTopWidth: 1,
+                    borderTopColor: C.border,
+                    backgroundColor: C.card,
+                    height: Platform.OS === 'ios' ? 88 : 64,
+                    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+                    paddingTop: 8,
+                    elevation: 0,
+                    shadowOpacity: 0
                   },
-                }}
+                  tabBarActiveTintColor: C.accent,
+                  tabBarInactiveTintColor: C.muted,
+                  tabBarShowLabel: false,
+                  tabBarIcon: ({ color, focused }) => {
+                    const size = focused ? 24 : 20;
+                    if (route.name === 'Dashboard') return <Home size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                    if (route.name === 'Students') return <Users size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                    if (route.name === 'Attendance') return (
+                      <View style={{ opacity: 0.4 }}>
+                        <CalendarCheck size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
+                      </View>
+                    );
+                    if (route.name === 'Marks') return <BarChart3 size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
+                    return null;
+                  }
+                })}
               >
-                {(props: any) => <AttendanceTab {...props} teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={() => syncData()} C={C} s={s} showToast={showToast} settings={settings} />}
-              </Tab.Screen>
-              <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} showToast={showToast} settings={settings} subjects={subjects} />}</Tab.Screen>
-            </Tab.Navigator>
-          )}
-        </Drawer.Screen>
-        <Drawer.Screen name="Analytics" options={{ title: t('teacher.analytics'), drawerIcon: ({ color }) => <TrendingUp size={18} color={color} />, drawerLabel: t('teacher.analytics') }}>
-          {(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} settings={settings} subjects={subjects} />}
-        </Drawer.Screen>
-        <Drawer.Screen name="Urgent" options={{ title: t('teacher.urgent'), drawerIcon: ({ color }) => <AlertTriangle size={18} color={color} />, drawerLabel: t('teacher.urgent') }}>
-          {(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}
-        </Drawer.Screen>
-        {!!(teacher!.cancreateassessments || teacher!.canCreateAssessments) && (
-          <Drawer.Screen name="AssessmentsMgmt" options={{ title: 'Assessments', drawerIcon: ({ color }) => <FileText size={18} color={color} />, drawerLabel: 'Assessments' }}>
-            {(props: any) => <AssessmentManagementTab {...props} teacher={teacher!} assessments={assessments} subjects={subjects} settings={settings} C={C} s={s} showToast={showToast} onRefresh={() => syncData()} />}
+                <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} subjects={subjects} settings={settings} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} isOnline={isOnline} lastSync={lastSync} />}</Tab.Screen>
+                <Tab.Screen name="Students">{(props: any) => <StudentsTab {...props} teacher={teacher!} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
+                <Tab.Screen
+                  name="Attendance"
+                  listeners={{
+                    tabPress: (e) => {
+                      e.preventDefault();
+                      showToast('📅 ' + t('common.comingSoon', 'Coming Soon'), 'info');
+                    },
+                  }}
+                >
+                  {(props: any) => <AttendanceTab {...props} teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={() => syncData()} C={C} s={s} settings={settings} />}
+                </Tab.Screen>
+                <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} settings={settings} subjects={subjects} />}</Tab.Screen>
+              </Tab.Navigator>
+            )}
           </Drawer.Screen>
-        )}
+          <Drawer.Screen name="Analytics" options={{ title: t('teacher.analytics'), drawerIcon: ({ color }) => <TrendingUp size={18} color={color} />, drawerLabel: t('teacher.analytics') }}>
+            {(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} settings={settings} subjects={subjects} />}
+          </Drawer.Screen>
+          <Drawer.Screen name="Urgent" options={{ title: t('teacher.urgent'), drawerIcon: ({ color }) => <AlertTriangle size={18} color={color} />, drawerLabel: t('teacher.urgent') }}>
+            {(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}
+          </Drawer.Screen>
+          {!!(teacher!.cancreateassessments || teacher!.canCreateAssessments) && (
+            <Drawer.Screen name="AssessmentsMgmt" options={{ title: 'Assessments', drawerIcon: ({ color }) => <FileText size={18} color={color} />, drawerLabel: 'Assessments' }}>
+              {(props: any) => <AssessmentManagementTab {...props} teacher={teacher!} assessments={assessments} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}
+            </Drawer.Screen>
+          )}
         </Drawer.Navigator>
       </NavigationContainer>
 
@@ -709,18 +648,6 @@ export default function App() {
         C={C}
         s={s}
       />
-
-      {toast.visible && (
-        <Animated.View style={{
-          position: 'absolute', bottom: Platform.OS === 'ios' ? 110 : 90, alignSelf: 'center', opacity: toastOp,
-          backgroundColor: toast.type === 'error' ? C.red : (toast.type === 'info' ? C.amber : C.green),
-          paddingHorizontal: 24, paddingVertical: 14, borderRadius: 30, elevation: 5,
-          shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.3, shadowRadius: 8,
-          flexDirection: 'row', alignItems: 'center', zIndex: 9999
-        }}>
-          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>{toast.msg}</Text>
-        </Animated.View>
-      )}
     </SafeAreaView>
   );
 }
@@ -745,7 +672,7 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
         </TouchableOpacity>
         <TouchableOpacity onPress={toggleTheme} style={{ padding: 8 }}><Text style={{ fontSize: 28 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
       </View>
-      
+
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 100 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={{ alignItems: 'center', marginBottom: 48 }}>
           <View style={{ width: 120, height: 120, borderRadius: 30, padding: 6, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, marginBottom: 24 }}>
@@ -758,16 +685,16 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
 
         <Text style={{ color: C.muted, textAlign: 'center', marginBottom: 32, fontWeight: '700', fontSize: 15 }}>{t('app.welcomeMessage', 'Welcome! Please select your portal')}</Text>
 
-        <TouchableOpacity 
-          style={[s.loginBtn, { backgroundColor: C.accent, marginBottom: 20, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]} 
+        <TouchableOpacity
+          style={[s.loginBtn, { backgroundColor: C.accent, marginBottom: 20, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]}
           onPress={() => onSelectMode('teacher')}
         >
           <Key size={22} color="#fff" />
           <Text style={[s.loginBtnText, { fontSize: 18 }]}>{t('app.teacherPortal', 'Teacher Portal')}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[s.loginBtn, { backgroundColor: 'transparent', borderWidth: 2, borderColor: C.accent, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]} 
+        <TouchableOpacity
+          style={[s.loginBtn, { backgroundColor: 'transparent', borderWidth: 2, borderColor: C.accent, flexDirection: 'row', justifyContent: 'center', gap: 12, height: 60, borderRadius: 16 }]}
           onPress={() => onSelectMode('parent')}
         >
           <Users size={22} color={C.accent} />
@@ -783,7 +710,7 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
   const { t, i18n } = useTranslation();
   const C = isDark ? THEMES.dark : THEMES.light;
   const s = makeStyles(C);
-  
+
   const [studentName, setStudentName] = useState('');
   const [accessCode, setAccessCode] = useState('');
   const [showCode, setShowCode] = useState(false);
@@ -801,7 +728,7 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
     if (!studentName.trim() || !accessCode.trim()) {
       return Alert.alert(t('common.error', 'Error'), t('parent.loginFieldsRequired', 'Both Student Name and Access Code are required.'));
     }
-    
+
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -815,13 +742,13 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
       if (!data) return Alert.alert(t('parent.notFound', 'Student Not Found'), t('parent.loginFailed', 'Incorrect name or portal access code. Please try again.'));
 
       setStudent(data);
-      
+
       const [mRes, aRes, attRes] = await Promise.all([
         supabase.from('marks').select('*').eq('studentid', data.id),
         supabase.from('assessments').select('*').eq('grade', data.grade),
         supabase.from('attendance').select('*').eq('studentid', data.id).order('date', { ascending: false })
       ]);
-      
+
       setMarks(mRes.data || []);
       setAssessments(aRes.data || []);
       setAttendance(attRes.data || []);
@@ -856,158 +783,158 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
             >
-            <View style={{ alignItems: 'center', marginBottom: 40 }}>
-              <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}>
-                <Search size={48} color={C.accent} />
+              <View style={{ alignItems: 'center', marginBottom: 40 }}>
+                <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}>
+                  <Search size={48} color={C.accent} />
+                </View>
+                <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', marginTop: 20, textAlign: 'center' }}>{t('parent.searchTitle', 'Find Student Results')}</Text>
+                <Text style={{ color: C.muted, textAlign: 'center', marginTop: 10, fontSize: 15, lineHeight: 22 }}>{t('parent.searchDesc', 'Enter the student full name or their ID/Portal code to view academic records.')}</Text>
               </View>
-              <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', marginTop: 20, textAlign: 'center' }}>{t('parent.searchTitle', 'Find Student Results')}</Text>
-              <Text style={{ color: C.muted, textAlign: 'center', marginTop: 10, fontSize: 15, lineHeight: 22 }}>{t('parent.searchDesc', 'Enter the student full name or their ID/Portal code to view academic records.')}</Text>
-            </View>
 
-            <View style={[s.loginCard, { padding: 24 }]}>
-               <Text style={s.inputLabel}>{t('parent.studentFullName', 'Student Full Name')}</Text>
-               <TextInput 
-                 style={[s.loginInput, { height: 56, marginBottom: 16 }]}
-                 placeholder={t('parent.namePlaceholder', 'e.g. Abebe Kebede')}
-                 placeholderTextColor={C.muted}
-                 value={studentName}
-                 onChangeText={setStudentName}
-                 autoCorrect={false}
-                 returnKeyType="next"
-                 onSubmitEditing={() => accessCodeRef.current?.focus()}
-               />
-               
-               <Text style={s.inputLabel}>{t('parent.portalAccessCode', 'Portal Access Code')}</Text>
-               <View style={{ position: 'relative' }}>
-                 <TextInput 
-                   ref={accessCodeRef}
-                   style={[s.loginInput, { height: 56, paddingRight: 50 }]}
-                   placeholder="------"
-                   keyboardType="numeric"
-                   maxLength={6}
-                   placeholderTextColor={C.muted}
-                   value={accessCode}
-                   onChangeText={setAccessCode}
-                   secureTextEntry={!showCode}
-                   returnKeyType="search"
-                   onSubmitEditing={doSearch}
-                 />
-                 <TouchableOpacity 
-                   onPress={() => setShowCode(!showCode)} 
-                   style={{ position: 'absolute', right: 15, top: 15 }}
-                 >
-                   {showCode ? <EyeOff size={24} color={C.muted} /> : <Eye size={24} color={C.muted} />}
-                 </TouchableOpacity>
-               </View>
+              <View style={[s.loginCard, { padding: 24 }]}>
+                <Text style={s.inputLabel}>{t('parent.studentFullName', 'Student Full Name')}</Text>
+                <TextInput
+                  style={[s.loginInput, { height: 56, marginBottom: 16 }]}
+                  placeholder={t('parent.namePlaceholder', 'e.g. Abebe Kebede')}
+                  placeholderTextColor={C.muted}
+                  value={studentName}
+                  onChangeText={setStudentName}
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  onSubmitEditing={() => accessCodeRef.current?.focus()}
+                />
 
-               <TouchableOpacity style={[s.loginBtn, { marginTop: 24, height: 60, borderRadius: 16, shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 }]} onPress={doSearch} disabled={loading}>
-                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={[s.loginBtnText, { fontSize: 17 }]}>{t('parent.viewResults', 'View Student Results')}</Text>}
-               </TouchableOpacity>
-            </View>
-          </ScrollView>
+                <Text style={s.inputLabel}>{t('parent.portalAccessCode', 'Portal Access Code')}</Text>
+                <View style={{ position: 'relative' }}>
+                  <TextInput
+                    ref={accessCodeRef}
+                    style={[s.loginInput, { height: 56, paddingRight: 50 }]}
+                    placeholder="------"
+                    keyboardType="numeric"
+                    maxLength={6}
+                    placeholderTextColor={C.muted}
+                    value={accessCode}
+                    onChangeText={setAccessCode}
+                    secureTextEntry={!showCode}
+                    returnKeyType="search"
+                    onSubmitEditing={doSearch}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowCode(!showCode)}
+                    style={{ position: 'absolute', right: 15, top: 15 }}
+                  >
+                    {showCode ? <EyeOff size={24} color={C.muted} /> : <Eye size={24} color={C.muted} />}
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity style={[s.loginBtn, { marginTop: 24, height: 60, borderRadius: 16, shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 }]} onPress={doSearch} disabled={loading}>
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={[s.loginBtnText, { fontSize: 17 }]}>{t('parent.viewResults', 'View Student Results')}</Text>}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </WebSafeTouchable>
         </KeyboardAvoidingView>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
-            <View style={[s.dashboardCard, { marginBottom: 24, alignItems: 'center', padding: 24 }]}>
-               <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-                 <User size={44} color={C.accent} />
-               </View>
-               <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', textAlign: 'center' }}>{student.name}</Text>
-               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 10 }}>
-                 <View style={{ backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}>
-                   <Text style={{ color: C.accent, fontSize: 13, fontWeight: '800' }}>{fmtGrade(student.grade)}</Text>
-                 </View>
-                 <Text style={{ color: C.muted }}>•</Text>
-                 <Text style={{ color: C.muted, fontWeight: '700', fontSize: 13 }}>ID: {student.portalcode || student.id.slice(0, 8)}</Text>
-               </View>
-               
-               <TouchableOpacity 
-                 style={{ marginTop: 28, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, backgroundColor: C.accent + '10' }} 
-                 onPress={() => setStudent(null)}
-               >
-                 <Text style={{ color: C.accent, fontWeight: '900', fontSize: 14 }}>{t('parent.searchAnother', 'Search Another Student')}</Text>
-               </TouchableOpacity>
+          <View style={[s.dashboardCard, { marginBottom: 24, alignItems: 'center', padding: 24 }]}>
+            <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+              <User size={44} color={C.accent} />
             </View>
-            
-            {/* Attendance Summary */}
-            <View style={{ marginBottom: 32 }}>
-               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
-                 <CalendarCheck size={20} color={C.muted} />
-                 <Text style={[s.sectionTitle, { marginBottom: 0, color: C.muted }]}>{t('profile.attendance', 'Attendance')}</Text>
-                 <View style={{ backgroundColor: C.amber + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                    <Text style={{ color: C.amber, fontSize: 10, fontWeight: '900' }}>COMING SOON</Text>
-                 </View>
-               </View>
-
-               <View style={[s.dashboardCard, { padding: 16, opacity: 0.6 }]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, filter: 'blur(3px)' }}>
-                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: C.accent, fontSize: 24, fontWeight: '900' }}>—%</Text>
-                        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Attendance Rate</Text>
-                     </View>
-                     <View style={{ width: 1, height: '80%', backgroundColor: C.border, alignSelf: 'center' }} />
-                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: C.red, fontSize: 24, fontWeight: '900' }}>—</Text>
-                        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Absences</Text>
-                     </View>
-                     <View style={{ width: 1, height: '80%', backgroundColor: C.border, alignSelf: 'center' }} />
-                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: C.amber, fontSize: 24, fontWeight: '900' }}>—</Text>
-                        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Lates</Text>
-                     </View>
-                  </View>
-
-                  <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingTop: 16, alignItems: 'center' }}>
-                     <Clock size={20} color={C.muted} opacity={0.5} />
-                     <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginTop: 8, textAlign: 'center' }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
-                  </View>
-               </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
-              <BarChart3 size={20} color={C.accent} />
-              <Text style={[s.sectionTitle, { marginBottom: 0 }]}>{t('parent.results', 'Academic Results')}</Text>
-            </View>
-            
-            {assessments.length === 0 ? (
-              <View style={{ padding: 40, alignItems: 'center' }}>
-                <Info size={40} color={C.muted} opacity={0.5} />
-                <Text style={[s.empty, { marginTop: 12 }]}>{t('parent.noAssessments', 'No assessments recorded yet.')}</Text>
+            <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', textAlign: 'center' }}>{student.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 10 }}>
+              <View style={{ backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}>
+                <Text style={{ color: C.accent, fontSize: 13, fontWeight: '800' }}>{fmtGrade(student.grade)}</Text>
               </View>
-            ) : (
-              Object.entries(
-                assessments.reduce((acc, a) => {
-                  if (!acc[a.subjectname]) acc[a.subjectname] = [];
-                  acc[a.subjectname].push(a);
-                  return acc;
-                }, {} as Record<string, Assessment[]>)
-              ).map(([subject, subjectAssessments]) => (
-                <View key={subject} style={{ marginBottom: 20 }}>
-                  <Text style={{ color: C.muted, fontSize: 13, fontWeight: '800', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>{subject}</Text>
-                  {subjectAssessments.map(a => {
-                    const mark = marks.find(m => m.assessmentid === a.id);
-                    return (
-                      <View key={a.id} style={[s.studentCard, { justifyContent: 'space-between', padding: 18, marginBottom: 8 }]}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[s.studentName, { fontSize: 15 }]}>{a.name}</Text>
-                        </View>
-                         <View style={{ alignItems: 'flex-end', backgroundColor: C.bg, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, minWidth: 70 }}>
-                          <Text style={{ color: mark ? C.accent : C.muted, fontSize: 22, fontWeight: '900' }}>{mark ? mark.score : '-'}</Text>
-                          <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', marginTop: -4 }}>/ {a.maxscore}</Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              ))
-            )}
-
-            <View style={{ marginTop: 24, padding: 24, backgroundColor: C.card, borderRadius: 24, alignItems: 'center' }}>
-               <CalendarCheck size={36} color={C.muted} opacity={0.3} />
-               <Text style={{ color: C.muted, textAlign: 'center', marginTop: 16, fontWeight: '700', fontSize: 14, lineHeight: 22 }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
+              <Text style={{ color: C.muted }}>•</Text>
+              <Text style={{ color: C.muted, fontWeight: '700', fontSize: 13 }}>ID: {student.portalcode || student.id.slice(0, 8)}</Text>
             </View>
-            <View style={{ height: 40 }} />
+
+            <TouchableOpacity
+              style={{ marginTop: 28, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, backgroundColor: C.accent + '10' }}
+              onPress={() => setStudent(null)}
+            >
+              <Text style={{ color: C.accent, fontWeight: '900', fontSize: 14 }}>{t('parent.searchAnother', 'Search Another Student')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Attendance Summary */}
+          <View style={{ marginBottom: 32 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
+              <CalendarCheck size={20} color={C.muted} />
+              <Text style={[s.sectionTitle, { marginBottom: 0, color: C.muted }]}>{t('profile.attendance', 'Attendance')}</Text>
+              <View style={{ backgroundColor: C.amber + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ color: C.amber, fontSize: 10, fontWeight: '900' }}>COMING SOON</Text>
+              </View>
+            </View>
+
+            <View style={[s.dashboardCard, { padding: 16, opacity: 0.6 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, filter: 'blur(3px)' }}>
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ color: C.accent, fontSize: 24, fontWeight: '900' }}>—%</Text>
+                  <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Attendance Rate</Text>
+                </View>
+                <View style={{ width: 1, height: '80%', backgroundColor: C.border, alignSelf: 'center' }} />
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ color: C.red, fontSize: 24, fontWeight: '900' }}>—</Text>
+                  <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Absences</Text>
+                </View>
+                <View style={{ width: 1, height: '80%', backgroundColor: C.border, alignSelf: 'center' }} />
+                <View style={{ alignItems: 'center', flex: 1 }}>
+                  <Text style={{ color: C.amber, fontSize: 24, fontWeight: '900' }}>—</Text>
+                  <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Lates</Text>
+                </View>
+              </View>
+
+              <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingTop: 16, alignItems: 'center' }}>
+                <Clock size={20} color={C.muted} opacity={0.5} />
+                <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginTop: 8, textAlign: 'center' }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
+            <BarChart3 size={20} color={C.accent} />
+            <Text style={[s.sectionTitle, { marginBottom: 0 }]}>{t('parent.results', 'Academic Results')}</Text>
+          </View>
+
+          {assessments.length === 0 ? (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <Info size={40} color={C.muted} opacity={0.5} />
+              <Text style={[s.empty, { marginTop: 12 }]}>{t('parent.noAssessments', 'No assessments recorded yet.')}</Text>
+            </View>
+          ) : (
+            Object.entries(
+              assessments.reduce((acc, a) => {
+                if (!acc[a.subjectname]) acc[a.subjectname] = [];
+                acc[a.subjectname].push(a);
+                return acc;
+              }, {} as Record<string, Assessment[]>)
+            ).map(([subject, subjectAssessments]) => (
+              <View key={subject} style={{ marginBottom: 20 }}>
+                <Text style={{ color: C.muted, fontSize: 13, fontWeight: '800', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>{subject}</Text>
+                {subjectAssessments.map(a => {
+                  const mark = marks.find(m => m.assessmentid === a.id);
+                  return (
+                    <View key={a.id} style={[s.studentCard, { justifyContent: 'space-between', padding: 18, marginBottom: 8 }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.studentName, { fontSize: 15 }]}>{a.name}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', backgroundColor: C.bg, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, minWidth: 70 }}>
+                        <Text style={{ color: mark ? C.accent : C.muted, fontSize: 22, fontWeight: '900' }}>{mark ? mark.score : '-'}</Text>
+                        <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', marginTop: -4 }}>/ {a.maxscore}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            ))
+          )}
+
+          <View style={{ marginTop: 24, padding: 24, backgroundColor: C.card, borderRadius: 24, alignItems: 'center' }}>
+            <CalendarCheck size={36} color={C.muted} opacity={0.3} />
+            <Text style={{ color: C.muted, textAlign: 'center', marginTop: 16, fontWeight: '700', fontSize: 14, lineHeight: 22 }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
+          </View>
+          <View style={{ height: 40 }} />
         </ScrollView>
       )}
     </View>
@@ -1065,9 +992,9 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
         <TouchableOpacity onPress={toggleTheme} style={{ padding: 8 }}><Text style={{ fontSize: 24 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
       </View>
       <View style={{ position: 'absolute', top: 32, left: 24, zIndex: 100 }}>
-         <TouchableOpacity onPress={onBack} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, elevation: 2 }}>
-           <ArrowLeft size={22} color={C.text} />
-         </TouchableOpacity>
+        <TouchableOpacity onPress={onBack} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, elevation: 2 }}>
+          <ArrowLeft size={22} color={C.text} />
+        </TouchableOpacity>
       </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -1097,7 +1024,7 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
             <View style={s.loginCard}>
               {errorMsg ? (
                 <View style={{ backgroundColor: C.red + '15', padding: 14, borderRadius: 14, marginBottom: 24 }}>
-                   <Text style={{ color: C.red, fontSize: 13, textAlign: 'center', fontWeight: '800' }}>{errorMsg}</Text>
+                  <Text style={{ color: C.red, fontSize: 13, textAlign: 'center', fontWeight: '800' }}>{errorMsg}</Text>
                 </View>
               ) : null}
 
@@ -1127,8 +1054,8 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
                   returnKeyType="go"
                   onSubmitEditing={doLogin}
                 />
-                <TouchableOpacity 
-                  onPress={() => setShowCode(!showCode)} 
+                <TouchableOpacity
+                  onPress={() => setShowCode(!showCode)}
                   style={{ position: 'absolute', right: 15, top: 12 }}
                 >
                   {showCode ? <EyeOff size={24} color={C.muted} /> : <Eye size={24} color={C.muted} />}
@@ -1155,60 +1082,60 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
 
 function makeStyles(C: any) {
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingTop: Platform.OS === 'android' ? 36 : 0 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
-  loginRoot: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', padding: 24 },
-  loginTitle: { color: C.text, fontSize: 32, fontWeight: '800', textAlign: 'center' },
-  loginSub: { color: C.accent, fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 32 },
-  loginCard: { backgroundColor: C.card, borderRadius: 24, padding: 24 },
-  inputLabel: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
-  loginInput: { backgroundColor: C.input, color: C.text, borderRadius: 12, padding: 14, fontSize: 16 },
-  loginBtn: { backgroundColor: C.accent, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 32 },
-  loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-  headerTitle: { color: C.text, fontSize: 22, fontWeight: '800' },
-  headerSub: { color: C.muted, fontSize: 13, marginTop: 2 },
-  logoutBtn: { backgroundColor: C.red + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
-  logoutBtnText: { color: C.red, fontSize: 14, fontWeight: '700' },
-  dashboardCard: { backgroundColor: C.card, borderRadius: 20, padding: 20 },
-  dashboardAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, padding: 18, borderRadius: 20, marginBottom: 14 },
-  tabBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: C.card, paddingVertical: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 12 },
-  searchInput: { margin: 16, marginBottom: 0, backgroundColor: C.card, color: C.text, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15 },
-  studentCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
-  sectionTitle: { color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 12 },
-  empty: { color: C.muted, textAlign: 'center', marginTop: 40, fontSize: 15 },
-  gradeChip: { backgroundColor: C.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8 },
-  gradeChipActive: { backgroundColor: C.accent },
-  gradeChipText: { color: C.muted, fontSize: 13, fontWeight: '600' },
-  gradeChipTextActive: { color: '#fff' },
-  attendanceRow: { backgroundColor: C.card, borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  statusText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  markRow: { backgroundColor: C.card, borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
-  glassFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 32 : 20, paddingTop: 16 },
-  glassBtn: { backgroundColor: C.accent, borderRadius: 16, padding: 18, alignItems: 'center', shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
-  actionBtn: { flex: 1, backgroundColor: C.accentMuted, padding: 12, borderRadius: 12, alignItems: 'center', gap: 6 },
-  actionBtnText: { color: C.accent, fontSize: 12, fontWeight: '700' },
-  markInput: { backgroundColor: C.input, color: C.text, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, width: 100, textAlign: 'right', fontSize: 16, fontWeight: '700', borderWidth: 1, borderColor: C.border },
-  maxScoreBar: { backgroundColor: C.accent + '15', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: C.accent + '44' },
-  issueCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border },
-  issueRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border },
-  issueText: { color: C.text, fontSize: 14, fontWeight: '600' },
-  issueSub: { color: C.muted, fontSize: 13, marginBottom: 16 },
-  issueTitle: { color: C.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
-  modalCard: { backgroundColor: C.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: C.border },
-  modalTitle: { color: C.text, fontSize: 20, fontWeight: '800', marginBottom: 8 },
-  modalSub: { color: C.muted, fontSize: 14, marginBottom: 20 },
-  modalBtn: { flex: 1, backgroundColor: C.accent, borderRadius: 14, padding: 16, alignItems: 'center', justifyContent: 'center' },
-  modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  sidebarItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, marginBottom: 4 },
-  sidebarIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.border + '33', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  sidebarText: { color: C.text, fontSize: 15, fontWeight: '600' },
-  badge: { backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-  badgeText: { color: C.accent, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  studentName: { color: C.text, fontSize: 16, fontWeight: '600' },
-  studentSub: { color: C.muted, fontSize: 13, marginTop: 2 },
-  themeBtn: { backgroundColor: C.border, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+    root: { flex: 1, backgroundColor: C.bg, paddingTop: Platform.OS === 'android' ? 36 : 0 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
+    loginRoot: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', padding: 24 },
+    loginTitle: { color: C.text, fontSize: 32, fontWeight: '800', textAlign: 'center' },
+    loginSub: { color: C.accent, fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 32 },
+    loginCard: { backgroundColor: C.card, borderRadius: 24, padding: 24 },
+    inputLabel: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
+    loginInput: { backgroundColor: C.input, color: C.text, borderRadius: 12, padding: 14, fontSize: 16 },
+    loginBtn: { backgroundColor: C.accent, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 32 },
+    loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
+    headerTitle: { color: C.text, fontSize: 22, fontWeight: '800' },
+    headerSub: { color: C.muted, fontSize: 13, marginTop: 2 },
+    logoutBtn: { backgroundColor: C.red + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+    logoutBtnText: { color: C.red, fontSize: 14, fontWeight: '700' },
+    dashboardCard: { backgroundColor: C.card, borderRadius: 20, padding: 20 },
+    dashboardAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, padding: 18, borderRadius: 20, marginBottom: 14 },
+    tabBar: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: C.card, paddingVertical: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 12 },
+    searchInput: { margin: 16, marginBottom: 0, backgroundColor: C.card, color: C.text, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15 },
+    studentCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
+    sectionTitle: { color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 12 },
+    empty: { color: C.muted, textAlign: 'center', marginTop: 40, fontSize: 15 },
+    gradeChip: { backgroundColor: C.card, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8 },
+    gradeChipActive: { backgroundColor: C.accent },
+    gradeChipText: { color: C.muted, fontSize: 13, fontWeight: '600' },
+    gradeChipTextActive: { color: '#fff' },
+    attendanceRow: { backgroundColor: C.card, borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
+    statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+    statusText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+    markRow: { backgroundColor: C.card, borderRadius: 16, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
+    glassFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 32 : 20, paddingTop: 16 },
+    glassBtn: { backgroundColor: C.accent, borderRadius: 16, padding: 18, alignItems: 'center', shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+    actionBtn: { flex: 1, backgroundColor: C.accentMuted, padding: 12, borderRadius: 12, alignItems: 'center', gap: 6 },
+    actionBtnText: { color: C.accent, fontSize: 12, fontWeight: '700' },
+    markInput: { backgroundColor: C.input, color: C.text, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, width: 100, textAlign: 'right', fontSize: 16, fontWeight: '700', borderWidth: 1, borderColor: C.border },
+    maxScoreBar: { backgroundColor: C.accent + '15', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: C.accent + '44' },
+    issueCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border },
+    issueRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border },
+    issueText: { color: C.text, fontSize: 14, fontWeight: '600' },
+    issueSub: { color: C.muted, fontSize: 13, marginBottom: 16 },
+    issueTitle: { color: C.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 24 },
+    modalCard: { backgroundColor: C.card, borderRadius: 24, padding: 24, borderWidth: 1, borderColor: C.border },
+    modalTitle: { color: C.text, fontSize: 20, fontWeight: '800', marginBottom: 8 },
+    modalSub: { color: C.muted, fontSize: 14, marginBottom: 20 },
+    modalBtn: { flex: 1, backgroundColor: C.accent, borderRadius: 14, padding: 16, alignItems: 'center', justifyContent: 'center' },
+    modalBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    sidebarItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, marginBottom: 4 },
+    sidebarIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: C.border + '33', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    sidebarText: { color: C.text, fontSize: 15, fontWeight: '600' },
+    badge: { backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+    badgeText: { color: C.accent, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+    studentName: { color: C.text, fontSize: 16, fontWeight: '600' },
+    studentSub: { color: C.muted, fontSize: 13, marginTop: 2 },
+    themeBtn: { backgroundColor: C.border, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   });
 }
