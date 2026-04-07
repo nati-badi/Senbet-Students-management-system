@@ -128,6 +128,10 @@ const resources = {
                 "autoCalculateConfirm": "This will automatically calculate promotion actions based on the student's yearly average percentage. Students missing marks will be skipped and flagged. Do you want to continue?",
                 "missingMarks": "Missing Marks",
                 "validationWarning": "calculating...",
+                "selectGrade": "Select Grade",
+                "selectGradeFirst": "Select Grade first",
+                "selectSubjectFirst": "Select Subject first",
+                "assessmentNamePlaceholder": "e.g. Midterm exam",
                 "dangerous": {
                     "title": "Dangerous Data Actions",
                     "desc": "Powerful tools for bulk data cleanup and system resets (Admin Only)",
@@ -398,6 +402,10 @@ const resources = {
                 "autoCalculateConfirm": "ይህ እርምጃ በተማሪው አመታዊ አማካይ ውጤት ላይ በመመስረት የማሳለፊያ ውሳኔዎችን በራስ-ሰር ያሰላል። ያልተሟላ ውጤት ያላቸው ተማሪዎች ይታለፋሉ። መቀጠል ይፈልጋሉ?",
                 "missingMarks": "ያልተሟላ ውጤት",
                 "validationWarning": "በማስላት ላይ...",
+                "selectGrade": "ክፍል ይምረጡ",
+                "selectGradeFirst": "መጀመሪያ ክፍል ይምረጡ",
+                "selectSubjectFirst": "መጀመሪያ የትምህርት ዓይነት ይምረጡ",
+                "assessmentNamePlaceholder": "ለምሳሌ አጋማሽ ፈተና",
                 "dangerous": {
                     "title": "አደገኛ የውሂብ እርምጃዎች",
                     "desc": "ለጅምላ ውሂብ ማጽዳት እና የስርዓት መልሶ ማግኛ መሳሪያዎች (ለአስተዳዳሪ ብቻ)",

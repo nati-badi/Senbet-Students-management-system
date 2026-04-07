@@ -26,16 +26,17 @@ export const formatGrade = (grade) => {
 };
 
 export const normalizeGrade = (rawGrade) => {
-    if (!rawGrade) return '';
+    if (rawGrade === undefined || rawGrade === null) return '';
     const s = String(rawGrade).toLowerCase().trim();
     const match = s.match(/(\d+)/);
     if (match) {
         const num = match[1];
-        if (parseInt(num) >= 1 && parseInt(num) <= 12) return num;
-        if (parseInt(num) > 12) return '13';
+        const n = parseInt(num);
+        if (n >= 1 && n <= 12) return String(n);
+        if (n > 12) return '13';
     }
     if (s.includes('ሌላ') || s.includes('other') || s.includes('12+')) return '13';
-    return rawGrade;
+    return s; // Consistency: return lowercase trimmed string if no digits
 };
 
 export const disabledDate = (current) => {

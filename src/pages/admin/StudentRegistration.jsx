@@ -477,7 +477,7 @@ export default function StudentRegistration() {
                 }}
             />
 
-            <Modal title={t('admin.edit')} open={isEditModalVisible} onOk={handleEditSave} onCancel={() => setIsEditModalVisible(false)}>
+            <Modal title={t('admin.edit')} open={isEditModalVisible} onOk={handleEditSave} onCancel={() => setIsEditModalVisible(false)} forceRender={true}>
                 <Form form={editForm} layout="vertical">
                     <Row gutter={16}>
                         <Col xs={24} md={12}><Form.Item label={t('admin.fullName')} name="name" rules={[{ required: true }]}><Input /></Form.Item></Col>

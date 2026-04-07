@@ -35,15 +35,19 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
             // Fallback to created_at if updated_at is missing (e.g. if SQL migration not yet run)
             const serverTime = (serverRecord.updated_at || serverRecord.created_at) 
                 ? new Date(serverRecord.updated_at || serverRecord.created_at).getTime() 
-                : 1; // Default to old but non-zero to distinguish from "nothing"
+                : 1;
             
             const localTime = localRecord.updated_at ? new Date(localRecord.updated_at).getTime() : 0;
             
-            if (serverTime > localTime) {
-                console.log(`Conflict resolved: Server is newer for ${tableName}:${serverRecord.id}`);
+            // Conflict Buffer: If the times are nearly identical (within 2 seconds), trust the local data 
+            // if the local record was unsynced, as it likely means the user just saved it.
+            const TIME_BUFFER_MS = 2000;
+            
+            if (serverTime > (localTime + TIME_BUFFER_MS)) {
+                console.log(`${SYNC_LOG_PREFIX} Conflict resolved: Server is newer for ${tableName}:${serverRecord.id}`);
                 shouldApply = true;
             } else {
-                console.log(`Conflict resolved: Local is newer for ${tableName}:${serverRecord.id} (Keeping local)`);
+                console.log(`${SYNC_LOG_PREFIX} Conflict resolved: Local is newer or too close for ${tableName}:${serverRecord.id} (Keeping local)`);
                 shouldApply = false;
             }
         }
@@ -76,7 +80,6 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
                 if (serverRecord.subject !== undefined) { mapped.subject = serverRecord.subject; }
                 if (serverRecord.semester !== undefined) { mapped.semester = serverRecord.semester; }
                 if (serverRecord.score !== undefined) { mapped.score = serverRecord.score; }
-                if (serverRecord.last_modified_by !== undefined) { mapped.markedBy = serverRecord.last_modified_by; }
             } else if (tableName === 'teachers') {
                 if (serverRecord.accesscode !== undefined) { mapped.accessCode = serverRecord.accesscode; delete mapped.accesscode; }
                 if (serverRecord.assignedgrades !== undefined) { mapped.assignedGrades = serverRecord.assignedgrades; delete mapped.assignedgrades; }
@@ -85,7 +88,18 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
                 // Support alternate casing (in case the column was created as camelCase in Supabase)
                 if (serverRecord.canCreateAssessments !== undefined && mapped.canCreateAssessments === undefined) {
                     mapped.canCreateAssessments = serverRecord.canCreateAssessments;
-                    // no delete needed: we only read from serverRecord
+                }
+            } else if (tableName === 'subjects') {
+                if (serverRecord.name !== undefined) { mapped.name = serverRecord.name; }
+                if (serverRecord.semester !== undefined) { mapped.semester = serverRecord.semester; }
+                if (serverRecord.grade !== undefined) { 
+                    // Shield: Never overwrite a local grade with a NULL from the server 
+                    // unless the server record is significantly newer (already handled by time check above)
+                    if (serverRecord.grade === null && localRecord && localRecord.grade) {
+                        mapped.grade = localRecord.grade;
+                    } else {
+                        mapped.grade = serverRecord.grade; 
+                    }
                 }
             }
 
@@ -330,6 +344,7 @@ export async function syncData({ force = false } = {}) {
                                 id: record.id,
                                 name: record.name,
                                 semester: record.semester,
+                                grade: record.grade,
                                 updated_at: record.updated_at
                             };
                         } else if (tableName === 'settings') {

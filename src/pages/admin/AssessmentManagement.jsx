@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, message, Row, Col, Select, DatePicker, Tag, Modal } from 'antd';
-import { EditOutlined, DeleteOutlined, WarningOutlined, AlertOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, WarningOutlined, AlertOutlined, PlusOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import dayjs from 'dayjs';
@@ -12,15 +12,25 @@ import { syncData } from '../../utils/sync';
 const { Title, Text, Paragraph } = Typography;
 
 export default function AssessmentManagement() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [modal, contextHolder] = Modal.useModal();
     const [form] = Form.useForm();
     const [editingId, setEditingId] = useState(null);
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const selectedGrade = Form.useWatch('grade', form);
     const selectedSubject = Form.useWatch('subjectName', form);
 
     const allSubjects = useLiveQuery(() => db.subjects.toArray()) || [];
-    const subjects = allSubjects.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
+    const subjects = (allSubjects || [])
+        .filter(s => {
+            if (!selectedGrade) return false;
+            const sGrade = normalizeGrade(s.grade);
+            const selGrade = normalizeGrade(selectedGrade);
+            // Robust matching: Normalized match OR direct string match OR inclusive match
+            return (sGrade && selGrade && sGrade === selGrade) || 
+                   String(s.grade).trim() === String(selectedGrade).trim();
+        })
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '', i18n.language === 'am' ? 'am' : 'en'));
     const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
 
     const handleSave = async (values) => {
@@ -54,6 +64,7 @@ export default function AssessmentManagement() {
             }
             form.resetFields();
             setEditingId(null);
+            setIsFormModalOpen(false);
             await syncData().catch(console.error);
         } catch (err) {
             message.error("Error saving assessment");
@@ -66,6 +77,7 @@ export default function AssessmentManagement() {
             ...assessment,
             date: assessment.date ? dayjs(assessment.date) : null
         });
+        setIsFormModalOpen(true);
     };
 
     const handleDelete = async (id) => {
@@ -147,7 +159,7 @@ export default function AssessmentManagement() {
             title: t('admin.semester', 'Semester'), 
             key: 'semester', 
             render: (_, record) => {
-                const subject = subjects.find(s => s.name === record.subjectName);
+                const subject = allSubjects.find(s => s.name === record.subjectName && normalizeGrade(s.grade) === normalizeGrade(record.grade));
                 const sem = subject?.semester || 'Semester I';
                 return <Tag color="gold">{t(`admin.${sem === 'Semester II' ? 'semester2' : 'semester1'}`, sem)}</Tag>;
             }
@@ -179,101 +191,122 @@ export default function AssessmentManagement() {
         }
     ];
 
+    const closeModal = () => {
+        setIsFormModalOpen(false);
+        setEditingId(null);
+        form.resetFields();
+    };
+
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 w-full">
             {contextHolder}
-            <div>
-                <Title level={2}>{t('admin.assessments')}</Title>
-                <Text type="secondary">{t('admin.manageAssessments')}</Text>
+            <div className="flex justify-between items-center bg-white dark:bg-slate-900/50 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                <div>
+                    <Title level={2} style={{ margin: 0 }}>{t('admin.assessments')}</Title>
+                    <Text type="secondary">{t('admin.manageAssessments')}</Text>
+                </div>
+                <Button 
+                    type="primary" 
+                    icon={<PlusOutlined />} 
+                    size="large" 
+                    onClick={() => setIsFormModalOpen(true)}
+                    className="rounded-xl shadow-md h-12 px-6 flex items-center gap-2 font-bold"
+                >
+                    {t('admin.addAssessment')}
+                </Button>
             </div>
 
-            <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-                <Form form={form} onFinish={handleSave} layout="vertical">
-                    <Row gutter={16}>
-                        <Col xs={24} md={8}>
-                            <Form.Item
-                                name="grade"
-                                label={t('admin.grade')}
-                                rules={[{ required: true }]}
-                            >
-                                <Select 
-                                    options={GRADE_OPTIONS} 
-                                    showSearch 
-                                    onChange={() => {
-                                        form.setFieldsValue({ subjectName: undefined });
-                                    }}
-                                />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item
-                                name="subjectName"
-                                label={t('admin.subjects')}
-                                rules={[{ required: true }]}
-                            >
-                                <Select 
-                                    showSearch
-                                    disabled={!selectedGrade}
-                                    placeholder={!selectedGrade ? "Select Grade first" : t('admin.subjects')}
+            <Modal
+                title={<Title level={3} className="m-0">{editingId ? t('admin.editAssessment') : t('admin.addAssessment')}</Title>}
+                open={isFormModalOpen}
+                onCancel={closeModal}
+                footer={null}
+                width={800}
+                className="top-10"
+                destroyOnClose
+                forceRender
+            >
+                <div className="pt-4">
+                    <Form form={form} onFinish={handleSave} layout="vertical">
+                        <Row gutter={16}>
+                            <Col xs={24} md={12}>
+                                <Form.Item
+                                    name="grade"
+                                    label={t('admin.grade')}
+                                    rules={[{ required: true }]}
                                 >
-                                    {subjects.map(s => (
-                                        <Select.Option key={s.id} value={s.name}>{s.name}</Select.Option>
-                                    ))}
-                                </Select>
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item
-                                name="name"
-                                label={t('admin.assessmentName')}
-                                rules={[{ required: true }]}
-                            >
-                                <Input 
-                                    placeholder={!selectedSubject ? "Select Subject first" : t('admin.assessmentNamePlaceholder')} 
-                                    disabled={!selectedSubject} 
-                                />
-                            </Form.Item>
-                        </Col>
+                                    <Select 
+                                        options={GRADE_OPTIONS} 
+                                        showSearch 
+                                        placeholder={t('admin.selectGrade')}
+                                        onChange={() => {
+                                            form.setFieldsValue({ subjectName: undefined });
+                                        }}
+                                        className="w-full h-10"
+                                    />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item
+                                    name="subjectName"
+                                    label={t('admin.subjects')}
+                                    rules={[{ required: true }]}
+                                >
+                                    <Select 
+                                        showSearch
+                                        disabled={!selectedGrade}
+                                        placeholder={!selectedGrade ? t('admin.selectGradeFirst') : t('admin.selectSubjectFirst')}
+                                        className="w-full h-10"
+                                    >
+                                        {subjects.map(s => (
+                                            <Select.Option key={s.id} value={s.name}>{s.name}</Select.Option>
+                                        ))}
+                                    </Select>
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item
+                                    name="name"
+                                    label={t('admin.assessmentName')}
+                                    rules={[{ required: true }]}
+                                >
+                                    <Input 
+                                        placeholder={!selectedSubject ? t('admin.selectSubjectFirst') : t('admin.assessmentNamePlaceholder')} 
+                                        disabled={!selectedSubject} 
+                                        className="h-10"
+                                    />
+                                </Form.Item>
+                            </Col>
 
-                        <Col xs={24} md={8}>
-                            <Form.Item
-                                name="maxScore"
-                                label={t('admin.maxScore')}
-                                rules={[{ required: true }]}
-                            >
-                                <Input type="number" disabled={!selectedSubject} />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Form.Item
-                                name="date"
-                                label={t('teacher.date')}
-                            >
-                                <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={16}>
-                            <Form.Item label=" ">
-                                <div className="flex justify-end">
-                                    <Space>
-                                        {editingId && (
-                                            <Button onClick={() => {
-                                                setEditingId(null);
-                                                form.resetFields();
-                                            }}>
-                                                {t('admin.cancel')}
-                                            </Button>
-                                        )}
-                                        <Button type="primary" htmlType="submit" size="large" className="px-8">
-                                            {editingId ? t('common.save') : t('admin.addAssessment')}
-                                        </Button>
-                                    </Space>
-                                </div>
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                </Form>
-            </Card>
+                            <Col xs={24} md={12}>
+                                <Form.Item
+                                    name="maxScore"
+                                    label={t('admin.maxScore')}
+                                    rules={[{ required: true }]}
+                                >
+                                    <Input type="number" disabled={!selectedSubject} min={0} className="h-10" />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24}>
+                                <Form.Item
+                                    name="date"
+                                    label={t('teacher.date')}
+                                >
+                                    <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} className="h-10" />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                        <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 dark:border-slate-800 mt-4">
+                            <Button onClick={closeModal} size="large" className="rounded-xl px-6">
+                                {t('admin.cancel')}
+                            </Button>
+                            <Button type="primary" htmlType="submit" size="large" className="rounded-xl px-10 font-bold">
+                                {editingId ? t('common.save') : t('admin.addAssessment')}
+                            </Button>
+                        </div>
+                    </Form>
+                </div>
+            </Modal>
 
             <Table
                 columns={columns}
