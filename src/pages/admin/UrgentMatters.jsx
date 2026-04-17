@@ -39,7 +39,7 @@ export default function UrgentMatters() {
         if (!s.grade) return false; 
         const isGradeActive = activeGrades.has(String(s.grade).trim()) || activeGrades.has(normalizeGrade(s.grade));
         if (!isGradeActive) return false;
-        return !s.name || (!s.baptismalName && !s.baptismalname) || (!s.parentContact && !s.parentcontact) || (!s.portalCode && !s.portalcode);
+        return !s.name || (!s.parentContact && !s.parentcontact) || (!s.portalCode && !s.portalcode);
     }), [students, activeGrades]);
 
     const isConduct = (a) => {
@@ -354,7 +354,16 @@ export default function UrgentMatters() {
                                                 style={avatarStyle('#fef2f2', '#b91c1c', '#fca5a5')}
                                             />
                                         }
-                                        title={<span className="font-bold">{student.name || <Text type="danger">No Name</Text>}</span>}
+                                        title={
+                                            <Space>
+                                                <span className="font-bold">{student.name || <Text type="danger">No Name</Text>}</span>
+                                                {(student.baptismalName || student.baptismalname) && (
+                                                    <Text type="secondary" className="text-xs font-normal italic">
+                                                        ({student.baptismalName || student.baptismalname})
+                                                    </Text>
+                                                )}
+                                            </Space>
+                                        }
                                         description={
                                             <div className="flex flex-wrap gap-1 mt-1">
                                                 {missing.map(field => (
@@ -468,7 +477,16 @@ export default function UrgentMatters() {
                                             style={avatarStyle('#fff7ed', '#c2410c', '#fdba74')}
                                         />
                                     }
-                                    title={<span className="font-bold">{student.name}</span>}
+                                    title={
+                                        <Space>
+                                            <span className="font-bold">{student.name}</span>
+                                            {(student.baptismalName || student.baptismalname) && (
+                                                <Text type="secondary" className="text-xs font-normal italic">
+                                                    ({student.baptismalName || student.baptismalname})
+                                                </Text>
+                                            )}
+                                        </Space>
+                                    }
                                     description={<div><Tag color="green">{formatGrade(student.grade)}</Tag> <Text type="secondary">{student.parentContact || student.parentcontact}</Text></div>}
                                 />
                             </List.Item>

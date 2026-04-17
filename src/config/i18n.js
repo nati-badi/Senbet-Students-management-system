@@ -22,9 +22,15 @@ const resources = {
                 "studentName": "Student Full Name",
                 "password": "Master Password",
                 "entryDate": "Entry Date",
-                "login": "Login"
+                "login": "Login",
+                "downloadComplete": "Download Complete!",
+                "students": "students",
+                "done": "Done"
             },
             "admin": {
+                "successGenText": "Successfully generated documents for",
+                "fileSaveText": "Your PDF file",
+                "savedToComputer": "has been downloaded to your computer.",
                 "menu": "Admin Menu",
                 "registerStudents": "Register Students",
                 "certificates": "Certificates",
@@ -296,9 +302,15 @@ const resources = {
                 "studentName": "የተማሪው ሙሉ ስም",
                 "password": "ዋና የይለፍ ቃል",
                 "entryDate": "የመግቢያ ቀን",
-                "login": "ግባ"
+                "login": "ግባ",
+                "downloadComplete": "የማውረድ ሂደት ተጠናቋል!",
+                "students": "ተማሪዎች",
+                "done": "ተከናውኗል"
             },
             "admin": {
+                "successGenText": "የሚከተሉትን ተማሪዎች ሰነድ በተሳካ ሁኔታ ተፈጥሯል፡",
+                "fileSaveText": "የእርስዎ PDF ፋይል",
+                "savedToComputer": "ወደ ኮምፒውተርዎ ወርዷል።",
                 "menu": "የአስተዳዳሪ ምናሌ",
                 "registerStudents": "ተማሪዎችን መመዝገብ",
                 "certificates": "የምስክር ወረቀቶች",

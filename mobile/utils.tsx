@@ -7,9 +7,13 @@ export interface Student {
   id: string;
   name: string;
   grade: string;
-  baptismalname?: string;
+  baptismalName?: string;
+  baptismalname?: string; // Keep for safety during transition
+  parentContact?: string;
   parentcontact?: string;
+  academicYear?: string;
   academicyear?: string;
+  portalCode?: string;
   portalcode?: string;
 }
 
@@ -32,6 +36,8 @@ export interface Teacher {
   canCreateAssessments?: boolean;
 }
 
+import { normalizeGrade as sharedNormG, normalizeSubject as sharedNormS, isConductAssessment } from '@shared/gradeUtils';
+
 // ── Grade helpers ──────────────────────────────────────────────
 export const GRADE_LABELS: Record<string, string> = {
   '1': '1ኛ ክፍል', '2': '2ኛ ክፍል', '3': '3ኛ ክፍል', '4': '4ኛ ክፍል',
@@ -41,23 +47,12 @@ export const GRADE_LABELS: Record<string, string> = {
 
 export const fmtGrade = (g: string | number) => GRADE_LABELS[String(g)] ?? `${g}ኛ ክፍል`;
 
-export const normG = (g: any) => {
-  if (!g) return '';
-  const m = String(g).match(/\d+/);
-  return m ? m[0] : String(g).trim();
-};
+export const normG = (g: any) => sharedNormG(g);
 
 // ── Subject helpers ────────────────────────────────────────────
-export const normS = (s: any) => {
-  if (!s) return '';
-  return String(s).trim().toLowerCase();
-};
+export const normS = (s: any) => sharedNormS(s);
 
-export const isConduct = (a: any) => {
-  const sName = (a.subjectname || '').toLowerCase();
-  const aName = (a.name || '').toLowerCase();
-  return sName.includes('conduct') || sName.includes('attitude') || aName.includes('conduct') || aName.includes('attitude');
-};
+export const isConduct = (a: any) => isConductAssessment(a);
 
 // ── Polyfills & Helpers ──────────────────────────────────────────
 export const generateUUID = () => {

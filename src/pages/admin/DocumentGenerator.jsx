@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Typography, Card, Select, Button, Space, message } from 'antd';
-import { FilePdfOutlined, IdcardOutlined, UserOutlined } from '@ant-design/icons';
+import { FilePdfOutlined, IdcardOutlined, UserOutlined, AlertOutlined } from '@ant-design/icons';
+import { Typography, Card, Select, Button, Space, message, Modal, List, Tag, Alert, Progress } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import jsPDF from 'jspdf';
@@ -10,6 +10,8 @@ import dayjs from 'dayjs';
 import { QRCodeCanvas } from 'qrcode.react';
 import { db } from '../../db/database';
 import { formatEthiopianDate, getEthiopianYear } from '../../utils/dateUtils';
+import { normalizeGrade } from '../../utils/gradeUtils';
+import { calculateRankings, calculateSubjectRows, isConductAssessment } from '../../utils/analyticsEngine';
 
 
 const { Title, Text } = Typography;
@@ -45,6 +47,11 @@ export default function DocumentGenerator({ type }) {
     const { t } = useTranslation();
     const [selectedGrade, setSelectedGrade] = useState(null);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [validationReport, setValidationReport] = useState(null);
+    const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [statusMsg, setStatusMsg] = useState("");
+    const [successModal, setSuccessModal] = useState({ open: false, count: 0, fileName: '' });
     
     const students = useLiveQuery(() => db.students.toArray()) || [];
     const marks = useLiveQuery(() => db.marks.toArray()) || [];
@@ -55,280 +62,156 @@ export default function DocumentGenerator({ type }) {
     const activeAcademicYear = useMemo(() => settings.find(s => s.key === 'currentAcademicYear')?.value || '-', [settings]);
     const activeSemester = useMemo(() => settings.find(s => s.key === 'currentSemester')?.value || 'Semester I', [settings]);
 
-    const normalizeGrade = (g) => {
-        if (!g) return '';
-        const match = String(g).match(/(\d+)/);
-        return match ? match[1] : g;
-    };
+    const normalizeGradeLocal = (g) => normalizeGrade(g);
     const uniqueGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
     const gradeStudents = students.filter(s => s.grade === selectedGrade);
 
-    const handleGenerate = async () => {
-        if (!selectedGrade || gradeStudents.length === 0) return;
-        setIsGenerating(true);
+    // Centralized Ranking for all students in the selected grade
+    const rankMap = useMemo(() => {
+        if (!selectedGrade || selectedGrade === 'All') return {};
         
-        const isIdCard = type === 'id-card';
-        const doc = new jsPDF({
-            orientation: isIdCard ? 'l' : 'p',
-            unit: 'mm',
-            format: isIdCard ? [86, 54] : 'a4'
+        const studentGradeNorm = normalizeGrade(selectedGrade);
+        const gradeAssesses = assessments.filter(a => {
+            if (normalizeGrade(a.grade) !== studentGradeNorm) return false;
+            if (isConductAssessment(a)) return false;
+
+            const subject = subjects.find(s => s.name === a.subjectName || s.name === a.subjectname);
+            const subjSem = subject?.semester || 'Semester I';
+            if (activeSemester === 'Semester I') return subjSem === 'Semester I';
+            return true;
         });
 
-        const studentsToProcess = gradeStudents; // Assuming gradeStudents is already filtered by selectedGrade
+        if (gradeAssesses.length === 0) return {};
 
-        if (studentsToProcess.length === 0) {
-            message.warning("No students found to generate documents for.");
-            setIsGenerating(false);
-            return;
-        }
-
-        // --- PRE-CALCULATE ALL RANKS IF WE ARE DOING CERTIFICATES ---
-        let rankMap = {};
-        if (!isIdCard) {
-            const studentGradeNorm = normalizeGrade(selectedGrade);
-            const gradeAssesses = assessments.filter(a => normalizeGrade(a.grade) === studentGradeNorm);
-            const assessIds = gradeAssesses.map(a => a.id);
-            const pertinentMarks = marks.filter(m => assessIds.includes(m.assessmentId));
-            const studentsInGrade = students.filter(s => normalizeGrade(s.grade) === studentGradeNorm);
+        const studentsInGrade = students.filter(s => normalizeGrade(s.grade) === studentGradeNorm);
+        const rankings = calculateRankings(studentsInGrade, gradeAssesses, marks);
+        
+        const map = {};
+        studentsInGrade.forEach(s => {
+            const overallRankIndex = rankings.findIndex(r => r.id === s.id);
+            const overallRank = overallRankIndex !== -1 ? overallRankIndex + 1 : 'N/A';
+            const classRankings = rankings.filter(r => r.grade === s.grade);
+            const classRankIndex = classRankings.findIndex(r => r.id === s.id);
+            const classRank = classRankIndex !== -1 ? classRankIndex + 1 : 'N/A';
             
-            const rankings = studentsInGrade.map(s => {
-                let sTotalScore = 0;
-                let sTotalMax = 0;
-                
-                gradeAssesses.forEach(a => {
-                    // Check if assessment matches the correct semester constraints
-                    const subjObj = subjects.find(subj => subj.name === a.subjectName);
-                    const isSem1 = (subjObj?.semester || 'Semester I') === 'Semester I';
-                    
-                    if (activeSemester === 'Semester I') {
-                        if (!isSem1) return; // Skip sem2 for sem1 ranking
-                    } // For Semester II, we tally EVERYTHING (Sem 1 + Sem 2)
+            map[s.id] = { 
+                classRank, 
+                overallRank, 
+                totalInClass: classRankings.length, 
+                totalInGrade: rankings.length,
+                stats: overallRankIndex !== -1 ? rankings[overallRankIndex] : null
+            };
+        });
+        return map;
+    }, [selectedGrade, students, assessments, marks, subjects, activeSemester]);
 
-                    const mark = pertinentMarks.find(m => m.studentId === s.id && m.assessmentId === a.id);
-                    if (mark) sTotalScore += mark.score;
-                    sTotalMax += (parseFloat(a.maxScore) || 0);
-                });
-                
-                const sPercentage = sTotalMax > 0 ? (sTotalScore / sTotalMax) * 100 : 0;
-                return { id: s.id, grade: s.grade, percentage: sPercentage, hasData: sTotalMax > 0 };
-            }).filter(s => s.hasData);
+    const validateGradeData = () => {
+        const studentGradeNorm = normalizeGrade(selectedGrade);
+        const gradeAssesses = assessments.filter(a => {
+            if (normalizeGrade(a.grade) !== studentGradeNorm) return false;
+            if (isConductAssessment(a)) return false;
 
-            rankings.sort((a, b) => b.percentage - a.percentage);
+            const subjObj = subjects.find(subj => subj.name === a.subjectName || subj.name === a.subjectname);
+            const isSem1 = (subjObj?.semester || 'Semester I') === 'Semester I';
+            if (activeSemester === 'Semester I') return isSem1;
+            return true; // Sem 2 includes everything
+        });
 
-            const totalInGrade = rankings.length;
+        const report = { ready: [], incomplete: [] };
 
-            studentsToProcess.forEach(s => {
-                const overallRankIndex = rankings.findIndex(r => r.id === s.id);
-                const overallRank = overallRankIndex !== -1 ? overallRankIndex + 1 : 'N/A';
-
-                const classRankings = rankings.filter(r => r.grade === s.grade);
-                const classRankIndex = classRankings.findIndex(r => r.id === s.id);
-                const classRank = classRankIndex !== -1 ? classRankIndex + 1 : 'N/A';
-                const totalInClass = classRankings.length;
-
-                rankMap[s.id] = { classRank, overallRank, totalInClass, totalInGrade };
+        gradeStudents.forEach(student => {
+            const issues = [];
+            const studentMarks = marks.filter(m => m.studentId === student.id);
+            
+            // 1. Mark Completeness
+            gradeAssesses.forEach(a => {
+                const hasMark = studentMarks.some(m => m.assessmentId === a.id);
+                if (!hasMark) {
+                    issues.push(`Missing mark: ${a.subjectName} - ${a.name}`);
+                }
             });
+
+            // 2. Critical Info
+            if (!student.name) issues.push("Missing full name");
+
+            if (issues.length > 0) {
+                report.incomplete.push({ student, issues });
+            } else {
+                report.ready.push(student);
+            }
+        });
+
+        return report;
+    };
+
+    const handleGenerate = async (targetStudents = null) => {
+        const studentsToProcess = Array.isArray(targetStudents) ? targetStudents : gradeStudents;
+        if (!selectedGrade || studentsToProcess.length === 0) return;
+        
+        const isIdCard = type === 'id-card';
+
+        // 1. Validation Logic
+        if (!Array.isArray(targetStudents) && !isIdCard) {
+            const report = validateGradeData();
+            if (report.incomplete.length > 0) {
+                setValidationReport(report);
+                setIsValidationModalOpen(true);
+                return;
+            }
         }
+
+        // 2. Generation Process
+        setIsGenerating(true);
+        setStatusMsg("Initializing high-fidelity engine...");
 
         try {
+            const doc = new jsPDF({
+                orientation: isIdCard ? 'l' : 'p',
+                unit: 'mm',
+                format: isIdCard ? [86, 54] : 'a4'
+            });
+
+            // High-Fidelity Rendering Loop
             for (let i = 0; i < studentsToProcess.length; i++) {
                 const student = studentsToProcess[i];
+                setStatusMsg(`Rendering ${student.name} (${i + 1}/${studentsToProcess.length})...`);
+                setProgress(Math.floor(10 + ((i / studentsToProcess.length) * 85)));
                 
-                if (i > 0) doc.addPage();
+                // Allow UI to breathe
+                await new Promise(resolve => setTimeout(resolve, 50));
 
-                if (isIdCard) {
-                    const element = document.getElementById(`temp-${type}-${student.id}`);
-                    if (!element) continue;
-
-                    const canvas = await html2canvas(element, {
-                        scale: 3,
-                        useCORS: true,
-                        logging: false,
-                        backgroundColor: null
-                    });
-
-                    const imgData = canvas.toDataURL('image/png');
-                    const pdfWidth = doc.internal.pageSize.getWidth();
-                    const imgProps = doc.getImageProperties(imgData);
-                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-                } else {
-                    // Certificate generation directly with jsPDF
-                    const pageWidth = doc.internal.pageSize.getWidth();
-                    const pageHeight = doc.internal.pageSize.getHeight();
-                    const margin = 15;
-                    const startY = 20;
-
-                    // Header
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(18);
-                    doc.text("Senbet School Academic Report", pageWidth / 2, startY, { align: 'center' });
-                    doc.setFontSize(12);
-                    doc.text("Finote Birhan Senbet School", pageWidth / 2, startY + 8, { align: 'center' });
-                    doc.line(margin, startY + 15, pageWidth - margin, startY + 15);
-
-                    // Top Left Info (Name / Grade)
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(14);
-                    doc.text(`Name: ${student.name}`, margin + 5, startY + 50);
-                    doc.setFontSize(10);
-                    doc.setTextColor(115, 115, 115); // text-slate-500
-                    doc.text(`Baptismal Name: ${student.baptismalName || '-'}`, margin + 5, startY + 56);
-                    
-                    doc.setFont("helvetica", "normal");
-                    doc.setTextColor(15, 23, 42); // slate-900
-                    doc.text(`Grade: ${student.grade || 'N/A'}`, margin + 5, startY + 64);
-                    
-                    // Top Right Info (Year / Semester)
-                    const displayYear = activeAcademicYear.includes('E.C.') ? activeAcademicYear : `${activeAcademicYear} E.C.`;
-                    doc.text(`Year: ${displayYear}`, pageWidth - margin - 5, startY + 50, { align: 'right' });
-                    doc.text(`Semester: ${activeSemester}`, pageWidth - margin - 5, startY + 56, { align: 'right' });
-
-                    // --- Calculate Marks & Render Table ---
-                    const gradeAssesses = assessments.filter(a => normalizeGrade(a.grade) === normalizeGrade(selectedGrade));
-                    const studentMarks = marks.filter(m => m.studentId === student.id);
-                    
-                    // Get unique subjects
-                    const subjectsList = [...new Set(gradeAssesses.map(a => a.subjectName))].sort();
-                    
-                    let tableBody = [];
-                    let totalMaxScore = 0;
-                    let totalEarnedScore = 0;
-
-                    subjectsList.forEach(subjectName => {
-                        const subjObj = subjects.find(s => s.name === subjectName);
-                        
-                        const semIAssessments = gradeAssesses.filter(a => a.subjectName === subjectName && (subjObj?.semester || 'Semester I') === 'Semester I');
-                        const semIIAssessments = gradeAssesses.filter(a => a.subjectName === subjectName && subjObj?.semester === 'Semester II');
-
-                        const semIEarned = semIAssessments.reduce((acc, a) => {
-                            const m = studentMarks.find(mark => mark.assessmentId === a.id);
-                            return acc + (m ? m.score : 0);
-                        }, 0);
-                        const semIMax = semIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
-                        const semIHasData = semIAssessments.some(a => studentMarks.find(m => m.assessmentId === a.id));
-
-                        const semIIEarned = semIIAssessments.reduce((acc, a) => {
-                            const m = studentMarks.find(mark => mark.assessmentId === a.id);
-                            return acc + (m ? m.score : 0);
-                        }, 0);
-                        const semIIMax = semIIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
-                        const semIIHasData = semIIAssessments.some(a => studentMarks.find(m => m.assessmentId === a.id));
-
-                        let rowTotalMax = 0;
-                        let rowTotalEarned = 0;
-
-                        if (activeSemester === 'Semester I') {
-                            rowTotalMax = semIMax;
-                            rowTotalEarned = semIEarned;
-                        } else {
-                            // Semester II aggregates both
-                            rowTotalMax = semIMax + semIIMax;
-                            rowTotalEarned = semIEarned + semIIEarned;
-                        }
-
-                        totalMaxScore += rowTotalMax;
-                        totalEarnedScore += rowTotalEarned;
-
-                        const rowAvg = rowTotalMax > 0 ? `${((rowTotalEarned / rowTotalMax) * 100).toFixed(0)}%` : '—';
-                        const semIRender = semIHasData ? `${semIEarned}/${semIMax}` : (semIAssessments.length ? '—' : 'N/A');
-                        const semIIRender = semIIHasData ? `${semIIEarned}/${semIIMax}` : (semIIAssessments.length ? '—' : 'N/A');
-
-                        if (activeSemester === 'Semester I') {
-                            tableBody.push([
-                                subjectName,
-                                semIRender,
-                                rowAvg
-                            ]);
-                        } else {
-                            tableBody.push([
-                                subjectName,
-                                semIRender,
-                                semIIRender,
-                                rowAvg
-                            ]);
-                        }
-                    });
-
-                    const averagePercentage = totalMaxScore > 0 ? ((totalEarnedScore / totalMaxScore) * 100).toFixed(1) : 0;
-                    
-                    // Add final Total row inside the table
-                    if (activeSemester === 'Semester I') {
-                        tableBody.push([
-                            { content: 'Grand Total', styles: { fontStyle: 'bold', textColor: [44, 24, 16] } },
-                            '',
-                            { content: `${averagePercentage}%`, styles: { fontStyle: 'bold', textColor: [139, 0, 0] } }
-                        ]);
-                    } else {
-                        tableBody.push([
-                            { content: 'Grand Total', styles: { fontStyle: 'bold', textColor: [44, 24, 16] } },
-                            '',
-                            '',
-                            { content: `${averagePercentage}%`, styles: { fontStyle: 'bold', textColor: [139, 0, 0] } }
-                        ]);
-                    }
-
-                    autoTable(doc, {
-                        startY: startY + 74,
-                        head: [
-                            activeSemester === 'Semester I' 
-                                ? ['Subject', 'Semester I', 'Average'] 
-                                : ['Subject', 'Semester I', 'Semester II', 'Average']
-                        ],
-                        body: tableBody,
-                        theme: 'grid',
-                        styles: {
-                            font: 'helvetica',
-                            fontSize: 10,
-                            cellPadding: 3,
-                            textColor: [44, 24, 16], // text-[#2c1810]
-                        },
-                        headStyles: {
-                            fillColor: [245, 245, 245], // light gray
-                            textColor: [140, 115, 97], // text-[#8c7361]
-                            fontStyle: 'bold',
-                            fontSize: 9,
-                            halign: 'center',
-                        },
-                        columnStyles: {
-                            0: { halign: 'left', cellWidth: 50 },
-                            1: { halign: 'center' },
-                            2: { halign: 'center' },
-                            3: { halign: 'center', fontStyle: 'bold' },
-                        },
-                        didParseCell: function (data) {
-                            if (data.section === 'body' && data.row.index === tableBody.length - 1) {
-                                data.cell.styles.fontStyle = 'bold';
-                                data.cell.styles.textColor = [44, 24, 16];
-                                if (data.column.index === (activeSemester === 'Semester I' ? 2 : 3)) {
-                                    data.cell.styles.textColor = [139, 0, 0]; // text-[#8b0000]
-                                    data.cell.styles.fontSize = 12;
-                                }
-                            }
-                        },
-                    });
-
-                    const finalY = doc.autoTable.previous.finalY;
-
-                    // Ranks
-                    doc.setFont("helvetica", "normal");
-                    doc.setFontSize(10);
-                    doc.setTextColor(15, 23, 42); // slate-900
-                    doc.text(`Class Rank: ${rankMap[student.id]?.classRank || 'N/A'} / ${rankMap[student.id]?.totalInClass || '0'}`, margin + 5, finalY + 15);
-                    doc.text(`Overall Grade Rank: ${rankMap[student.id]?.overallRank || 'N/A'} / ${rankMap[student.id]?.totalInGrade || '0'}`, margin + 5, finalY + 22);
-
-                    // Footer (Signatures)
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(10);
-                    doc.setTextColor(140, 115, 97); // text-[#8c7361]
-                    doc.text("School Administrator", margin + 5, pageHeight - 30);
-                    doc.text("Class Coordinator", pageWidth - margin - 5, pageHeight - 30, { align: 'right' });
-                    doc.line(margin + 5, pageHeight - 35, margin + 60, pageHeight - 35);
-                    doc.line(pageWidth - margin - 60, pageHeight - 35, pageWidth - margin - 5, pageHeight - 35);
+                const element = document.getElementById(`temp-${type}-${student.id}`);
+                if (!element) {
+                    console.warn(`Template not found for student ${student.id}`);
+                    continue;
                 }
+
+                const canvas = await html2canvas(element, {
+                    scale: 1.5, 
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff', // Ensures JPEG background works correctly
+                });
+
+                const imgData = canvas.toDataURL('image/jpeg', 0.85); // Use JPEG compression to fix Out of Memory limits
+                const pdfWidth = doc.internal.pageSize.getWidth();
+                const imgProps = doc.getImageProperties(imgData);
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                if (i > 0) doc.addPage();
+                doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                
+                // Explicitly clear canvas to free memory
+                canvas.width = 0; 
+                canvas.height = 0;
             }
-            doc.save(`Senbet_${type === 'id-card' ? 'ID_Cards' : 'Certificates'}_${selectedGrade}.pdf`);
-            message.success(t('common.success', 'Generation complete!'));
+
+            const fileName = `Senbet_${type === 'id-card' ? 'ID_Cards' : 'Certificates'}_${selectedGrade}.pdf`;
+            doc.save(fileName);
+            setProgress(100);
+            setStatusMsg("Download ready.");
+            setIsValidationModalOpen(false);
+            setSuccessModal({ open: true, count: studentsToProcess.length, fileName });
         } catch (err) {
             console.error("PDF Gen Error:", err);
             message.error("Failed to generate documents.");
@@ -339,6 +222,91 @@ export default function DocumentGenerator({ type }) {
 
     return (
         <div className="flex flex-col gap-6 w-full">
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+                
+                .cert-container { font-family: 'Inter', sans-serif; }
+                .cert-amharic { font-family: 'Noto Sans Ethiopic', 'Inter', sans-serif; }
+                .cert-serif { font-family: 'Playfair Display', serif; }
+
+                /* Utility Classes */
+                .cert-label {
+                    font-size: 12px;
+                    text-transform: uppercase;
+                    color: #666;
+                    font-weight: 800;
+                    letter-spacing: 0.08em;
+                    display: block;
+                    margin-bottom: 4px;
+                }
+                .cert-label-sm {
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    color: #666;
+                    font-weight: 700;
+                    letter-spacing: 0.05em;
+                    display: block;
+                    margin-bottom: 2px;
+                }
+                .cert-value {
+                    font-weight: 700;
+                    color: #1A1A1A;
+                }
+                .cert-card {
+                    background: #fff;
+                    border-radius: 16px;
+                    border: 1px solid rgba(201,162,39,0.2);
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.05);
+                    z-index: 10;
+                }
+                .cert-th {
+                    padding: 14px 12px;
+                    text-align: center;
+                    color: #111;
+                    font-weight: 900;
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                    border-bottom: 2px solid #D1D5DB;
+                    background-color: #FAFAFA;
+                    border-right: 1px solid #eee;
+                }
+                .cert-th:last-child { border-right: none; }
+                .cert-td {
+                    padding: 14px 12px;
+                    border-right: 1px solid #f0f0f0;
+                }
+                .cert-td:last-child { border-right: none; }
+                .cert-badge {
+                    display: inline-block;
+                    min-width: 48px;
+                    height: 30px;
+                    line-height: 30px;
+                    padding: 0 10px;
+                    border-radius: 6px;
+                    font-weight: 900;
+                    font-size: 15px;
+                    letter-spacing: 0.03em;
+                    text-align: center;
+                    vertical-align: middle;
+                    box-sizing: border-box;
+                }
+                .cert-sig-title {
+                    font-size: 10px;
+                    font-weight: 800;
+                    color: #1A1A1A;
+                    text-transform: uppercase;
+                    letter-spacing: 0.1em;
+                    margin-bottom: 2px;
+                }
+                .cert-sig-name {
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: #666;
+                    letter-spacing: 0.1em;
+                }
+            `}</style>
             <div className="max-w-[600px]">
                 <Title level={2}>{type === 'id-card' ? t('admin.idCardGenerator') : t('admin.finalCertificates')}</Title>
                 <Text type="secondary">{type === 'id-card' ? t('admin.idCardDesc') : t('admin.generatorDesc')}</Text>
@@ -364,21 +332,42 @@ export default function DocumentGenerator({ type }) {
                             block
                             disabled={!selectedGrade || gradeStudents.length === 0}
                             loading={isGenerating}
-                            onClick={handleGenerate}
+                            onClick={() => handleGenerate()}
                         >
                             {type === 'id-card' ? t('admin.downloadIDCards') : t('admin.downloadAllCertificates')}
                         </Button>
+                        
+                        {isGenerating && (
+                            <div className="mt-4 p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm transition-all animate-in fade-in slide-in-from-top-2">
+                                <div className="flex justify-between items-center mb-2">
+                                    <Text strong className="text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">
+                                        {statusMsg}
+                                    </Text>
+                                    <Text className="text-xs font-mono text-blue-600 font-bold">{progress}%</Text>
+                                </div>
+                                <Progress 
+                                    percent={progress} 
+                                    status="active" 
+                                    strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
+                                    showInfo={false}
+                                />
+                            </div>
+                        )}
                     </Space>
                 </Card>
             </div>
 
             <div className="opacity-0 pointer-events-none fixed top-[5000px] left-0">
                 {gradeStudents.map(student => (
-                    <div key={student.id} id={`temp-${type}-${student.id}`} style={{ 
-                        width: type === 'id-card' ? '86mm' : '210mm',
-                        height: 'auto',
-                        padding: '10px' 
-                    }}>
+                    <div key={student.id} id={`temp-${type}-${student.id}`} 
+                        className="html2canvas-safe-zone"
+                        style={{ 
+                            width: type === 'id-card' ? '86mm' : '210mm',
+                            height: 'auto',
+                            padding: '10px',
+                            background: 'white',
+                            color: 'black'
+                        }}>
                         {type === 'id-card' ? (
                             <IDCardTemplate student={student} />
                         ) : (
@@ -389,199 +378,364 @@ export default function DocumentGenerator({ type }) {
                                 marks={marks.filter(m => m.studentId === student.id)} 
                                 subjects={subjects}
                                 assessments={assessments}
+                                semester={activeSemester}
+                                rankMap={rankMap}
                             />
                         )}
                     </div>
                 ))}
             </div>
+            <Modal
+                title={
+                    <div className="flex items-center gap-2 text-orange-600 font-serif">
+                        <AlertOutlined />
+                        <span className="text-lg font-bold">Data Readiness Report</span>
+                    </div>
+                }
+                open={isValidationModalOpen}
+                onCancel={() => setIsValidationModalOpen(false)}
+                width={700}
+                footer={[
+                    <Button key="cancel" onClick={() => setIsValidationModalOpen(false)}>
+                        {t('common.cancel', 'Cancel')}
+                    </Button>,
+                    <Button 
+                        key="proceed" 
+                        type="primary" 
+                        danger 
+                        onClick={() => handleGenerate(validationReport.ready)}
+                        disabled={validationReport?.ready.length === 0}
+                    >
+                        Generate for {validationReport?.ready.length || 0} Ready Students
+                    </Button>
+                ]}
+            >
+                <div className="flex flex-col gap-4 py-4">
+                    <Alert
+                        message="Incomplete Data Detected"
+                        description={`${validationReport?.incomplete.length} students have missing marks or information. Results for these students will be inaccurate.`}
+                        type="warning"
+                        showIcon
+                    />
+                    
+                    <div className="max-h-[400px] overflow-y-auto mt-2">
+                        <List
+                            header={<Text strong>Students with Issues</Text>}
+                            dataSource={validationReport?.incomplete || []}
+                            renderItem={item => (
+                                <List.Item className="flex flex-col !items-start gap-1 py-3 border-b border-slate-100">
+                                    <Text strong className="text-slate-900">{item.student.name}</Text>
+                                    <div className="flex flex-wrap gap-1">
+                                        {item.issues.map((issue, idx) => (
+                                            <Tag key={idx} color="red" className="text-[10px]">{issue}</Tag>
+                                        ))}
+                                    </div>
+                                </List.Item>
+                            )}
+                        />
+                    </div>
+
+                    {validationReport?.ready.length === 0 && (
+                        <Alert 
+                            type="error"
+                            message="No Complete Data Found"
+                            description="All students in this grade have missing information. Please resolve the issues in the Mark Entry or Student Registration tabs."
+                        />
+                    )}
+                </div>
+            </Modal>
+
+            {/* Success Confirmation Modal — rendered inside ConfigProvider for automatic dark mode */}
+            <Modal
+                open={successModal.open}
+                onOk={() => setSuccessModal(s => ({ ...s, open: false }))}
+                onCancel={() => setSuccessModal(s => ({ ...s, open: false }))}
+                okText={t('common.done', 'Done')}
+                cancelButtonProps={{ style: { display: 'none' } }}
+                centered
+                destroyOnClose
+                title={
+                    <Space size="middle">
+                        <div style={{ padding: '6px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '50%', display: 'flex' }}>
+                            <Tag color="success" style={{ border: 'none', margin: 0, padding: 0 }}>✓</Tag>
+                        </div>
+                        <Text strong style={{ fontSize: '18px' }}>{t('common.downloadComplete', 'Download Complete!')}</Text>
+                    </Space>
+                }
+            >
+                <div style={{ padding: '12px 0' }}>
+                    <Typography.Paragraph>
+                        {t('admin.successGenText', 'Successfully generated documents for')}{' '}
+                        <Text strong type="success">{successModal.count}</Text> {t('common.students', 'students')}.
+                    </Typography.Paragraph>
+                    <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                        {t('admin.fileSaveText', 'Your PDF file')}{' '}
+                        <Text code style={{ fontSize: '13px' }}>
+                            {successModal.fileName}
+                        </Text>{' '}
+                        {t('admin.savedToComputer', 'has been downloaded to your computer.')}
+                    </Typography.Paragraph>
+                </div>
+            </Modal>
         </div>
     );
 }
 
 function IDCardTemplate({ student }) {
     return (
-        <div className="w-[86mm] h-[54mm] bg-white border-[2px] border-slate-900 rounded-xl overflow-hidden flex flex-col relative text-slate-900 font-sans shadow-lg">
-            <div className="bg-slate-900 text-white p-2 flex items-center justify-between">
-                <div className="flex flex-col">
-                    <span className="text-[10px] font-bold">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</span>
-                    <span className="text-[7px] uppercase tracking-tighter">Finote Birhan Senbet School</span>
-                </div>
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                    <IdcardOutlined className="text-white text-lg" />
+        <div className="cert-container" style={{
+            width: '86mm', height: '54mm', backgroundColor: '#ffffff', border: '1px solid #d1d5db',
+            borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            position: 'relative', color: '#1e293b', boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
+        }}>
+            <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: 'white', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <img src="/logo.png" alt="Logo" style={{ width: '24px', height: '24px', objectFit: 'contain', borderRadius: '50%' }} crossOrigin="anonymous" />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span className="cert-amharic" style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.02em', color: '#f8fafc' }}>በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</span>
+                    <span style={{ fontSize: '6.5px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>Finote Birhan Senbet School</span>
                 </div>
             </div>
-            <div className="flex-1 flex p-2 gap-3 items-center">
-                <div className="w-[20mm] h-[24mm] border-2 border-slate-200 rounded-lg flex flex-col items-center justify-center bg-slate-50 overflow-hidden">
-                    <UserOutlined className="text-slate-300 text-3xl mb-1" />
-                    <span className="text-[6px] text-slate-400 uppercase">Student Photo</span>
+            
+            <div style={{ flex: 1, display: 'flex', padding: '12px', gap: '14px', alignItems: 'center', backgroundImage: 'radial-gradient(#f1f5f9 1px, transparent 1px)', backgroundSize: '10px 10px' }}>
+                <div style={{ width: '22mm', height: '26mm', border: '2px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'white', overflow: 'hidden', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
+                    <div style={{ fontSize: '28px', color: '#cbd5e1' }}>👤</div>
                 </div>
-                <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
-                    <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">FullName / ሙሉ ስም</span>
-                    <span className="text-[11px] font-bold text-slate-900 leading-tight mb-1 truncate">{student.name}</span>
-                    <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Baptismal / የክርስትና ስም</span>
-                    <span className="text-[9px] font-semibold text-slate-700 leading-tight mb-1 truncate">{student.baptismalName || '-'}</span>
-                    <div className="flex gap-4">
-                        <div>
-                            <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Grade / ክፍል</span>
-                            <div className="text-[9px] font-bold">{student.grade}</div>
+                
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '6px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Student Name <span className="cert-amharic">/ ሙሉ ስም</span></span>
+                        <span className="cert-serif" style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', lineHeight: '1.2' }}>{student.name}</span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '6px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Baptismal <span className="cert-amharic">/ የክርስትና ስም</span></span>
+                        <span className="cert-amharic" style={{ fontSize: '10px', fontWeight: '600', color: '#334155' }}>{student.baptismalName || '-'}</span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '16px', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '6px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ID Number</span>
+                            <div style={{ fontSize: '10px', fontWeight: '700', color: '#0f172a' }}>{student.id}</div>
                         </div>
-                        <div>
-                            <span className="text-[7px] text-slate-400 font-bold uppercase leading-none">Year / ዘመን</span>
-                            <div className="text-[9px] font-bold">
-                                {getEthiopianYear(student.academicYear || dayjs().toISOString())}
-                            </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '6px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Grade</span>
+                            <div style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a' }}>{student.grade}</div>
                         </div>
                     </div>
                 </div>
-                <div className="p-1 bg-white border border-slate-100 rounded-lg">
-                    <QRCodeCanvas value={student.id} size={50} level="H" />
-                    <div className="text-[5px] text-center mt-0.5 text-slate-400 font-mono italic">SCAN FOR ATTENDANCE</div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ padding: '6px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #f1f5f9' }}>
+                        <QRCodeCanvas value={student.id} size={42} level="H" />
+                    </div>
+                    <span style={{ fontSize: '5px', fontWeight: '700', color: '#94a3b8', letterSpacing: '0.1em' }}>VERIFIED</span>
                 </div>
             </div>
-            <div className="h-1 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 w-full" />
+            
+            <div style={{ height: '6px', display: 'flex', width: '100%' }}>
+                <div style={{ flex: 1, backgroundColor: '#22c55e' }}></div>
+                <div style={{ flex: 1, backgroundColor: '#eab308' }}></div>
+                <div style={{ flex: 1, backgroundColor: '#ef4444' }}></div>
+            </div>
         </div>
     );
 }
 
-function CertificateTemplate({ student, marks, subjects = [], assessments = [] }) {
-    const studentGrade = student.grade;
-    const gradeAssessments = assessments.filter(a => a.grade === studentGrade);
-    const uniqueSubjects = [...new Set(gradeAssessments.map(a => a.subjectName))].sort();
+function CertificateTemplate({ student, marks, subjects = [], assessments = [], semester = 'Semester I', rankMap = {} }) {
+    const subjectRows = calculateSubjectRows(student, assessments, marks, subjects, semester);
 
-    const subjectRows = uniqueSubjects.map(subjectName => {
-        const semIAssessments = gradeAssessments.filter(a => {
-            const subj = subjects.find(s => s.name === a.subjectName);
-            return a.subjectName === subjectName && (subj?.semester || 'Semester I') === 'Semester I';
-        });
-        const semIIAssessments = gradeAssessments.filter(a => {
-            const subj = subjects.find(s => s.name === a.subjectName);
-            return a.subjectName === subjectName && subj?.semester === 'Semester II';
-        });
-
-        const semIEarned = semIAssessments.reduce((acc, a) => {
-            const mark = marks.find(m => m.assessmentId === a.id);
-            return acc + (mark ? (mark.score || 0) : 0);
-        }, 0);
-        const semIMax = semIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
-        const semIHasData = semIAssessments.some(a => marks.find(m => m.assessmentId === a.id));
-
-        const semIIEarned = semIIAssessments.reduce((acc, a) => {
-            const mark = marks.find(m => m.assessmentId === a.id);
-            return acc + (mark ? (mark.score || 0) : 0);
-        }, 0);
-        const semIIMax = semIIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
-        const semIIHasData = semIIAssessments.some(a => marks.find(m => m.assessmentId === a.id));
-
-        const totalMax = semIMax + semIIMax;
-        const totalEarned = semIEarned + semIIEarned;
-        const avgPct = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(0) : '-';
-
-        return {
-            subject: subjectName,
-            semI: semIHasData ? `${semIEarned} / ${semIMax}` : '—',
-            semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIAssessments.length === 0 ? 'N/A' : '—'),
-            avg: avgPct !== '-' ? `${avgPct}%` : '—',
-        };
+    let overallEarned = 0;
+    let overallMax = 0;
+    subjectRows.forEach(row => {
+        overallEarned += row.rowEarned;
+        overallMax += row.rowMax;
     });
 
-    const overallEarned = marks.reduce((acc, m) => acc + (m.score || 0), 0);
-    const overallMax = gradeAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
     const overallAvg = overallMax > 0 ? ((overallEarned / overallMax) * 100).toFixed(1) : 0;
-
-    const { t } = useTranslation();
+    const rankInfo = rankMap[student.id] || { classRank: '-', overallRank: '-', totalInClass: 0, totalInGrade: 0 };
 
     return (
-        <div className="w-[190mm] h-[277mm] bg-[#fdfbf7] p-12 flex flex-col relative font-serif text-[#2c1810] border border-[#e8dfce]">
-            {/* Minimalist Corner Accents */}
-            <div className="absolute top-8 left-8 w-10 h-10 border-t border-l border-[#d4af37]" />
-            <div className="absolute top-8 right-8 w-10 h-10 border-t border-r border-[#d4af37]" />
-            <div className="absolute bottom-8 left-8 w-10 h-10 border-b border-l border-[#d4af37]" />
-            <div className="absolute bottom-8 right-8 w-10 h-10 border-b border-r border-[#d4af37]" />
+        <div className="cert-container" style={{
+            width: '210mm', minHeight: '297mm', background: 'linear-gradient(180deg, #FAFAFA 0%, #F5F5F0 100%)', padding: '24px',
+            display: 'flex', flexDirection: 'column', position: 'relative', color: '#1A1A1A', overflow: 'hidden'
+        }}>
+            {/* Elegant Outer Border */}
+            <div style={{ position: 'absolute', inset: '12px', border: '2px solid #C9A227', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', inset: '18px', border: '1px solid rgba(201,162,39,0.4)', pointerEvents: 'none' }} />
 
-            {/* Faint Background Emblem */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
-                <EthiopianCross className="w-[500px] h-[500px] text-[#2c1810]" />
+            {/* Corner Flourishes */}
+            <svg style={{ position: 'absolute', top: '12px', left: '12px', width: '32px', height: '32px', color: '#C9A227' }} viewBox="0 0 100 100" fill="none"><path d="M0 0v100h20V20h80V0H0z" fill="currentColor"/></svg>
+            <svg style={{ position: 'absolute', top: '12px', right: '12px', width: '32px', height: '32px', color: '#C9A227', transform: 'rotate(90deg)' }} viewBox="0 0 100 100" fill="none"><path d="M0 0v100h20V20h80V0H0z" fill="currentColor"/></svg>
+            <svg style={{ position: 'absolute', bottom: '12px', left: '12px', width: '32px', height: '32px', color: '#C9A227', transform: 'rotate(-90deg)' }} viewBox="0 0 100 100" fill="none"><path d="M0 0v100h20V20h80V0H0z" fill="currentColor"/></svg>
+            <svg style={{ position: 'absolute', bottom: '12px', right: '12px', width: '32px', height: '32px', color: '#C9A227', transform: 'rotate(180deg)' }} viewBox="0 0 100 100" fill="none"><path d="M0 0v100h20V20h80V0H0z" fill="currentColor"/></svg>
+
+            {/* Faint Background Logo */}
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.04, pointerEvents: 'none' }}>
+                <img src="/logo.png" alt="" style={{ width: '400px', height: '400px', objectFit: 'contain', filter: 'grayscale(100%)' }} crossOrigin="anonymous" />
             </div>
 
-            {/* Header */}
-            <div className="flex flex-col items-center mb-12 text-center relative z-10">
-                <EthiopianCross className="w-16 h-16 text-[#d4af37] mb-6" />
-                <Title level={2} className="!mb-2 !text-[#2c1810] !font-serif tracking-wide">በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Title>
-                <Text className="text-base uppercase tracking-[0.2em] text-[#5c4033] font-medium">የተማሪዎች ውጤት መግለጫ</Text>
-                <div className="w-16 h-px bg-[#d4af37] my-6" />
-                <Text className="text-xl uppercase tracking-widest text-[#8b0000] font-semibold">{t('admin.finalCertificates', 'Academic Report Card')}</Text>
+            {/* Header Section */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', padding: '0 24px', zIndex: 10 }}>
+                <div style={{ width: '96px', height: '96px', flexShrink: 0 }}>
+                    <img src="/logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.12))' }} crossOrigin="anonymous" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, paddingTop: '8px' }}>
+                    <span className="cert-amharic" style={{ fontSize: '28px', fontWeight: '800', color: '#0F3A2B', marginBottom: '4px', letterSpacing: '0.02em' }}>በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</span>
+                    <span style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.15em', color: '#166534', marginBottom: '16px', fontWeight: '700' }}>Finote Birhan Senbet School</span>
+                    <span className="cert-amharic" style={{ fontSize: '12px', color: '#A67C00', marginBottom: '16px', fontStyle: 'italic', fontWeight: '600', letterSpacing: '0.05em' }}>"በሃይማኖትና በምግባር የታነጹ ትውልድን ማፍራት"</span>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span className="cert-serif" style={{ fontSize: '26px', textTransform: 'uppercase', color: '#0A0A0A', fontWeight: '800', letterSpacing: '0.08em', marginBottom: '8px' }}>Academic Transcript</span>
+                        <div style={{ width: '120px', height: '1px', backgroundColor: '#C9A227' }}></div>
+                        <div style={{ width: '64px', height: '1px', backgroundColor: '#C9A227', marginTop: '3px' }}></div>
+                    </div>
+                </div>
+                <div style={{ width: '96px', display: 'flex', justifyContent: 'flex-end' }}></div>
             </div>
 
-            {/* Student Info (Minimalist Grid) */}
-            <div className="w-full flex justify-between items-end border-b border-[#e8dfce] pb-6 mb-12 z-10">
-                <div className="flex flex-col gap-1.5">
-                    <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ሙሉ ስም / NAME</Text>
-                    <Text className="text-2xl font-medium text-[#2c1810]">{student.name}</Text>
+            {/* Student Information Card */}
+            <div className="cert-card" style={{ padding: '24px 32px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div>
+                        <span className="cert-label">Student Name <span className="cert-amharic">/ የተማሪው ስም</span></span>
+                        <span className="cert-serif" style={{ fontSize: '52px', fontWeight: '900', color: '#0A0A0A', display: 'block', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{student.name}</span>
+                    </div>
                     {!!student?.baptismalName && (
-                        <Text className="text-base italic text-[#5c4033]">የክርስትና ስም: {student.baptismalName}</Text>
+                        <div style={{ marginTop: '8px' }}>
+                            <span className="cert-label-sm">Baptismal Name <span className="cert-amharic">/ የክርስትና ስም</span></span>
+                            <span className="cert-amharic cert-value" style={{ fontSize: '18px', fontWeight: '800', color: '#0F3A2B', display: 'block' }}>{student.baptismalName}</span>
+                        </div>
                     )}
                 </div>
-                <div className="flex gap-16 text-right">
-                    <div className="flex flex-col gap-1.5">
-                        <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ክፍል / GRADE</Text>
-                        <Text className="text-xl text-[#2c1810]">{student.grade}</Text>
+                
+                <div style={{ display: 'flex', gap: '48px', borderLeft: '2px solid #F0F0F0', paddingLeft: '48px', alignItems: 'center' }}>
+                    <div>
+                        <span className="cert-label">Academic Year</span>
+                        <span className="cert-value" style={{ fontSize: '18px' }}>{getEthiopianYear(student.academicYear || dayjs().toISOString())} / {semester}</span>
                     </div>
-                        <div className="flex flex-col gap-1.5">
-                            <Text className="uppercase text-xs tracking-widest text-[#8c7361] font-semibold">ዓ.ም / YEAR</Text>
-                            <Text className="text-xl text-[#2c1810]">
-                                {getEthiopianYear(student.academicYear || dayjs().toISOString())}
-                            </Text>
-                        </div>
+                    <div>
+                        <span className="cert-label">Grade Level</span>
+                        <span className="cert-value" style={{ fontSize: '20px', fontWeight: '900', color: '#0F3A2B' }}>{student.grade}</span>
+                    </div>
                 </div>
             </div>
 
-            {/* Minimalist Data Table */}
-            <div className="w-full mb-12 z-10">
-                <table className="w-full border-collapse text-base">
+            {/* Academic Performance Table */}
+            <div className="cert-card" style={{ flex: 1, padding: '24px 32px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                     <thead>
                         <tr>
-                            <th className="p-4 text-left font-medium text-[#8c7361] uppercase tracking-wider text-sm border-b border-[#d4af37]/30">የትምህርት አይነት</th>
-                            <th className="p-4 text-center font-medium text-[#8c7361] uppercase tracking-wider text-sm border-b border-[#d4af37]/30">፩ኛ መንፈቀ ዓመት (1st Sem)</th>
-                            <th className="p-4 text-center font-medium text-[#8c7361] uppercase tracking-wider text-sm border-b border-[#d4af37]/30">፪ኛ መንፈቀ ዓመት (2nd Sem)</th>
-                            <th className="p-4 text-center font-medium text-[#8c7361] uppercase tracking-wider text-sm border-b border-[#d4af37]/30">አማካይ ውጤት (Avg)</th>
+                            <th className="cert-th" style={{ textAlign: 'left' }}>Course Title <span className="cert-amharic" style={{fontSize:'11px', textTransform:'none', fontWeight:'600'}}>/ የትምህርት ዓይነት</span></th>
+                            <th className="cert-th">Semester I</th>
+                            <th className="cert-th">Semester II</th>
+                            <th className="cert-th" style={{ borderRight: 'none' }}>Final Grade</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {subjectRows.map((row, idx) => (
-                            <tr key={idx} className="border-b border-[#e8dfce]/50">
-                                <td className="p-4 text-[#2c1810]">{row.subject}</td>
-                                <td className="p-4 text-center text-[#5c4033]">{row.semI}</td>
-                                <td className="p-4 text-center text-[#5c4033]">{row.semII}</td>
-                                <td className="p-4 text-center font-medium text-[#2c1810]">{row.avg}</td>
-                            </tr>
-                        ))}
+                        {subjectRows.map((row, idx) => {
+                            const val = parseFloat(row.avg);
+                            const badgeColor = isNaN(val) ? 'transparent' : (val >= 70 ? '#166534' : (val >= 50 ? '#374151' : '#991B1B'));
+                            const badgeBg = isNaN(val) ? 'transparent' : (val >= 70 ? '#DCFCE7' : (val >= 50 ? '#F3F4F6' : '#FEE2E2'));
+                            const badgeBorder = isNaN(val) ? 'none' : `1px solid ${val >= 70 ? '#BBF7D0' : (val >= 50 ? '#E5E7EB' : '#FECACA')}`;
+
+                            return (
+                                <tr key={idx} style={{ borderBottom: '1px solid #E5E7EB', backgroundColor: idx % 2 === 0 ? 'transparent' : '#FAFAFA' }}>
+                                    <td className="cert-td" style={{ color: '#0A0A0A', fontWeight: '800' }}>{row.subject}</td>
+                                    <td className="cert-td" style={{ textAlign: 'center', color: '#333', fontWeight: '600' }}>
+                                        <span style={{ position: 'relative', top: '-4px' }}>{row.semI}</span>
+                                    </td>
+                                    <td className="cert-td" style={{ textAlign: 'center', color: '#333', fontWeight: '600' }}>
+                                        <span style={{ position: 'relative', top: '-4px' }}>{row.semII}</span>
+                                    </td>
+                                    <td className="cert-td" style={{ textAlign: 'center', fontWeight: '800', color: '#1A1A1A', borderRight: 'none', padding: 0 }}>
+                                        <div style={{ height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span style={{ 
+                                                display: 'inline-block', 
+                                                minWidth: '48px', 
+                                                padding: '6px 12px', 
+                                                borderRadius: '6px', 
+                                                fontWeight: '900', 
+                                                fontSize: '15px', 
+                                                letterSpacing: '0.03em', 
+                                                lineHeight: '1', 
+                                                textAlign: 'center', 
+                                                backgroundColor: badgeBg, 
+                                                color: badgeColor, 
+                                                border: badgeBorder
+                                            }}>
+                                                {row.avg}
+                                            </span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
-                    <tfoot>
-                        <tr>
-                            <td className="p-5 pt-8 text-[#2c1810] uppercase tracking-widest font-semibold text-sm">አጠቃላይ ድምር (Grand Total)</td>
-                            <td colSpan={2} className="p-5 pt-8 text-center text-[#5c4033]">{overallEarned} / {overallMax}</td>
-                            <td className="p-5 pt-8 text-center text-[#8b0000] font-semibold text-2xl">{overallAvg}%</td>
-                        </tr>
-                    </tfoot>
                 </table>
+                
+                {/* Summary Section */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px', paddingTop: '24px', borderTop: '2px solid #E5E7EB' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '64px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', position: 'relative', top: '-10px' }}>
+                                <span className="cert-label" style={{ marginBottom: '8px' }}>Total Marks</span>
+                                <span style={{ fontSize: '24px', fontWeight: '800', color: '#333', fontVariantNumeric: 'tabular-nums' }}>{overallEarned} <span style={{fontSize: '16px', color: '#888'}}>/ {overallMax}</span></span>
+                            </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                            <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#888', fontWeight: '800', letterSpacing: '0.05em' }}>Grade Rank</span>
+                            <span style={{ fontSize: '16px', fontWeight: '700', color: '#333' }}>{rankInfo.overallRank} / {rankInfo.totalInGrade}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                            <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#888', fontWeight: '800', letterSpacing: '0.05em' }}>Class Rank</span>
+                            <span style={{ fontSize: '16px', fontWeight: '700', color: '#333' }}>{rankInfo.classRank} / {rankInfo.totalInClass}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                            <span style={{ fontSize: '14px', textTransform: 'uppercase', color: '#A67C00', fontWeight: '900', letterSpacing: '0.1em', marginBottom: '8px' }}>Overall Average</span>
+                            <div style={{ padding: '8px 24px', border: '2px solid rgba(201,162,39,0.2)', borderRadius: '12px', backgroundColor: 'rgba(201,162,39,0.03)', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span className="cert-serif" style={{ fontSize: '64px', fontWeight: '900', color: '#A67C00', lineHeight: '1', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                                    {overallAvg}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Signatures */}
-            <div className="w-full grid grid-cols-2 gap-16 text-center mt-auto pb-8 z-10">
-                <div className="flex flex-col items-center">
-                    <div className="w-56 border-b border-[#2c1810]/40 mb-3 h-16" />
-                    <span className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8c7361]">የትምህርት ቤቱ አስተዳዳሪ</span>
+            {/* Footer Section */}
+            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', zIndex: 10 }}>
+                {/* Official QR Code & Issue Date */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ padding: '8px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid rgba(201,162,39,0.4)' }}>
+                        <QRCodeCanvas value={`verify:${student.id}|yr:${getEthiopianYear(student.academicYear || dayjs().toISOString())}`} size={64} level="M" />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#0F3A2B', letterSpacing: '0.1em' }}>OFFICIAL RECORD</span>
+                        <span style={{ fontSize: '9px', color: '#666', maxWidth: '140px', lineHeight: 1.4, fontWeight: '500' }}>Scan to verify authenticity of this electronic document.</span>
+                        <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #E5E7EB' }}>
+                            <span style={{ fontSize: '9px', textTransform: 'uppercase', color: '#666', fontWeight: '800', letterSpacing: '0.05em' }}>Issue Date: </span>
+                            <span style={{ fontSize: '10px', fontWeight: '600', color: '#0A0A0A' }}>{dayjs().format('MMM D, YYYY')}</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex flex-col items-center">
-                    <div className="w-56 border-b border-[#2c1810]/40 mb-3 h-16" />
-                    <span className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8c7361]">የክፍል አስተባባሪ</span>
+                
+                {/* Signatures */}
+                <div style={{ display: 'flex', gap: '64px', alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '160px' }}>
+                        <div style={{ width: '100%', borderBottom: '2px solid #1A1A1A', marginBottom: '8px', height: '32px' }} />
+                        <span className="cert-sig-title">Administrator</span>
+                        <span className="cert-sig-name cert-serif">Aba Tsegaye</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '160px' }}>
+                        <div style={{ width: '100%', borderBottom: '2px solid #1A1A1A', marginBottom: '8px', height: '32px' }} />
+                        <span className="cert-sig-title">Coordinator</span>
+                        <span className="cert-sig-name cert-serif">Ato. Melaku Y.</span>
+                    </div>
                 </div>
             </div>
-
-            {/* Faint Seal Position */}
-            <div className="absolute bottom-24 left-16 opacity-10 transform -rotate-12 pointer-events-none">
-                <div className="w-40 h-40 border-2 border-dashed border-[#8b0000] rounded-full flex items-center justify-center">
-                    <Text className="text-xs font-bold text-center uppercase tracking-widest text-[#8b0000]">ኦፊሴላዊ<br/>ማህተም</Text>
+            
+            {/* Digital Seal Overlay */}
+            <div style={{ position: 'absolute', bottom: '48px', left: '50%', transform: 'translateX(-50%)', opacity: 0.025, zIndex: 5, pointerEvents: 'none' }}>
+                <div style={{ width: '200px', height: '200px', border: '6px double #C9A227', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(201,162,39,0.05)' }}>
+                    <span className="cert-serif" style={{ fontSize: '20px', color: '#C9A227', fontWeight: '800', textAlign: 'center', letterSpacing: '0.1em' }}>OFFICIAL<br/>SEAL</span>
                 </div>
             </div>
         </div>

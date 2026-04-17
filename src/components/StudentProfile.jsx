@@ -17,6 +17,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
 import { useTranslation } from 'react-i18next';
 import { formatEthiopianDate, getEthiopianYear } from '../utils/dateUtils';
+import { normalizeGrade } from '../utils/gradeUtils';
+import { calculateSingleStudentRank, calculateSubjectRows, isConductAssessment } from '../utils/analyticsEngine';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -106,25 +108,12 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
     // --- Academic Data ---
     // Filter assessments relevant only to this student's grade
-    const normalizeGrade = (g) => {
-        if (!g) return '';
-        const match = String(g).match(/(\d+)/);
-        return match ? match[1] : g;
-    };
-
     const studentGradeNorm = useMemo(() => normalizeGrade(student?.grade), [student]);
     const gradeAssessments = useMemo(() => {
         if (!allAssessments || !studentGradeNorm) return [];
         return allAssessments.filter(a => {
             if (normalizeGrade(a.grade) !== studentGradeNorm) return false;
-            if (a.subjectName === '__CONDUCT__') return false;
-            
-            const n = (a.name || '').toLowerCase();
-            const s = (a.subjectName || '').toLowerCase();
-            if (n.includes('conduct') || n.includes('attitude')) return false;
-            if (s.includes('conduct') || s.includes('attitude')) return false;
-            
-            return true;
+            return !isConductAssessment(a);
         });
     }, [allAssessments, studentGradeNorm]);
 
@@ -152,23 +141,44 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
         });
     }, [gradeAssessments, marks, allSubjects]);
 
-    // Calculate Summary
+    const subjectRows = useMemo(() => {
+        return calculateSubjectRows(student, allAssessments, allMarks, allSubjects, activeSemester);
+    }, [student, allAssessments, allMarks, allSubjects, activeSemester]);
+
+    const rankingInfo = useMemo(() => {
+        return calculateSingleStudentRank(student, allStudents, allAssessments, allMarks, activeSemester, allSubjects);
+    }, [student, allStudents, allAssessments, allMarks, activeSemester, allSubjects]);
+
+    const academicStats = useMemo(() => {
+        const stats = rankingInfo.stats || { totalScore: 0, totalMax: 0, percentage: 0 };
+        const avg = stats.percentage.toFixed(1);
+        
+        return {
+            totalEarnedScore: stats.totalScore,
+            totalMaxScore: stats.totalMax,
+            averagePercentage: avg,
+            overallAvg: avg
+        };
+    }, [rankingInfo.stats]);
+
+    const { 
+        totalEarnedScore, 
+        totalMaxScore, 
+        averagePercentage,
+        overallAvg 
+    } = academicStats;
+
     const summary = useMemo(() => {
         const missing = markHistory.filter(m => !m.hasMark);
         const completed = markHistory.filter(m => m.hasMark);
         const sem1 = markHistory.filter(m => m.semester === 'Semester I');
         const sem2 = markHistory.filter(m => m.semester === 'Semester II');
-        const totalEarned = completed.reduce((acc, curr) => acc + (curr.score || 0), 0);
-        const totalMax = completed.reduce((acc, curr) => acc + (parseFloat(curr.maxScore) || 0), 0);
-        const avg = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(1) : '0';
+        
         return {
             missingAssessments: missing,
             completedAssessments: completed,
             sem1Marks: sem1,
-            sem2Marks: sem2,
-            totalEarnedScore: totalEarned,
-            totalMaxScore: totalMax,
-            averagePercentage: avg
+            sem2Marks: sem2
         };
     }, [markHistory]);
 
@@ -176,10 +186,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
         missingAssessments, 
         completedAssessments, 
         sem1Marks, 
-        sem2Marks, 
-        totalEarnedScore, 
-        totalMaxScore, 
-        averagePercentage 
+        sem2Marks
     } = summary;
     // --- Columns ---
     const markColumns = [
@@ -351,118 +358,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     );
 
     const renderLiveCertificate = () => {
-        const subjectsList = [...new Set(gradeAssessments.map(a => a.subjectName))].sort();
-        const subjectRows = subjectsList.map(subject => {
-            const semIAssessments = gradeAssessments.filter(a => {
-                const subjObj = allSubjects.find(s => s.name === a.subjectName);
-                return a.subjectName === subject && (subjObj?.semester || 'Semester I') === 'Semester I';
-            });
-            const semIIAssessments = gradeAssessments.filter(a => {
-                const subjObj = allSubjects.find(s => s.name === a.subjectName);
-                return a.subjectName === subject && subjObj?.semester === 'Semester II';
-            });
-            
-            const semIEarned = semIAssessments.reduce((acc, a) => {
-                const m = marks?.find(mark => mark.assessmentId === a.id);
-                return acc + (m ? m.score : 0);
-            }, 0);
-            const semIMax = semIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
-            const semIHasData = semIAssessments.some(a => marks?.find(m => m.assessmentId === a.id));
-
-            const semIIEarned = semIIAssessments.reduce((acc, a) => {
-                const m = marks?.find(mark => mark.assessmentId === a.id);
-                return acc + (m ? m.score : 0);
-            }, 0);
-            const semIIMax = semIIAssessments.reduce((acc, a) => acc + (parseFloat(a.maxScore) || 0), 0);
-            const semIIHasData = semIIAssessments.some(a => marks?.find(m => m.assessmentId === a.id));
-
-            let totalMax = 0;
-            let totalEarned = 0;
-
-            if (activeSemester === 'Semester I') {
-                totalMax = semIMax;
-                totalEarned = semIEarned;
-            } else {
-                 // For Semester II, average the whole year
-                totalMax = semIMax + semIIMax;
-                totalEarned = semIEarned + semIIEarned;
-            }
-
-            const avgPct = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(0) : '-';
-
-            return {
-                subject,
-                semI: semIHasData ? `${semIEarned} / ${semIMax}` : (semIAssessments.length ? '—' : 'N/A'),
-                semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIAssessments.length ? '—' : 'N/A'),
-                avg: avgPct !== '-' ? `${avgPct}%` : '—',
-                rowMax: totalMax,
-                rowEarned: totalEarned
-            };
-        });
-
-        // Compute real grand total based on visible row max/earned
-        let liveTotalMax = 0;
-        let liveTotalEarned = 0;
-        subjectRows.forEach(row => {
-            liveTotalMax += row.rowMax;
-            liveTotalEarned += row.rowEarned;
-        });
-
-        const overallAvg = liveTotalMax > 0 ? ((liveTotalEarned / liveTotalMax) * 100).toFixed(1) : 0;
-
-        // Rank Calculations
-        const calculateRanks = () => {
-            if (!student || !allStudents || !allMarks || !allAssessments || !allSubjects) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
-
-            // Find all assessments for the student's normalized grade
-            const gradeAssesses = allAssessments.filter(a => normalizeGrade(a.grade) === studentGradeNorm);
-            if (gradeAssesses.length === 0) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
-            
-            const assessIds = gradeAssesses.map(a => a.id);
-            const pertinentMarks = allMarks.filter(m => assessIds.includes(m.assessmentId));
-
-            // Calculate percentage for all students in the same normalized grade
-            const studentsInGrade = allStudents.filter(s => normalizeGrade(s.grade) === studentGradeNorm);
-            
-            const rankings = studentsInGrade.map(s => {
-                let sTotalScore = 0;
-                let sTotalMax = 0;
-                
-                gradeAssesses.forEach(a => {
-                    const subjObj = allSubjects.find(subj => subj.name === a.subjectName);
-                    const isSem1 = (subjObj?.semester || 'Semester I') === 'Semester I';
-                    
-                    if (activeSemester === 'Semester I') {
-                        if (!isSem1) return; // Skip Sem 2 marks from rank calc if we are in Sem I
-                    }
-
-                    const mark = pertinentMarks.find(m => m.studentId === s.id && m.assessmentId === a.id);
-                    if (mark) sTotalScore += mark.score;
-                    sTotalMax += a.maxScore;
-                });
-                
-                const sPercentage = sTotalMax > 0 ? (sTotalScore / sTotalMax) * 100 : 0;
-                return { id: s.id, grade: s.grade, percentage: sPercentage, hasData: sTotalMax > 0 };
-            }).filter(s => s.hasData); // Only rank students with data
-
-            // Sort by percentage descending
-            rankings.sort((a, b) => b.percentage - a.percentage);
-
-            // Overall Grade Rank
-            const overallRankIndex = rankings.findIndex(r => r.id === student?.id);
-            const overallRank = overallRankIndex !== -1 ? overallRankIndex + 1 : 'N/A';
-            const totalInGrade = rankings.length;
-
-            // Class Rank (exact grade match)
-            const classRankings = rankings.filter(r => r.grade === student?.grade);
-            const classRankIndex = classRankings.findIndex(r => r.id === student?.id);
-            const classRank = classRankIndex !== -1 ? classRankIndex + 1 : 'N/A';
-            const totalInClass = classRankings.length;
-
-            return { classRank, overallRank, totalInClass, totalInGrade };
-        };
-
-        const { classRank, overallRank, totalInClass, totalInGrade } = calculateRanks();
+        const { classRank, overallRank, totalInClass, totalInGrade } = rankingInfo;
 
         return (
             <div className="mt-4 flex flex-col items-center bg-slate-100 dark:bg-slate-900 p-8 rounded-lg overflow-auto">
@@ -553,7 +449,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                                 <span className="text-sm font-bold text-[#2c1810] uppercase tracking-widest">
                                     አጠቃላይ ድምር / GRAND TOTAL
                                 </span>
-                                <span className="text-3xl font-black text-[#8b0000]">{overallAvg}%</span>
+                                <span className="text-3xl font-black text-[#8b0000]">{averagePercentage}%</span>
                             </div>
 
                             {totalInClass > 0 && (

@@ -233,20 +233,9 @@ export default function TeacherDashboard() {
                             )}
                         </div>
                     </div>
-                    <Space size="middle">
-                        <Button 
-                            icon={<SyncOutlined />} 
-                            onClick={() => {
-                                message.loading(t('common.syncing', 'Syncing...'), 0);
-                                window.dispatchEvent(new Event('triggerSync'));
-                            }}
-                        >
-                            {t('admin.syncNow', 'Sync Now')}
-                        </Button>
-                        <Button danger onClick={handleTeacherLogout}>
-                            {t('common.logout', 'Logout')}
-                        </Button>
-                    </Space>
+                    <Button danger onClick={handleTeacherLogout} className="sm:self-start">
+                        {t('common.logout', 'Logout')}
+                    </Button>
                 </div>
             </Card>
             {/* Mobile Navigation */}

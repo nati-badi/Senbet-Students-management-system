@@ -126,9 +126,11 @@ const normS = (s: any) => {
 };
 
 const isConduct = (a: any) => {
-  const sName = (a.subjectname || '').toLowerCase();
+  if (!a) return false;
+  const sName = (a.subjectname || a.subjectName || '').toLowerCase();
   const aName = (a.name || '').toLowerCase();
-  return sName.includes('conduct') || sName.includes('attitude') || aName.includes('conduct') || aName.includes('attitude');
+  const keywords = ['conduct', 'attitude', 'behaviour', 'behavior', 'ስነ-ምግባር', 'ስነ ምግባር'];
+  return keywords.some(kw => sName.includes(kw) || aName.includes(kw));
 };
 
 

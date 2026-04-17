@@ -25,19 +25,10 @@ export const formatGrade = (grade) => {
     return `${s}ኛ ክፍል`;
 };
 
-export const normalizeGrade = (rawGrade) => {
-    if (rawGrade === undefined || rawGrade === null) return '';
-    const s = String(rawGrade).toLowerCase().trim();
-    const match = s.match(/(\d+)/);
-    if (match) {
-        const num = match[1];
-        const n = parseInt(num);
-        if (n >= 1 && n <= 12) return String(n);
-        if (n > 12) return '13';
-    }
-    if (s.includes('ሌላ') || s.includes('other') || s.includes('12+')) return '13';
-    return s; // Consistency: return lowercase trimmed string if no digits
-};
+import { normalizeGrade as sharedNormalizeGrade, normalizeSubject as sharedNormalizeSubject } from '../../shared/gradeUtils';
+
+export const normalizeGrade = (rawGrade) => sharedNormalizeGrade(rawGrade);
+export const normalizeSubject = (raw) => sharedNormalizeSubject(raw);
 
 export const disabledDate = (current) => {
     return current && current > dayjs().endOf('day');
@@ -46,12 +37,7 @@ export const disabledDate = (current) => {
 export const getNextGrade = (rawGrade) => {
     const normalized = normalizeGrade(rawGrade);
     const num = parseInt(normalized);
-    if (isNaN(num)) return rawGrade; // If we couldn't parse it, return as is
-    if (num >= 12) return '13'; // Graduate / Other
+    if (isNaN(num)) return rawGrade;
+    if (num >= 12) return '13';
     return String(num + 1);
-};
-
-export const normalizeSubject = (raw) => {
-    if (!raw) return '';
-    return String(raw).toLowerCase().trim();
 };

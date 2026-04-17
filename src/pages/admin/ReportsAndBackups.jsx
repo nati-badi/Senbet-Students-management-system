@@ -46,10 +46,15 @@ export default function ReportsAndBackups() {
             return;
         }
 
-        // Filter assessments by semester (derived from subject)
+        // Filter assessments by semester (Standard: Semester II includes Semester I)
         const semesterAssessments = assessments.filter(a => {
             const subject = subjects.find(s => s.name === a.subjectName);
-            return (subject?.semester || 'Semester I') === semester;
+            const subjSem = subject?.semester || 'Semester I';
+            if (semester === 'Semester I') {
+                return subjSem === 'Semester I';
+            }
+            // Semester II is cumulative
+            return true;
         });
         if (semesterAssessments.length === 0) {
             message.warning(`No assessments found for ${semester}.`);

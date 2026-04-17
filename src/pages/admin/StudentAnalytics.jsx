@@ -4,7 +4,8 @@ import { TrophyOutlined, StarOutlined, BarChartOutlined, LineChartOutlined, Team
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useTranslation } from 'react-i18next';
-import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
+import { GRADE_OPTIONS, formatGrade, normalizeGrade, normalizeSubject } from '../../utils/gradeUtils';
+import { calculateRankings, calculateGroupAverage, isConductAssessment } from '../../utils/analyticsEngine';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -51,33 +52,33 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
         if (!students.length || !marks.length || !assessments.length) return [];
 
         const semesterAssessments = assessments.filter(a => {
-            const subject = subjects.find(s => s.name === a.subjectName);
-            const isMatchSem = (subject?.semester || 'Semester I') === selectedSemester;
-            const isMatchSub = selectedSubject === 'All' || a.subjectName === selectedSubject;
+            const subject = subjects.find(s => s.name === a.subjectName || s.name === a.subjectname);
+            const subjSem = subject?.semester || 'Semester I';
+            
+            // Basic Semester Match
+            let isMatchSem = false;
+            if (selectedSemester === 'Semester I') {
+                isMatchSem = subjSem === 'Semester I';
+            } else {
+                // Semester II is cumulative
+                isMatchSem = true;
+            }
+            
+            if (isConductAssessment(a)) return false;
+            
+            const isMatchSub = selectedSubject === 'All' || (a.subjectName || a.subjectname) === selectedSubject;
             return isMatchSem && isMatchSub;
         });
+
         if (semesterAssessments.length === 0) return [];
 
-        const assessmentIds = semesterAssessments.map(a => a.id);
-        const semesterMarks = marks.filter(m => assessmentIds.includes(m.assessmentId));
+        // Use centralized ranking engine
+        const rankings = calculateRankings(students, semesterAssessments, marks);
 
-        const rankings = students.map(student => {
-            let totalScore = 0;
-            let totalMax = 0;
-
-            const studentAssessments = semesterAssessments.filter(a => normalizeGrade(a.grade) === normalizeGrade(student.grade));
-            
-            studentAssessments.forEach(sa => {
-                const mark = semesterMarks.find(m => m.studentId === student.id && m.assessmentId === sa.id);
-                if (mark) totalScore += mark.score;
-                totalMax += sa.maxScore;
-            });
-
-            const percentage = totalMax > 0 ? (totalScore / totalMax) * 100 : 0;
-
-            // Calculate attendance stats
+        // Add attendance stats and filter by grade
+        const rankingsWithAttendance = rankings.map(s => {
             const studentAttendance = attendance.filter(a => 
-                a.studentId === student.id && 
+                (a.studentId === s.id || a.studentid === s.id) && 
                 (a.semester || 'Semester I') === selectedSemester
             );
             const presentCount = studentAttendance.filter(a => a.status === 'present').length;
@@ -85,29 +86,25 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
             const attendanceRate = totalDays > 0 ? (presentCount / totalDays) * 100 : 0;
 
             return {
-                ...student,
-                totalScore,
-                totalMax,
-                percentage,
+                ...s,
                 attendanceRate,
                 totalDays
             };
-        }).filter(s => s.totalMax > 0); // Only rank students with recorded marks
+        });
 
-        // Filter by grade if selected
-        let filteredRankings = rankings;
+        let filteredRankings = rankingsWithAttendance;
         if (selectedGrade !== 'All') {
-            filteredRankings = rankings.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
+            filteredRankings = rankingsWithAttendance.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
         }
 
-        // Sort by percentage descending
         return filteredRankings.sort((a, b) => b.percentage - a.percentage);
-    }, [students, marks, assessments, attendance, selectedGrade, selectedSemester]);
+    }, [students, marks, assessments, attendance, selectedGrade, selectedSemester, selectedSubject, subjects]);
 
     const top10Students = studentRankings.slice(0, 10);
-    const schoolAverage = studentRankings.length > 0 
-        ? studentRankings.reduce((sum, s) => sum + s.percentage, 0) / studentRankings.length 
-        : 0;
+    const schoolAverage = useMemo(
+        () => calculateGroupAverage(studentRankings),
+        [studentRankings]
+    );
 
     const columns = [
         {

@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, TouchableWithoutFeedback, Pressable, Platform, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, TouchableWithoutFeedback, Pressable, Platform, StyleSheet, Image } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { useTranslation } from 'react-i18next';
 import { Info, CalendarCheck, TrendingUp, Users } from 'lucide-react-native';
 import { Student, Assessment, normG, normS, isConduct } from '../utils';
+import { calculateSingleStudentRank, calculateSubjectRows } from '../analyticsEngine';
 
 export const StudentProfileModal = React.memo(({ student, onClose, assessments, marks, allStudents, subjects, settings, C, s }: {
   student: Student | null, onClose: () => void, assessments: Assessment[], marks: any[], allStudents: Student[], subjects: any[], settings: any, C: any, s: any
@@ -12,8 +14,9 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
   
   const getEthiopianYear = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
-    if (String(dateString).includes('E.C.') || String(dateString).includes('ዓ.ም')) return dateString;
-    if (String(dateString).includes('-')) {
+    const sDate = String(dateString);
+    if (sDate.includes('E.C.') || sDate.includes('ዓ.ም')) return sDate;
+    if (sDate.includes('-')) {
       const d = new Date(dateString);
       if (!isNaN(d.getTime())) {
         const month = d.getMonth(); 
@@ -30,118 +33,30 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
   const studentMarks = useMemo(() => marks.filter(m => {
     if (!student) return false;
     const ass = assessments.find(a => a.id === (m.assessmentid || m.assessmentId));
-    return (m.studentid || m.studentId) === student.id && ass && !isConduct(ass);
+    const mStudentId = m.studentid || m.studentId;
+    return mStudentId === student.id && ass && !isConduct(ass);
   }), [marks, assessments, student?.id]);
   
+  const activeSemester = settings?.currentSemester || 'Semester I';
+
   const rankings = useMemo(() => {
-    if (!student) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
-    const sGrade = String(student.grade);
-    const gAss = assessments.filter(a => String(a.grade) === sGrade && !isConduct(a));
-    if (gAss.length === 0) return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
-    
-    const aIds = gAss.map(a => a.id);
-    const gMarks = marks.filter(m => aIds.includes(m.assessmentid || m.assessmentId));
-    const gStudents = allStudents.filter(s => String(s.grade) === sGrade);
-    
-    const calculatedRankings = gStudents.map(s => {
-      let score = 0, max = 0;
-      gAss.forEach(a => {
-        const m = gMarks.find(mx => (mx.studentid || mx.studentId) === s.id && (mx.assessmentid || mx.assessmentId) === a.id);
-        if (m) score += Number(m.score) || 0;
-        max += a.maxscore;
-      });
-      return { id: s.id, grade: s.grade, perc: max > 0 ? (score / max) * 100 : 0, hasData: max > 0 };
-    }).filter(s => s.hasData).sort((a, b) => b.perc - a.perc);
-
-    const overallIdx = calculatedRankings.findIndex(r => r.id === student.id);
-    const classRanks = calculatedRankings.filter(r => r.grade === student.grade);
-    const classIdx = classRanks.findIndex(r => r.id === student.id);
-
-    return { 
-      overallRank: overallIdx !== -1 ? overallIdx + 1 : 'N/A', 
-      totalInGrade: calculatedRankings.length,
-      classRank: classIdx !== -1 ? classIdx + 1 : 'N/A',
-      totalInClass: classRanks.length
-    };
-  }, [student?.id, student?.grade, assessments, marks, allStudents]);
+    return calculateSingleStudentRank(student!, allStudents, assessments, marks, activeSemester, subjects);
+  }, [student?.id, student?.grade, assessments, marks, allStudents, activeSemester, subjects]);
 
   const { classRank, overallRank, totalInClass, totalInGrade } = rankings;
 
-  const stats = useMemo(() => {
-    const totalScore = studentMarks.reduce((acc, m) => acc + (Number(m.score) || 0), 0);
-    const maxPossible = studentMarks.reduce((acc, m) => {
-      const ass = assessments.find(a => a.id === (m.assessmentid || m.assessmentId));
-      return acc + (ass?.maxscore || 100);
-    }, 0);
-    const avg = maxPossible > 0 ? ((totalScore / maxPossible) * 100).toFixed(1) : '0';
-    return { totalScore, maxPossible, avg };
-  }, [studentMarks, assessments]);
-
-  const activeSemester = settings?.currentSemester || 'Semester I';
-  
   const subjectRows = useMemo(() => {
-    if (!student) return [];
-    const gradeAssessments = assessments.filter(a => normG(a.grade) === normG(student.grade) && !isConduct(a));
-    const subjectsList = [...new Set(gradeAssessments.map(a => a.subjectname))].sort() as string[];
-    
-    return subjectsList.map(subject => {
-      const semIAssessments = gradeAssessments.filter(a => {
-        const subjObj = subjects.find(s => normS(s.name) === normS(a.subjectname));
-        return normS(a.subjectname) === normS(subject) && (subjObj?.semester || 'Semester I') === 'Semester I';
-      });
-      const semIIAssessments = gradeAssessments.filter(a => {
-        const subjObj = subjects.find(s => normS(s.name) === normS(a.subjectname));
-        return normS(a.subjectname) === normS(subject) && subjObj?.semester === 'Semester II';
-      });
-      
-      const semIEarned = semIAssessments.reduce((acc, a) => {
-        const m = marks.find(mark => (mark.studentid || mark.studentId) === student.id && (mark.assessmentid || mark.assessmentId) === a.id);
-        return acc + (m ? Number(m.score) : 0);
-      }, 0);
-      const semIMax = semIAssessments.reduce((acc, a) => acc + (Number(a.maxscore) || 0), 0);
-      const semIHasData = semIAssessments.some(a => marks.find(m => (m.studentid || m.studentId) === student.id && (m.assessmentid || m.assessmentId) === a.id));
-
-      const semIIEarned = semIIAssessments.reduce((acc, a) => {
-        const m = marks.find(mark => (mark.studentid || mark.studentId) === student.id && (mark.assessmentid || mark.assessmentId) === a.id);
-        return acc + (m ? Number(m.score) : 0);
-      }, 0);
-      const semIIMax = semIIAssessments.reduce((acc, a) => acc + (Number(a.maxscore) || 0), 0);
-      const semIIHasData = semIIAssessments.some(a => marks.find(m => (m.studentid || m.studentId) === student.id && (m.assessmentid || m.assessmentId) === a.id));
-
-      let totalMax = 0;
-      let totalEarned = 0;
-
-      if (activeSemester === 'Semester I') {
-        totalMax = semIMax;
-        totalEarned = semIEarned;
-      } else {
-        totalMax = semIMax + semIIMax;
-        totalEarned = semIEarned + semIIEarned;
-      }
-
-      const avgPct = totalMax > 0 ? ((totalEarned / totalMax) * 100).toFixed(0) : '-';
-
-      return {
-        subject,
-        semI: semIHasData ? `${semIEarned} / ${semIMax}` : (semIAssessments.length ? '—' : 'N/A'),
-        semII: semIIHasData ? `${semIIEarned} / ${semIIMax}` : (semIIAssessments.length ? '—' : 'N/A'),
-        avg: avgPct !== '-' ? `${avgPct}%` : '—',
-        rowMax: totalMax,
-        rowEarned: totalEarned
-      };
-    });
+    return calculateSubjectRows(student!, assessments, marks, subjects, activeSemester);
   }, [student?.id, student?.grade, assessments, marks, subjects, activeSemester]);
 
-  const liveTotals = useMemo(() => {
-    let liveTotalMax = 0;
-    let liveTotalEarned = 0;
-    subjectRows.forEach(row => {
-      liveTotalMax += row.rowMax;
-      liveTotalEarned += row.rowEarned;
-    });
-    const overallAvg = liveTotalMax > 0 ? ((liveTotalEarned / liveTotalMax) * 100).toFixed(1) : '0';
-    return { liveTotalMax, liveTotalEarned, overallAvg };
-  }, [subjectRows]);
+  const academicStats = useMemo(() => {
+    const stats = (rankings as any).stats || { totalScore: 0, totalMax: 0, percentage: 0 };
+    const avg = stats.percentage.toFixed(1);
+    return { totalScore: stats.totalScore, totalMax: stats.totalMax, avg };
+  }, [rankings.stats]);
+
+  const { totalScore, totalMax, avg: studentAvg } = academicStats;
+  const overallAvg = studentAvg; // Consistency: both views use the same value
 
   const sections = [
     { key: 'overview', label: t('profile.overview'), icon: <Info size={18} color={subTab === 'overview' ? C.accent : C.muted} /> },
@@ -187,12 +102,12 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
                 {subTab === 'overview' && (
                   <View>
                     <View style={[s.dashboardCard, { flexDirection: 'row', padding: 20, marginBottom: 20, borderRadius: 24 }]}>
-                      <View style={{ flex: 1, alignItems: 'center', borderRightWidth: 1, borderRightColor: C.border }}><Text style={{ color: C.green, fontSize: 28, fontWeight: '900' }}>{stats.avg}%</Text><Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.average').toUpperCase()}</Text></View>
+                      <View style={{ flex: 1, alignItems: 'center', borderRightWidth: 1, borderRightColor: C.border }}><Text style={{ color: C.green, fontSize: 28, fontWeight: '900' }}>{studentAvg}%</Text><Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.average').toUpperCase()}</Text></View>
                       <View style={{ flex: 1, alignItems: 'center' }}><Text style={{ color: C.accent, fontSize: 28, fontWeight: '900' }}>{student.grade}</Text><Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{t('profile.grade').toUpperCase()}</Text></View>
                     </View>
                     <View style={{ gap: 16 }}>
-                       <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.baptismalName').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.baptismalname || t('profile.notProvided')}</Text></View>
-                       <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.contact').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.parentcontact || t('profile.notProvided')}</Text></View>
+                       <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.baptismalName').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.baptismalName || student.baptismalname || t('profile.notProvided')}</Text></View>
+                       <View><Text style={{ color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 4 }}>{t('profile.contact').toUpperCase()}</Text><Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>{student.parentContact || student.parentcontact || t('profile.notProvided')}</Text></View>
                     </View>
                   </View>
                 )}
@@ -221,10 +136,15 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
                       <View style={{ position: 'absolute', bottom: 12, left: 12, width: 16, height: 16, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: '#d4af37' }} />
                       <View style={{ position: 'absolute', bottom: 12, right: 12, width: 16, height: 16, borderBottomWidth: 1, borderRightWidth: 1, borderColor: '#d4af37' }} />
 
+                      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 24, gap: 12 }}>
+                        <Image source={require('../assets/logo.png')} style={{ width: 42, height: 42, resizeMode: 'contain' }} />
+                        <View style={{ alignItems: 'center' }}>
+                          <Text style={{ textAlign: 'center', color: '#2c1810', fontSize: 16, fontWeight: '900', marginBottom: 2 }}>በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Text>
+                          <Text style={{ textAlign: 'center', color: '#5c4033', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>የተማሪዎች ውጤት መግለጫ</Text>
+                        </View>
+                      </View>
                       <View style={{ alignItems: 'center', marginBottom: 24 }}>
-                        <Text style={{ textAlign: 'center', color: '#2c1810', fontSize: 16, fontWeight: '900', marginBottom: 4 }}>በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Text>
-                        <Text style={{ textAlign: 'center', color: '#5c4033', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>የተማሪዎች ውጤት መግለጫ</Text>
-                        <View style={{ width: 40, height: 1, backgroundColor: '#d4af37', marginVertical: 12 }} />
+                        <View style={{ width: 40, height: 1, backgroundColor: '#d4af37', marginBottom: 12 }} />
                         <Text style={{ textAlign: 'center', color: '#8b0000', fontSize: 12, fontWeight: '900', letterSpacing: 1 }}>ACADEMIC TRANSCRIPT</Text>
                       </View>
 
@@ -232,15 +152,15 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
                         <View style={{ flex: 1 }}>
                           <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>ሙሉ ስም / NAME</Text>
                           <Text style={{ fontSize: 16, color: '#2c1810', fontWeight: '800', marginTop: 2 }}>{student.name}</Text>
-                          {!!student.baptismalname && (
-                            <Text style={{ fontSize: 12, color: '#5c4033', fontStyle: 'italic', marginTop: 2 }}>የክርስትና ስም: {student.baptismalname}</Text>
+                          {!!(student.baptismalName || student.baptismalname) && (
+                            <Text style={{ fontSize: 12, color: '#5c4033', fontStyle: 'italic', marginTop: 2 }}>የክርስትና ስም: {student.baptismalName || student.baptismalname}</Text>
                           )}
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
                            <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>ክፍል / GRADE</Text>
                            <Text style={{ fontSize: 14, color: '#2c1810', fontWeight: '800', marginTop: 2, marginBottom: 8 }}>{student.grade}</Text>
                            <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>ዓ.ም / YEAR</Text>
-                           <Text style={{ fontSize: 14, color: '#2c1810', fontWeight: '800', marginTop: 2 }}>{getEthiopianYear(student.academicyear)}</Text>
+                           <Text style={{ fontSize: 14, color: '#2c1810', fontWeight: '800', marginTop: 2 }}>{getEthiopianYear(student.academicYear || student.academicyear)}</Text>
                         </View>
                       </View>
 
@@ -269,7 +189,7 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
                       <View style={{ marginTop: 24 }}>
                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#e8dfce' }}>
                              <Text style={{ fontSize: 10, color: '#2c1810', fontWeight: '800', letterSpacing: 1 }}>አጠቃላይ ድምር / GRAND TOTAL</Text>
-                             <Text style={{ fontSize: 18, color: '#8b0000', fontWeight: '900' }}>{liveTotals.overallAvg}%</Text>
+                             <Text style={{ fontSize: 18, color: '#8b0000', fontWeight: '900' }}>{overallAvg}%</Text>
                          </View>
                          {totalInClass > 0 && (
                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
@@ -283,6 +203,14 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
                                  <Text style={{ fontSize: 12, color: '#5c4033', fontWeight: '700' }}>{overallRank} / {totalInGrade}</Text>
                              </View>
                          )}
+
+                         <View style={{ marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#e8dfce', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                           <QRCode value={student.id} size={48} color="#2c1810" backgroundColor="#fdfbf7" />
+                           <View style={{ flex: 1 }}>
+                             <Text style={{ fontSize: 9, fontWeight: '900', color: '#2c1810', letterSpacing: 1 }}>OFFICIAL RECORD</Text>
+                             <Text style={{ fontSize: 8, color: '#8c7361', marginTop: 2 }}>Digitally verified academic transcript.</Text>
+                           </View>
+                         </View>
                       </View>
                     </View>
                   </View>

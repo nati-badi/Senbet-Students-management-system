@@ -82,11 +82,6 @@ export default function AdminDashboard() {
 
     const menuItems = [
         {
-            key: '/admin',
-            icon: <HomeOutlined />,
-            label: t('app.title')
-        },
-        {
             type: 'group',
             label: <span className="text-xs uppercase tracking-widest text-slate-400 px-2">{t('admin.menu')}</span>,
             children: [
@@ -202,13 +197,6 @@ export default function AdminDashboard() {
                 width={240}
                 className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden lg:block overflow-hidden"
             >
-                <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-slate-800">
-                    <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow" />
-                    <div className="min-w-0">
-                        <Text strong className="text-sm leading-tight block truncate">{t('app.shortTitle', 'Senbet School')}</Text>
-                        <Text type="secondary" style={{ fontSize: '10px' }} className="uppercase tracking-wider block">{t('admin.menu')}</Text>
-                    </div>
-                </div>
                 <Menu
                     mode="inline"
                     selectedKeys={[location.pathname]}
