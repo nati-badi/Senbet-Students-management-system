@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Layout, Menu, Button, Space, Typography, ConfigProvider, theme, Badge, Tooltip, message } from 'antd';
+import { Layout, Menu, Button, Space, Typography, ConfigProvider, theme, Badge, Tooltip, App as AntApp } from 'antd';
 import {
   BookOutlined,
   UserOutlined,
@@ -26,53 +26,15 @@ import { formatEthiopianTime } from './utils/dateUtils';
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
-export default function App() {
+function AppContent({ isDarkMode, toggleTheme }) {
   const { t, i18n } = useTranslation();
+  const { message } = AntApp.useApp(); // Context-aware message for dark mode
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
   const [isAdminAuth, setIsAdminAuth] = useState(() => sessionStorage.getItem('admin_auth') === 'true');
   const [activeRole, setActiveRole] = useState(() => sessionStorage.getItem('active_role') || null);
   const [lastSync, setLastSync] = useState(() => localStorage.getItem('last_sync_time') || null);
   const location = useLocation();
-  const themeTransitionTimeoutRef = useRef(null);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      if (themeTransitionTimeoutRef.current) {
-        window.clearTimeout(themeTransitionTimeoutRef.current);
-        themeTransitionTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkMode]);
-
-  const toggleTheme = () => {
-    // Add a short-lived class that enables CSS transitions during the toggle.
-    // This avoids "always-on" transitions that can make the UI feel sluggish.
-    document.documentElement.classList.add('theme-transition');
-    if (themeTransitionTimeoutRef.current) window.clearTimeout(themeTransitionTimeoutRef.current);
-    themeTransitionTimeoutRef.current = window.setTimeout(() => {
-      document.documentElement.classList.remove('theme-transition');
-      themeTransitionTimeoutRef.current = null;
-    }, 260);
-    setIsDarkMode(v => !v);
-  };
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -91,15 +53,14 @@ export default function App() {
   };
 
   const handleAdminLogin = (password) => {
-    // Simple admin password for local access - can be improved later
     if (password === 'senbet2026') {
       setIsAdminAuth(true);
       sessionStorage.setItem('admin_auth', 'true');
       sessionStorage.setItem('active_role', 'admin');
       setActiveRole('admin');
-      message.success('Logged in successfully!');
+      message.success(t('parent.loginSuccess'));
     } else {
-      message.error('Invalid password!');
+      message.error(t('parent.loginError'));
     }
   };
 
@@ -108,28 +69,28 @@ export default function App() {
     sessionStorage.removeItem('admin_auth');
     sessionStorage.removeItem('active_role');
     setActiveRole(null);
-    message.info('Logged out.');
+    message.info(t('parent.loggedOut'));
   };
 
   const handleSync = useCallback(async ({ silent = false, force = false } = {}) => {
     if (!isOnline || isSyncing) return;
     setIsSyncing(true);
-    const hide = silent ? message.loading('Syncing...', 0) : null;
+    const hide = silent ? message.loading(t('common.syncing'), 0) : null;
     const result = await syncData({ force });
     setIsSyncing(false);
     if (hide) hide();
     if (result.success) {
-      if (!silent) message.success(`Sync successful!`);
+      if (!silent) message.success(t('common.syncSuccess'));
       const now = formatEthiopianTime(new Date());
       setLastSync(now);
       localStorage.setItem('last_sync_time', now);
       window.dispatchEvent(new Event('syncComplete'));
     } else {
-      message.error("Sync disabled: " + (result.error || "Check your internet connection and .env keys"));
+      message.error(t('common.syncError') + ": " + (result.error || t('common.syncDisabled')));
     }
-  }, [isOnline, isSyncing]);
+  }, [isOnline, isSyncing, t, message]);
 
-  // Sync once when the app first loads (not on every route change)
+  // Sync once when the app first loads
   const hasSyncedOnLoad = useRef(false);
   useEffect(() => {
     if (!hasSyncedOnLoad.current && isOnline) {
@@ -138,16 +99,139 @@ export default function App() {
     }
   }, [isOnline, handleSync]);
 
-  // Auto-sync every 60 seconds in the background
+  // Auto-sync every 60 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       if (isOnline) {
-        // Run silently to not disrupt the UI
         void handleSync({ silent: true });
       }
     }, 60 * 1000);
     return () => clearInterval(interval);
   }, [isOnline, handleSync]);
+
+  return (
+    <Layout className="min-h-screen flex-1 w-full flex flex-col bg-slate-50 dark:bg-slate-950">
+      <Header
+        className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-50 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800"
+        style={{ height: '64px' }}
+      >
+        <Space align="center" size="small">
+          <Link to="/" className="flex items-center gap-2 notranslate" translate="no">
+            <img src="/logo.png" alt="Logo" className="w-9 h-9 object-cover rounded-full shadow-sm flex-shrink-0" />
+            <Title level={4} style={{ margin: 0, fontSize: '1rem', maxWidth: '220px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }} className="hidden sm:block">
+              በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት
+            </Title>
+          </Link>
+        </Space>
+
+        <div className="flex items-center gap-1 sm:gap-4">
+          <Space size="small">
+            <Tooltip title={
+              <div className="text-xs">
+                <div>{t('teacher.attendanceModule')}: <b>{isOnline ? t('common.online', 'Online') : t('common.offline')}</b></div>
+                <div>Sync: <b>{isSyncing ? t('common.syncing') : (lastSync ? t('common.synced') : t('common.ready'))}</b></div>
+                {lastSync && <div className="mt-1 opacity-80 italic">Last synced: {lastSync}</div>}
+              </div>
+            }>
+              <Badge
+                status={isSyncing ? 'processing' : isOnline ? (lastSync ? 'success' : 'warning') : 'error'}
+                text={
+                  <Button
+                    type="text"
+                    onClick={() => handleSync()}
+                    disabled={!isOnline || isSyncing}
+                    className="flex items-center gap-1 p-0 hover:text-forest-700 cursor-pointer"
+                  >
+                    {isSyncing ? <SyncOutlined spin /> : isOnline ? <CloudOutlined /> : <DatabaseOutlined />}
+                    <span className="text-xs font-medium hidden sm:inline">
+                      {isSyncing ? t('common.syncing') : isOnline ? (lastSync ? t('common.synced') : t('common.ready')) : t('common.offline')}
+                    </span>
+                  </Button>
+                }
+              />
+            </Tooltip>
+
+            <Button
+              onClick={toggleTheme}
+              icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
+              className="cursor-pointer"
+              type="text"
+              size="small"
+            />
+
+            <Button
+              onClick={toggleLanguage}
+              icon={<GlobalOutlined />}
+              className="font-bold cursor-pointer"
+              size="small"
+            >
+              {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
+            </Button>
+
+            {isAdminAuth && (
+               <Button
+                  onClick={handleAdminLogout}
+                  icon={<LogoutOutlined />}
+                  type="primary"
+                  danger
+                  className="font-bold shadow-md shadow-red-500/20"
+              >
+                  {t('common.logout')}
+              </Button>
+            )}
+          </Space>
+        </div>
+      </Header>
+
+      <Content className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <Routes>
+          <Route path="/" element={<Home activeRole={activeRole} isDesktop={!!window.__TAURI_INTERNALS__} />} />
+          <Route 
+            path="/admin/*" 
+            element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : isAdminAuth ? <AdminDashboard /> : <AdminLogin onLogin={handleAdminLogin} />} 
+          />
+          <Route 
+            path="/teacher/*" 
+            element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <TeacherDashboard />} 
+          />
+          <Route 
+            path="/parent" 
+            element={window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <ParentPortal />} 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Content>
+
+      <Footer className="text-center text-slate-400 bg-slate-50 dark:bg-slate-900 notranslate" translate="no">
+        በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት ©{new Date().getFullYear()}
+      </Footer>
+    </Layout>
+  );
+}
+
+export default function SenbetApp() {
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+  const themeTransitionTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  const toggleTheme = () => {
+    document.documentElement.classList.add('theme-transition');
+    if (themeTransitionTimeoutRef.current) window.clearTimeout(themeTransitionTimeoutRef.current);
+    themeTransitionTimeoutRef.current = window.setTimeout(() => {
+      document.documentElement.classList.remove('theme-transition');
+      themeTransitionTimeoutRef.current = null;
+    }, 260);
+    setIsDarkMode(v => !v);
+  };
 
   return (
     <ConfigProvider
@@ -175,102 +259,9 @@ export default function App() {
         }
       }}
     >
-      <Layout className="min-h-screen flex-1 w-full flex flex-col bg-slate-50 dark:bg-slate-950">
-        <Header
-          className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-50 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800"
-          style={{ height: '64px' }}
-        >
-          <Space align="center" size="small">
-            <Link to="/" className="flex items-center gap-2 notranslate" translate="no">
-              <img src="/logo.png" alt="Logo" className="w-9 h-9 object-cover rounded-full shadow-sm flex-shrink-0" />
-              <Title level={4} style={{ margin: 0, fontSize: '1rem', maxWidth: '220px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }} className="hidden sm:block">
-                በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት
-              </Title>
-            </Link>
-          </Space>
-
-          <div className="flex items-center gap-1 sm:gap-4">
-            <Space size="small">
-              <Tooltip title={
-                <div className="text-xs">
-                  <div>Status: <b>{isOnline ? 'Online' : 'Offline'}</b></div>
-                  <div>Sync: <b>{isSyncing ? 'In Progress' : (lastSync ? 'Completed' : 'Pending')}</b></div>
-                  {lastSync && <div className="mt-1 opacity-80 italic">Last synced: {lastSync}</div>}
-                </div>
-              }>
-                <Badge
-                  status={isSyncing ? 'processing' : isOnline ? (lastSync ? 'success' : 'warning') : 'error'}
-                  text={
-                    <Button
-                      type="text"
-                      onClick={() => handleSync()}
-                      disabled={!isOnline || isSyncing}
-                      className="flex items-center gap-1 p-0 hover:text-forest-700 cursor-pointer"
-                    >
-                      {isSyncing ? <SyncOutlined spin /> : isOnline ? <CloudOutlined /> : <DatabaseOutlined />}
-                      <span className="text-xs font-medium hidden sm:inline">
-                        {isSyncing ? 'Syncing...' : isOnline ? (lastSync ? 'Synced' : 'Ready') : 'Offline'}
-                      </span>
-                    </Button>
-                  }
-                />
-              </Tooltip>
-
-              <Button
-                onClick={toggleTheme}
-                icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
-                className="cursor-pointer"
-                type="text"
-                size="small"
-              />
-
-              <Button
-                onClick={toggleLanguage}
-                icon={<GlobalOutlined />}
-                className="font-bold cursor-pointer"
-                size="small"
-              >
-                {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
-              </Button>
-
-              {isAdminAuth && (
-                 <Button
-                    onClick={handleAdminLogout}
-                    icon={<LogoutOutlined />}
-                    type="primary"
-                    danger
-                    className="font-bold shadow-md shadow-red-500/20"
-                >
-                    {t('common.logout')}
-                </Button>
-              )}
-            </Space>
-          </div>
-        </Header>
-
-        <Content className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
-          <Routes>
-            <Route path="/" element={<Home activeRole={activeRole} isDesktop={!!window.__TAURI_INTERNALS__} />} />
-            <Route 
-              path="/admin/*" 
-              element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : isAdminAuth ? <AdminDashboard /> : <AdminLogin onLogin={handleAdminLogin} />} 
-            />
-            <Route 
-              path="/teacher/*" 
-              element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <TeacherDashboard />} 
-            />
-            <Route 
-              path="/parent" 
-              element={window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <ParentPortal />} 
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Content>
-
-        <Footer className="text-center text-slate-400 bg-slate-50 dark:bg-slate-900 notranslate" translate="no">
-          በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት ©{new Date().getFullYear()}
-        </Footer>
-      </Layout>
+      <AntApp style={{ width: '100%', height: '100%' }}>
+        <AppContent isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+      </AntApp>
     </ConfigProvider>
   );
 }

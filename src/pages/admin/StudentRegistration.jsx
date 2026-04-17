@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Row, Col, Card, Form, Input, Select, DatePicker, Button, Table, Tag, Space, Tooltip, Popconfirm, Modal, notification, Upload, message, Skeleton, Empty } from 'antd';
+import { Typography, Row, Col, Card, Form, Input, Select, DatePicker, Button, Table, Tag, Space, Tooltip, Popconfirm, App, Upload, Skeleton, Empty } from 'antd';
 import { SearchOutlined, FilterOutlined, DownloadOutlined, UploadOutlined, EditOutlined, DeleteOutlined, UserOutlined, CopyOutlined, KeyOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -16,9 +16,9 @@ import StudentProfile from '../../components/StudentProfile';
 const { Title, Text } = Typography;
 
 export default function StudentRegistration() {
-    const { t, i18n } = useTranslation();
     const [form] = Form.useForm();
     const [editForm] = Form.useForm();
+    const { message, notification, modal } = App.useApp();
 
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
@@ -65,7 +65,7 @@ export default function StudentRegistration() {
         );
         if (existingWithSameName.length > 0) {
             const confirmed = await new Promise(resolve => {
-                Modal.confirm({
+                modal.confirm({
                     title: 'ይህ ስም በዳታባዚ ውስጥ ተመዘግቡዘል',
                     content: `"‹${values.name}›" ዋነም በዳታባዜው Ꭻሎች ይገኙ። ዘመዘግብዘት ይፈልጋቸሎል?`,
                     okText: 'ዘመዘግብ (ዱቤል)',

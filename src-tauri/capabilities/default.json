@@ -6,6 +6,12 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "notification:default",
+    "dialog:default",
+    "fs:default",
+    "fs:write-all",
+    "shell:default",
+    "shell:allow-open"
   ]
 }

@@ -36,14 +36,10 @@ import {
     Col,
     Tag,
     Divider,
-    message,
-    Skeleton,
-    Empty,
-    Radio,
-    notification,
     DatePicker,
     Modal,
-    Badge
+    Badge,
+    App
 } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -109,6 +105,7 @@ export default function TeacherDashboard() {
     const location = useLocation();
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const { message, notification } = App.useApp();
     const [profileStudentId, setProfileStudentId] = useState(null);
     const [teacherSession, setTeacherSession] = useState(() => {
         try {

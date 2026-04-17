@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Button, Typography, Statistic, Row, Col, List, Badge, notification, Empty, Space } from 'antd';
+import { Card, Button, Typography, Statistic, Row, Col, List, Badge, Empty, Space, App } from 'antd';
 import { CloudSyncOutlined, CloudUploadOutlined, CloudDownloadOutlined, CheckCircleOutlined, ExclamationCircleOutlined, SyncOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { syncData } from '../../utils/sync';
@@ -8,6 +8,7 @@ const { Title, Text, Paragraph } = Typography;
 
 export default function SyncCenter() {
     const { t } = useTranslation();
+    const { notification } = App.useApp();
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastSync, setLastSync] = useState(null);
     const [syncStats, setSyncStats] = useState(null);
@@ -59,8 +60,8 @@ export default function SyncCenter() {
         <div className="flex flex-col gap-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <Title level={2}>{t('admin.syncCenter') || 'Cloud Sync Center'}</Title>
-                    <Text type="secondary">Keep your Local Desktop and Teacher Mobile data in sync via Supabase Cloud.</Text>
+                    <Title level={2}>{t('admin.syncCenter')}</Title>
+                    <Text type="secondary">{t('admin.syncCenterSubtitle')}</Text>
                 </div>
                 <Space>
                     <Button
@@ -69,7 +70,7 @@ export default function SyncCenter() {
                         loading={isSyncing}
                         onClick={() => handleSync({ force: true })}
                     >
-                        {isSyncing ? 'Processing...' : 'Force Full Re-sync'}
+                        {isSyncing ? t('common.done') : t('admin.forceSync')}
                     </Button>
                     <Button
                         type="primary"
@@ -78,7 +79,7 @@ export default function SyncCenter() {
                         loading={isSyncing}
                         onClick={() => handleSync()}
                     >
-                        {isSyncing ? 'Syncing...' : 'Start Sync Now'}
+                        {isSyncing ? t('common.syncing') : t('admin.syncNow')}
                     </Button>
                 </Space>
             </div>
@@ -87,7 +88,7 @@ export default function SyncCenter() {
                 <Col span={8}>
                     <Card shadow="sm">
                         <Statistic
-                            title="Records Pushed"
+                            title={t('admin.recordsPushed')}
                             value={syncStats?.pushed ?? 0}
                             prefix={<CloudUploadOutlined className="text-blue-500" />}
                         />
@@ -96,7 +97,7 @@ export default function SyncCenter() {
                 <Col span={8}>
                     <Card shadow="sm">
                         <Statistic
-                            title="Records Pulled"
+                            title={t('admin.recordsPulled')}
                             value={syncStats?.pulled ?? 0}
                             prefix={<CloudDownloadOutlined className="text-green-500" />}
                         />
@@ -105,8 +106,8 @@ export default function SyncCenter() {
                 <Col span={8}>
                     <Card shadow="sm">
                         <Statistic
-                            title="Last Successful Sync"
-                            value={lastSync ?? 'Never'}
+                            title={t('admin.lastSync')}
+                            value={lastSync ?? t('common.pending', 'Never')}
                             valueStyle={{ fontSize: '16px' }}
                             prefix={<CheckCircleOutlined className={lastSync ? "text-green-500" : "text-slate-300"} />}
                         />
@@ -114,27 +115,27 @@ export default function SyncCenter() {
                 </Col>
             </Row>
 
-            <Card title="Database Status" className="mt-4">
+            <Card title={t('admin.dbStatus')} className="mt-4">
                 <Space orientation="vertical" className="w-full">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <Space>
                             <Badge status="processing" />
                             <Text strong>Local Storage (Dexie.js)</Text>
                         </Space>
-                        <Tag color="blue">Active</Tag>
+                        <Tag color="blue">{t('common.active', 'Active')}</Tag>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <Space>
                             <Badge status={syncStats ? "success" : "default"} />
                             <Text strong>Cloud Backend (Supabase)</Text>
                         </Space>
-                        <Tag color={syncStats ? "green" : "orange"}>{syncStats ? "Connected" : "Standby"}</Tag>
+                        <Tag color={syncStats ? "green" : "orange"}>{syncStats ? t('common.connected', 'Connected') : t('common.ready')}</Tag>
                     </div>
                 </Space>
             </Card>
 
             {syncStats?.tableStatus && (
-                <Card title="Table Details" className="mt-4">
+                <Card title={t('admin.tableDetails')} className="mt-4">
                     <List
                         itemLayout="horizontal"
                         dataSource={Object.entries(syncStats.tableStatus)}
@@ -149,7 +150,7 @@ export default function SyncCenter() {
                             >
                                 <List.Item.Meta
                                     title={<Text strong className="capitalize">{name}</Text>}
-                                    description={status.error ? <Text type="danger" size="small">Error: {status.error}</Text> : `Last synced: ${lastSync}`}
+                                    description={status.error ? <Text type="danger" size="small">Error: {status.error}</Text> : `${t('admin.lastSync')}: ${lastSync}`}
                                 />
                             </List.Item>
                         )}
@@ -157,12 +158,12 @@ export default function SyncCenter() {
                 </Card>
             )}
 
-            <Card title="How to Sync" className="mt-4">
+            <Card title={t('admin.howToSync')} className="mt-4">
                 <Paragraph>
-                    1. Ensure you have an active internet connection.<br />
-                    2. Click <b>"Start Sync Now"</b> to upload any changes made on this desktop.<br />
-                    3. This will also download any attendance or marks entered by teachers on their mobile devices.<br />
-                    4. Once finished, navigate to the relevant pages to see the updated data.
+                    1. {t('common.onlineCheck', 'Ensure you have an active internet connection.')}<br />
+                    2. {t('common.syncInstruction1', 'Click "Start Sync Now" to upload any changes made on this desktop.')}<br />
+                    3. {t('common.syncInstruction2', 'This will also download any attendance or marks entered by teachers.')}<br />
+                    4. {t('common.syncInstruction3', 'Once finished, navigate to the relevant pages to see the updated data.')}
                 </Paragraph>
             </Card>
         </div>

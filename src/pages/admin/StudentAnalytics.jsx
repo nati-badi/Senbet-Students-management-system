@@ -112,11 +112,12 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
             key: 'rank',
             width: 80,
             align: 'center',
-            render: (_, __, index) => {
-                let badge = <span>{index + 1}</span>;
-                if (index === 0) badge = <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 border-2 border-yellow-400 font-bold mx-auto"><TrophyOutlined /></div>;
-                else if (index === 1) badge = <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 border-2 border-slate-300 font-bold mx-auto">2</div>;
-                else if (index === 2) badge = <div className="w-7 h-7 rounded-full bg-orange-50 flex items-center justify-center text-orange-700 border-2 border-orange-300 font-bold mx-auto">3</div>;
+            render: (_, record) => {
+                const rank = 1 + studentRankings.filter(s => s.percentage > record.percentage).length;
+                let badge = <span>{rank}</span>;
+                if (rank === 1) badge = <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 border-2 border-yellow-400 font-bold mx-auto"><TrophyOutlined /></div>;
+                else if (rank === 2) badge = <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 border-2 border-slate-300 font-bold mx-auto">2</div>;
+                else if (rank === 3) badge = <div className="w-7 h-7 rounded-full bg-orange-50 flex items-center justify-center text-orange-700 border-2 border-orange-300 font-bold mx-auto">3</div>;
                 return badge;
             }
         },

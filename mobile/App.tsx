@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image as RNImage, Linking, Animated, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback
+  StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image as RNImage, Linking, Animated, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import NetInfo from "@react-native-community/netinfo";
 import { StatusBar } from 'expo-status-bar';
 import dayjs from 'dayjs';
@@ -180,15 +181,19 @@ const WebSafeTouchable = ({ children }: any) => {
   return <TouchableWithoutFeedback onPress={Keyboard.dismiss}>{children}</TouchableWithoutFeedback>;
 };
 
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 export default function App() {
   const [isDark, setIsDark] = useState(true);
 
   return (
-    <PaperProvider>
-      <ToastProvider themes={THEMES} isDark={isDark}>
-        <AppContent isDark={isDark} setIsDark={setIsDark} />
-      </ToastProvider>
-    </PaperProvider>
+    <SafeAreaProvider>
+      <PaperProvider>
+        <ToastProvider themes={THEMES} isDark={isDark}>
+          <AppContent isDark={isDark} setIsDark={setIsDark} />
+        </ToastProvider>
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -442,7 +447,7 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
   }
 
   return (
-    <SafeAreaView style={s.root}>
+    <View style={s.root}>
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
       <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
         <Drawer.Navigator
@@ -552,7 +557,6 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
               shadowOpacity: 0,
               borderBottomWidth: 1,
               borderBottomColor: C.border,
-              height: Platform.OS === 'android' ? 64 : undefined,
             },
             headerTitleStyle: {
               color: C.text,
@@ -650,7 +654,7 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
         C={C}
         s={s}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -666,16 +670,16 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
   const s = makeStyles(C);
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
-      <View style={{ position: 'absolute', top: 60, right: 24, flexDirection: 'row', alignItems: 'center', gap: 12, zIndex: 100 }}>
+      <View style={{ position: 'absolute', top: 16, right: 24, flexDirection: 'row', alignItems: 'center', gap: 12, zIndex: 100 }}>
         <TouchableOpacity onPress={toggleLanguage} style={{ backgroundColor: C.card, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: C.border, elevation: 2 }}>
           <Text style={{ color: C.text, fontWeight: '800', fontSize: 13 }}>{i18n.language === 'en' ? 'አማ' : 'EN'}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={toggleTheme} style={{ padding: 8 }}><Text style={{ fontSize: 28 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 100 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={{ alignItems: 'center', marginBottom: 48 }}>
           <View style={{ width: 120, height: 120, borderRadius: 30, padding: 6, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, marginBottom: 24 }}>
             {/* @ts-ignore */}
@@ -705,7 +709,7 @@ function LandingPage({ onSelectMode, isDark, toggleTheme, toggleLanguage }: { on
 
         <Text style={{ color: C.muted, textAlign: 'center', marginTop: 40, marginBottom: 20, fontSize: 12 }}>v2.4.0 • ©{new Date().getFullYear()}</Text>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }: { isDark: boolean, onBack: () => void, toggleTheme: () => void, toggleLanguage: () => void, isOnline: boolean }) {
@@ -762,15 +766,16 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.card }}>
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border }}>
           <ArrowLeft size={20} color={C.text} />
         </TouchableOpacity>
         <Text style={{ color: C.text, fontSize: 18, fontWeight: '900' }}>{t('parent.title', 'Parent Portal')}</Text>
         <View style={{ width: 40 }} />
       </View>
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
 
       {!student ? (
         <KeyboardAvoidingView
@@ -939,7 +944,8 @@ function ParentPortal({ isDark, onBack, toggleTheme, toggleLanguage, isOnline }:
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -988,12 +994,12 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
-      <View style={{ position: 'absolute', top: 32, right: 24, zIndex: 100 }}>
+      <View style={{ position: 'absolute', top: 16, right: 24, zIndex: 100 }}>
         <TouchableOpacity onPress={toggleTheme} style={{ padding: 8 }}><Text style={{ fontSize: 24 }}>{isDark ? '🌙' : '☀️'}</Text></TouchableOpacity>
       </View>
-      <View style={{ position: 'absolute', top: 32, left: 24, zIndex: 100 }}>
+      <View style={{ position: 'absolute', top: 16, left: 24, zIndex: 100 }}>
         <TouchableOpacity onPress={onBack} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, elevation: 2 }}>
           <ArrowLeft size={22} color={C.text} />
         </TouchableOpacity>
@@ -1071,7 +1077,7 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
           </ScrollView>
         </WebSafeTouchable>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -1084,7 +1090,7 @@ function TeacherLogin({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, is
 
 function makeStyles(C: any) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: C.bg, paddingTop: Platform.OS === 'android' ? 36 : 0 },
+    root: { flex: 1, backgroundColor: C.bg },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg },
     loginRoot: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', padding: 24 },
     loginTitle: { color: C.text, fontSize: 32, fontWeight: '800', textAlign: 'center' },

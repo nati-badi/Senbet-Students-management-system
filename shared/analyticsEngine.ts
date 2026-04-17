@@ -156,19 +156,27 @@ export const calculateSingleStudentRank = (
   // 3. Calculate rankings for the grade level
   const rankings = calculateRankings(studentsInGradeLevel, filteredAssessments, marks);
 
-  // 4. Find indexing
-  const overallIdx = rankings.findIndex(r => r.id === student.id);
+  // 4. Find student stats
+  const studentStats = rankings.find(r => r.id === student.id);
   
-  // 5. Calculate class-specific rank (e.g. 10A vs 10B)
+  // 5. Calculate class-specific subset
   const classRanks = rankings.filter(r => r.grade === student.grade);
-  const classIdx = classRanks.findIndex(r => r.id === student.id);
+
+  let overallRank: number | 'N/A' = 'N/A';
+  let classRank: number | 'N/A' = 'N/A';
+
+  if (studentStats) {
+    // Standard Competition Ranking (12225): Rank = 1 + (number of peers strictly ahead of you)
+    overallRank = 1 + rankings.filter(r => r.percentage > studentStats.percentage).length;
+    classRank = 1 + classRanks.filter(r => r.percentage > studentStats.percentage).length;
+  }
 
   return {
-    overallRank: overallIdx !== -1 ? overallIdx + 1 : 'N/A',
+    overallRank,
     totalInGrade: rankings.length,
-    classRank: classIdx !== -1 ? classIdx + 1 : 'N/A',
+    classRank,
     totalInClass: classRanks.length,
-    stats: overallIdx !== -1 ? rankings[overallIdx] : null 
+    stats: studentStats || null 
   };
 };
 

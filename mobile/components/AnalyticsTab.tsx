@@ -180,14 +180,16 @@ export const AnalyticsTab = React.memo(
           <Text
             style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}
           >{`Average ${studentStats.length ? schoolAverage.toFixed(1) : 0}%`}</Text>
-          {studentStats.slice(0, 5).map((st, i) => (
+          {studentStats.slice(0, 5).map((st, i) => {
+            const rank = 1 + studentStats.filter(s => s.perc > st.perc).length;
+            return (
             <View
               key={i}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 paddingVertical: 12,
-                borderBottomWidth: i < 4 ? 1 : 0,
+                borderBottomWidth: i < Math.min(4, studentStats.length - 1) ? 1 : 0,
                 borderBottomColor: C.border,
               }}
             >
@@ -205,7 +207,7 @@ export const AnalyticsTab = React.memo(
                 <Text
                   style={{ color: C.accent, fontWeight: "900", fontSize: 12 }}
                 >
-                  {i + 1}
+                  {rank}
                 </Text>
               </View>
               <Text
@@ -222,7 +224,8 @@ export const AnalyticsTab = React.memo(
                 {st.perc.toFixed(1)}%
               </Text>
             </View>
-          ))}
+            );
+          })}
           {studentStats.length === 0 && (
             <Text style={[s.empty, { marginTop: 20 }]}>
               {t("teacher.noPerfData")}
