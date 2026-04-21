@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -29,6 +33,16 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Document specific font utilities (Now global for consistency) */
+.cert-container { font-family: 'Inter', sans-serif; }
+.cert-amharic { font-family: 'Noto Sans Ethiopic', 'Inter', sans-serif; }
+.cert-serif { font-family: 'Playfair Display', serif; }
+
+/* Dark mode body background fix */
+.dark body {
+  background-color: #020617; /* Matches colorBgLayout in App.jsx */
 }
 
 /* Global Pointer Cursor for Interactive Elements */

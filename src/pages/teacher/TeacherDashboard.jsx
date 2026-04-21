@@ -19,7 +19,8 @@ import {
     BarChartOutlined,
     WarningOutlined,
     SyncOutlined,
-    CloudSyncOutlined
+    CloudSyncOutlined,
+    ClearOutlined
 } from '@ant-design/icons';
 import {
     Layout,
@@ -39,6 +40,8 @@ import {
     DatePicker,
     Modal,
     Badge,
+    Skeleton,
+    Empty,
     App
 } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -46,7 +49,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { syncData } from '../../utils/sync';
 import { supabase } from '../../utils/supabaseClient';
-import { formatEthiopianDate, formatEthiopianTime } from '../../utils/dateUtils';
+import { formatEthiopianDate, formatEthiopianTime, getEthiopianYear } from '../../utils/dateUtils';
 import dayjs from 'dayjs';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import StudentProfile from '../../components/StudentProfile';
@@ -101,20 +104,12 @@ const EthiopicClockWidget = () => {
     );
 };
 
-export default function TeacherDashboard() {
+export default function TeacherDashboard({ teacherSession, setTeacherSession }) {
     const location = useLocation();
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { message, notification } = App.useApp();
+    const { message, notification, modal } = App.useApp();
     const [profileStudentId, setProfileStudentId] = useState(null);
-    const [teacherSession, setTeacherSession] = useState(() => {
-        try {
-            const raw = sessionStorage.getItem('senbet_teacher_auth');
-            return raw ? JSON.parse(raw) : null;
-        } catch {
-            return null;
-        }
-    });
 
     const [syncKey, setSyncKey] = useState(0);
     useEffect(() => {
@@ -151,12 +146,6 @@ export default function TeacherDashboard() {
     if (!activeTeacher) {
         return <TeacherLogin onLogin={setTeacherSession} />;
     }
-
-    const handleTeacherLogout = () => {
-        sessionStorage.removeItem('senbet_teacher_auth');
-        setTeacherSession(null);
-        message.info(t('common.logout', 'Logged out'));
-    };
 
     const canManageAssessments = !!(activeTeacher?.canCreateAssessments ?? activeTeacher?.cancreateassessments);
 
@@ -230,9 +219,6 @@ export default function TeacherDashboard() {
                             )}
                         </div>
                     </div>
-                    <Button danger onClick={handleTeacherLogout} className="sm:self-start">
-                        {t('common.logout', 'Logout')}
-                    </Button>
                 </div>
             </Card>
             {/* Mobile Navigation */}
@@ -329,6 +315,7 @@ export default function TeacherDashboard() {
 
 function TeacherLogin({ onLogin }) {
     const { t } = useTranslation();
+    const { message } = App.useApp();
     const [form] = Form.useForm();
     const teachers = useLiveQuery(() => db.teachers?.toArray()) || [];
 
@@ -338,16 +325,16 @@ function TeacherLogin({ onLogin }) {
         const match = teachers.find(tt => String(tt.name || '').trim().toLowerCase() === name && String(tt.accessCode || '').trim() === accessCode);
 
         if (!match) {
-            message.error(t('teacher.loginError', 'Invalid teacher name or access code'));
+            message.error(t('teacher.loginError'));
             return;
         }
         sessionStorage.setItem('senbet_teacher_auth', JSON.stringify(match));
         onLogin(match);
-        message.success(t('teacher.loginSuccess', 'Welcome'));
+        message.success(t('teacher.loginSuccess'));
     };
 
     return (
-        <div className="max-w-md mx-auto py-10">
+        <div className="flex-1 flex items-center justify-center w-full py-10">
             <Card className="shadow-xl rounded-2xl border-slate-200 dark:border-slate-800">
                 <Title level={3} style={{ marginTop: 0 }}>{t('teacher.portalLogin', 'Teacher Portal Login')}</Title>
                 <Text type="secondary">{t('teacher.portalLoginDesc', 'Enter your access code provided by the admin.')}</Text>
@@ -356,20 +343,20 @@ function TeacherLogin({ onLogin }) {
                     <Form.Item
                         name="teacherName"
                         label={<span className="dark:text-white">{t('admin.name', 'Name')}</span>}
-                        rules={[{ required: true, message: 'Please enter your name' }]}
+                        rules={[{ required: true, message: t('teacher.enterNameRequired') }]}
                     >
                         <Input 
-                            placeholder="Full name" 
+                            placeholder={t('teacher.fullNamePlaceholder')} 
                             className="dark:bg-slate-800 dark:text-white dark:border-slate-700 dark:placeholder:text-slate-500 h-12 rounded-xl"
                         />
                     </Form.Item>
                     <Form.Item
                         name="accessCode"
                         label={<span className="dark:text-white">{t('parent.accessCode', 'Access Code')}</span>}
-                        rules={[{ required: true, message: 'Please enter your access code' }]}
+                        rules={[{ required: true, message: t('teacher.enterCodeRequired') }]}
                     >
                         <Input.Password 
-                            placeholder="6-digit code" 
+                            placeholder={t('teacher.accessCodePlaceholder')} 
                             maxLength={6} 
                             className="dark:bg-slate-800 dark:text-white dark:border-slate-700 dark:placeholder:text-slate-500 h-12 rounded-xl"
                         />
@@ -384,18 +371,18 @@ function TeacherLogin({ onLogin }) {
                             <WarningOutlined /> {t('teacher.noDataFound', 'No teacher data found locally.')}
                         </Text>
                         <Paragraph className="text-xs text-center text-slate-500 mb-4">
-                            You might need to sync with the cloud to download teacher accounts.
+                            {t('teacher.syncNeededDesc')}
                         </Paragraph>
                         <Button 
                             block 
                             icon={<CloudSyncOutlined />} 
                             onClick={async () => {
-                                message.loading('Syncing with cloud...', 1.5);
+                                message.loading(t('common.syncingCloud'), 1.5);
                                 await syncData();
                                 window.dispatchEvent(new Event('syncComplete'));
                             }}
                         >
-                            Sync From Cloud
+                            {t('teacher.syncFromCloud')}
                         </Button>
                     </div>
                 )}
@@ -479,8 +466,13 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const assessmentsForGrade = allAssessments.filter(a => {
         const subject = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(a.subjectName));
         const assessmentSemester = subject?.semester || 'Semester I';
+        const currentYear = settingsRows.find(s => s.key === 'currentAcademicYear')?.value;
+        const targetYearNum = currentYear ? getEthiopianYear(currentYear) : null;
+        const assessmentYearNum = a.academicYear ? getEthiopianYear(a.academicYear) : null;
+
         return normalizeGrade(a.grade) === normalizeGrade(selectedGrade) &&
             assessmentSemester === currentSemesterSetting &&
+            (!targetYearNum || assessmentYearNum === targetYearNum) &&
             (allowedGrades.length === 0 || allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(a.grade))) &&
             (allowedSubjects.length === 0 || normalizedAllowedSubjects.includes(normalizeSubject(a.subjectName)));
     });
@@ -535,6 +527,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
     const studentsInGrade = teacherStudents
         .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
+        .filter(s => s.archived !== 1) // Exclude archived/graduated students
         .filter(s => {
             if (!searchQuery) return true;
             const q = searchQuery.toLowerCase();
@@ -683,6 +676,9 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 const value = marksToUse[studentId];
                 const score = parseFloat(value);
 
+                const student = allStudents.find(s => s.id === studentId);
+                const studentYear = student?.academicYear;
+
                 const allExisting = await db.marks
                     .where('[studentId+assessmentId]').equals([studentId, selectedAssessmentId])
                     .toArray();
@@ -713,7 +709,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 }
 
                 if (score > selectedAssessment.maxScore) {
-                    message.error(`❌ Mark for ${studentId} exceeds max score of ${selectedAssessment.maxScore}. Mark ignored.`);
+                    message.error(t('teacher.markExceedsMax', { max: selectedAssessment.maxScore }));
                     continue;
                 }
 
@@ -723,6 +719,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         subject: selectedAssessment.subjectName,
                         assessmentDate: selectedAssessment.date,
                         semester: currentSemesterSetting,
+                        academicYear: studentYear || existingMark.academicYear,
                         markedBy: teacher.id,
                         synced: 0,
                         updated_at: new Date().toISOString()
@@ -746,6 +743,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         markedBy: teacher.id,
                         synced: 0,
                         semester: currentSemesterSetting,
+                        academicYear: studentYear,
                         updated_at: new Date().toISOString()
                     });
                 }
@@ -795,7 +793,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     />
                 </div>
             ),
-            onOk: async () => {
+            onOk: () => {
                 const val = window._tempBulkValue;
                 if (val === undefined || val === '') return;
                 if (val > selectedAssessment.maxScore) {
@@ -815,11 +813,15 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 setMarks(newMarks);
                 setModifiedMarks(newlyModified);
                 
-                // Immediate Auto-save
-                await handleSaveMarks(newMarks, newlyModified);
-                
-                message.success(t('teacher.fillSuccess', { count }));
-                await syncData().catch(console.error);
+                // Background execute to make modal snappy
+                (async () => {
+                    try {
+                        await handleSaveMarks(newMarks, newlyModified);
+                        message.success(t('teacher.fillSuccess', { count }));
+                    } catch (e) {
+                        console.error("Fill failed:", e);
+                    }
+                })();
                 delete window._tempBulkValue;
             }
         });
@@ -832,29 +834,41 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         const hasMarksToClear = studentsInGrade.some(s => marks[s.id] !== undefined && marks[s.id] !== '');
         
         if (!hasMarksToClear) {
-            message.info(t('teacher.alreadyCleared', 'All marks for this assessment are already cleared.'));
+            message.info(t('teacher.alreadyCleared'));
             return;
         }
 
         modal.confirm({
-            title: t('teacher.clearAllMarks', 'Clear All Marks?'),
-            content: t('teacher.confirmClearAll', 'This will remove all marks for the current assessment. This action cannot be undone once saved.'),
-            okText: t('common.yes', 'Yes, Clear All'),
+            title: t('teacher.clearAllMarks'),
+            content: t('teacher.confirmClearAll'),
+            okText: t('teacher.yesClearAll'),
             okType: 'danger',
-            onOk: async () => {
+            onOk: () => {
                 const newMarks = { ...marks };
                 const newlyModified = new Set(modifiedMarks);
-                for (const student of studentsInGrade) {
+                
+                // Fix: Clear ALL students in grade, not just those currently filtered by search UI
+                const studentsToClear = teacherStudents.filter(s => 
+                    normalizeGrade(s.grade) === normalizeGrade(selectedGrade) && 
+                    s.archived !== 1
+                );
+
+                for (const student of studentsToClear) {
                     newMarks[student.id] = '';
                     newlyModified.add(student.id);
                 }
                 setMarks(newMarks);
                 setModifiedMarks(newlyModified);
                 
-                // Immediate Auto-save
-                await handleSaveMarks(newMarks, newlyModified);
-                
-                message.success(t('teacher.clearSuccess', 'Marks cleared for this assessment.'));
+                // Background execute to make modal snappy
+                (async () => {
+                    try {
+                        await handleSaveMarks(newMarks, newlyModified);
+                        message.success(t('teacher.clearSuccess'));
+                    } catch (e) {
+                        console.error("Clear failed:", e);
+                    }
+                })();
             }
         });
     };
@@ -895,59 +909,68 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         }
 
         if (studentsWithHistory.length === 0) {
-            message.warning(t('teacher.noHistoryFound', 'No mark history found for these students in this subject. Predictions cannot be made.'));
+            message.warning(t('teacher.noHistoryFound'));
             return;
         }
 
         modal.confirm({
             title: t('teacher.predictMarks'),
             content: t('teacher.confirmPredict', { count: studentsWithHistory.length, subject: selectedAssessment.subjectName }),
-            onOk: async () => {
-                const predictions = [];
-                const normS = (s) => String(s || "").trim().toLowerCase().normalize('NFC');
-                const targetSubject = normS(selectedAssessment.subjectName);
-                const allAssMap = new Map((assessmentsData || []).map(a => [a.id, normS(a.subjectName)]));
-
-                for (const student of studentsWithHistory) {
-                    // Find all marks for this student
-                    const studentMarks = await db.marks.where('studentId').equals(student.id).toArray();
+            onOk: () => {
+                // Background Execute to close modal instantly
+                (async () => {
+                    const normS = (s) => String(s || "").trim().toLowerCase().normalize('NFC');
+                    const targetSubject = normS(selectedAssessment.subjectName);
+                    const allAssMap = new Map((assessmentsData || []).map(a => [a.id, normS(a.subjectName)]));
                     
-                    // Strictly limit to the same subject (using the same robust check as above)
-                    const subjectMarks = studentMarks.filter(m => {
-                        const markSub = normS(m.subject);
-                        if (markSub === targetSubject) return true;
-                        
-                        const assessmentSub = allAssMap.get(m.assessmentId);
-                        return assessmentSub === targetSubject;
-                    });
+                    // Bulk fetch ALL marks for these students in one go for 10x performance
+                    const studentIds = studentsWithHistory.map(s => s.id);
+                    const allRecentMarks = await db.marks.where('studentId').anyOf(studentIds).toArray();
+                    
+                    // Group marks by student for easy lookup
+                    const marksByStudent = allRecentMarks.reduce((acc, m) => {
+                        if (!acc[m.studentId]) acc[m.studentId] = [];
+                        acc[m.studentId].push(m);
+                        return acc;
+                    }, {});
 
-                    if (subjectMarks.length > 0) {
-                        // Calculate average percentage
-                        let totalPercentage = 0;
-                        let validCount = 0;
-                        for (const m of subjectMarks) {
-                            const assessment = allAssessments.find(a => a.id === m.assessmentId);
-                            // Fallback maxScore: if assessment not found, assume 100 or check if mark has it (unlikely)
-                            const maxScore = assessment?.maxScore || 100; 
-                            if (maxScore > 0) {
-                                totalPercentage += (Number(m.score) / maxScore);
-                                validCount++;
+                    const predictions = [];
+                    for (const student of studentsWithHistory) {
+                        const studentMarks = marksByStudent[student.id] || [];
+                        
+                        const subjectMarks = studentMarks.filter(m => {
+                            const markSub = normS(m.subject);
+                            if (markSub === targetSubject) return true;
+                            const assessmentSub = allAssMap.get(m.assessmentId);
+                            return assessmentSub === targetSubject;
+                        });
+
+                        if (subjectMarks.length > 0) {
+                            let totalPercentage = 0;
+                            let validCount = 0;
+                            for (const m of subjectMarks) {
+                                const assessment = allAssessments.find(a => a.id === m.assessmentId);
+                                const maxScore = assessment?.maxScore || 100; 
+                                if (maxScore > 0) {
+                                    totalPercentage += (Number(m.score) / maxScore);
+                                    validCount++;
+                                }
+                            }
+                            if (validCount > 0) {
+                                const avgPercentage = totalPercentage / validCount;
+                                const predictedScore = Math.round(avgPercentage * selectedAssessment.maxScore * 10) / 10;
+                                predictions.push({ id: student.id, score: predictedScore });
                             }
                         }
-                        if (validCount > 0) {
-                            const avgPercentage = totalPercentage / validCount;
-                            const predictedScore = Math.round(avgPercentage * selectedAssessment.maxScore * 10) / 10;
-                            predictions.push({ id: student.id, score: predictedScore });
-                        }
                     }
-                }
 
-                let count = 0;
-                for (const p of predictions) {
-                    handleMarkChange(p.id, p.score.toString());
-                    count++;
-                }
-                message.success(t('teacher.predictSuccess', { count }));
+                    let count = 0;
+                    for (const p of predictions) {
+                        handleMarkChange(p.id, p.score.toString());
+                        count++;
+                    }
+                    message.success(t('teacher.predictSuccess', { count }));
+                })();
             }
         });
     };
@@ -1085,7 +1108,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                         onClick={() => navigate('/teacher/assessments')}
                                         className="w-full h-10 rounded-xl"
                                     >
-                                        {t('admin.assessments', 'Assessments')}
+                                        {t('admin.assessments')}
                                     </Button>
                                 </Form.Item>
                             </Col>
@@ -1107,7 +1130,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
             <div className="flex flex-col sm:flex-row items-center gap-4 mt-6 mb-4 w-full">
                 <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
-                    {t('teacher.studentsList', 'Students List')}
+                    {t('teacher.studentsList')}
                     <Tag color="blue" style={{ marginLeft: '12px' }}>
                         {selectedAssessmentId
                             ? (searchQuery
@@ -1118,7 +1141,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 </Title>
                 <div className="hidden sm:block flex-grow border-t border-slate-200 dark:border-slate-700 mx-2"></div>
                 <Input
-                    placeholder={t('common.search', 'Search students...')}
+                    placeholder={t('common.searchPlaceholder')}
                     prefix={<SearchOutlined className="text-slate-400" />}
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
@@ -1135,7 +1158,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                             loading={isSaving}
                             disabled={!selectedAssessmentId || studentsInGrade.length === 0}
                         >
-                            {t('common.save', 'Save Marks')}
+                            {t('teacher.saveMarks')}
                         </Button>
                         <Button
                             icon={<BarChartOutlined />}
@@ -1152,12 +1175,12 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                             {t('teacher.fillConstant')}
                         </Button>
                         <Button
-                            icon={<DeleteOutlined />}
+                            icon={<ClearOutlined />}
                             danger
                             onClick={handleClearAssessmentMarks}
                             disabled={!selectedAssessmentId || studentsInGrade.length === 0 || isSaving}
                         >
-                            {t('teacher.clearAll', 'Clear All')}
+                            {t('teacher.clearMarks')}
                         </Button>
                     </Space>
                 )}
@@ -1171,7 +1194,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     </div>
                 ) : !selectedAssessmentId ? (
                     <div className="p-10">
-                        <Empty description={t('teacher.selectAssessment', 'Select an assessment to start entering marks.')} />
+                        <Empty description={t('teacher.selectAssessmentPrompt')} />
                     </div>
                 ) : (
                     <Table
@@ -1192,7 +1215,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                             pageSizeOptions: ['10', '20', '50', '100'],
                             showQuickJumper: true,
                             position: ['bottomRight'],
-                            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                            showTotal: (total, range) => `${range[0]}-${range[1]} ${t('admin.target')} ${total}`,
                         }}
                         scroll={{ x: 'max-content', y: 500 }}
                         className="students-table w-full"
@@ -1353,7 +1376,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
     const handleSaveAttendance = async () => {
         if (!attendanceDate) return;
         if (modifiedAttendance.size === 0) {
-            message.info(t('teacher.noChanges', 'No changes to save.'));
+            message.info(t('teacher.noChanges'));
             return;
         }
 
@@ -1362,6 +1385,9 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             const idsToDelete = [];
             for (const studentId of modifiedAttendance) {
                 const status = attendance[studentId];
+                const student = allStudents.find(s => s.id === studentId);
+                const studentYear = student?.academicYear;
+
                 const allExisting = await db.attendance
                     .where('[studentId+date]')
                     .equals([studentId, attendanceDate])
@@ -1419,11 +1445,11 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             }
 
             setModifiedAttendance(new Set());
-            message.success(t('teacher.saveSuccess', 'Attendance saved successfully!'));
+            message.success(t('teacher.saveSuccess'));
             syncData().catch(console.error);
         } catch (err) {
             console.error("Attendance save failed:", err);
-            message.error(t('teacher.saveError', 'Failed to save attendance!'));
+            message.error(t('teacher.saveError'));
         } finally {
             setIsSaving(false);
         }
@@ -1433,7 +1459,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
         for (const student of studentsInGrade) {
             handleAttendanceChange(student.id, 'present');
         }
-        message.success(t('teacher.markAllPresentSuccess', 'Successfully marked all as present locally. Click Save to persist.'));
+        message.success(t('teacher.markAllPresentSuccess'));
     };
 
     const handleClearAttendance = () => {
@@ -1451,7 +1477,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                 return next;
             });
         }
-        message.success(t('teacher.attendanceCleared', 'Attendance cleared locally. Click Save to persist.'));
+        message.success(t('teacher.attendanceCleared'));
     };
 
     const handleScanSuccess = async (decodedText) => {
@@ -1464,7 +1490,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
 
         // Only record if student is in the selected grade (or if no grade selected, just record it)
         if (selectedGrade && normalizeGrade(student.grade) !== normalizeGrade(selectedGrade)) {
-            message.warning(`Student is from ${formatGrade(student.grade)}, not ${formatGrade(selectedGrade)}`);
+            message.warning(t('teacher.studentWrongGrade', { from: formatGrade(student.grade), to: formatGrade(selectedGrade) }));
             // Still record it though, as they are present
         }
 
@@ -1565,7 +1591,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                                         style={{ width: '100%' }}
                                         size="large"
                                         options={gradeOptions2}
-                                        placeholder="Choose a grade"
+                                        placeholder={t('teacher.chooseGrade')}
                                         allowClear
                                     />
                                 </Space>
@@ -1585,7 +1611,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                                         style={{ width: '100%' }}
                                         size="large"
                                         options={subjectOptions2}
-                                        placeholder="Choose a subject"
+                                        placeholder={t('teacher.chooseSubject')}
                                         disabled={!selectedGrade}
                                         allowClear
                                     />
@@ -1603,7 +1629,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                                             onChange={setSelectedAssessmentId}
                                             style={{ width: '100%' }}
                                             size="large"
-                                            placeholder="Choose an assessment"
+                                            placeholder={t('teacher.chooseAssessment')}
                                             disabled={!selectedSubject}
                                             allowClear
                                         >
@@ -1620,7 +1646,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                                 ) : (
                                     <div className="text-center w-full py-2">
                                         <Text type="secondary">
-                                            {!currentSemesterSetting ? 'Please ask admin to set Semester' : !selectedGrade ? 'First, select a grade' : 'No subjects/grades assigned to you'}
+                                            {!currentSemesterSetting ? t('teacher.askAdminSemester') : !selectedGrade ? t('teacher.selectGradeFirst') : t('teacher.noAssignedClasses')}
                                         </Text>
                                     </div>
                                 )}
@@ -1634,7 +1660,13 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                                     style={{ width: '100%' }}
                                     value={dayjs(attendanceDate)}
                                     onChange={(date) => setAttendanceDate(date ? date.format('YYYY-MM-DD') : '')}
+                                    placeholder={t('admin.selectDate')}
                                 />
+                                {attendanceDate && (
+                                    <div className="mt-1 text-xs text-slate-500 italic">
+                                        {formatEthiopianDate(attendanceDate)}
+                                    </div>
+                                )}
                             </Form.Item>
                         </Col>
                         <Col xs={24} sm={24} lg={12}>
@@ -1647,7 +1679,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                                         loading={isSaving}
                                         disabled={!selectedGrade || studentsInGrade.length === 0}
                                     >
-                                        {t('common.save', 'Save Attendance')}
+                                        {t('teacher.saveAttendance')}
                                     </Button>
                                     <Button
                                         icon={<DeleteOutlined />}
@@ -1675,7 +1707,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
 
             <div className="flex flex-col sm:flex-row items-center gap-4 mt-6 mb-4 w-full">
                 <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
-                    {t('teacher.studentsList', 'Students List')}
+                    {t('teacher.studentsList')}
                     <Tag color="blue" style={{ marginLeft: '12px' }}>
                         {searchQuery
                             ? `${studentsInGrade.length} / ${teacherStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade)).length}`
@@ -1710,7 +1742,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                             pageSizeOptions: ['10', '20', '50', '100'],
                             showQuickJumper: true,
                             position: ['bottomRight'],
-                            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                            showTotal: (total, range) => `${range[0]}-${range[1]} ${t('admin.target')} ${total}`,
                         }}
                         scroll={{ x: 'max-content', y: 500 }}
                         className="students-table w-full"
@@ -1725,13 +1757,13 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
             {/* Standardized "Coming Soon" Overlay */}
             <div className="coming-soon-overlay">
                 <div className="coming-soon-badge">
-                    {t('common.comingSoon', 'Coming Soon')}
+                    {t('common.comingSoon')}
                 </div>
                 <div className="coming-soon-text">
-                    {t('teacher.attendanceModuleStatus', 'Attendance tracking will be enabled in a future update.')}
+                    {t('teacher.attendanceModuleStatus')}
                 </div>
                 <div className="mt-2 text-slate-500 dark:text-slate-400 text-xs font-medium italic">
-                    Feature currently in development
+                    {t('teacher.featureInDevelopment')}
                 </div>
             </div>
         </div>
@@ -1781,7 +1813,7 @@ function QRScanner({ onScanSuccess }) {
                         onClick={() => setIsScanning(false)}
                         className="rounded-full px-12 uppercase tracking-widest text-xs font-bold"
                     >
-                        {t('teacher.stopScanning', 'Stop Camera')}
+                        {t('teacher.stopScanning')}
                     </Button>
                 </div>
             )}

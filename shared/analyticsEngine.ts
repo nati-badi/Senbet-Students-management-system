@@ -132,16 +132,22 @@ export const calculateSingleStudentRank = (
     // Skip conduct
     if (isConductAssessment(a)) return false;
 
-    // Check semester logic
     const sName = a.subjectName || a.subjectname;
     const subjectObj = subjects.find(s => normalizeSubject(s.name) === normalizeSubject(sName));
     const subjSem = subjectObj?.semester || 'Semester I';
 
+    // YEAR FILTERING: Assessments are passed here already filtered by year in most cases,
+    // but if not, we should keep those that match or are untagged.
+    
     if (activeSemester === 'Semester I') {
       return subjSem === 'Semester I';
     }
     // Semester II is cumulative (includes both Sem I and Sem II subjects)
     return true; 
+  }).filter(a => {
+    // If we're performing a year-specific calculation (optional)
+    // currently filtered at caller level, but we add safety here
+    return true;
   });
 
   if (filteredAssessments.length === 0) {
@@ -194,9 +200,10 @@ export const calculateSubjectRows = (
 
   const gradeNorm = normalizeGrade(student.grade);
   
-  const gradeAssessments = assessments.filter(a => 
-    normalizeGrade(a.grade) === gradeNorm && !isConductAssessment(a)
-  );
+  const gradeAssessments = assessments.filter(a => {
+    const isTargetGrade = !student.grade || normalizeGrade(a.grade) === gradeNorm;
+    return isTargetGrade && !isConductAssessment(a);
+  });
 
   const uniqueSubjectNames = [...new Set(gradeAssessments.map(a => a.subjectName || a.subjectname))].sort();
 

@@ -20,6 +20,9 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
         return () => window.removeEventListener('syncComplete', handleSync);
     }, []);
 
+    const settings = useLiveQuery(() => db.settings.toArray(), [syncKey]) || [];
+    const currentYear = settings.find(s => s.key === 'currentAcademicYear')?.value;
+
     const students = useLiveQuery(() => db.students.toArray(), [syncKey]) || [];
     const marks = useLiveQuery(() => db.marks.toArray(), [syncKey]) || [];
     const assessments = useLiveQuery(() => db.assessments.toArray(), [syncKey]) || [];
@@ -52,6 +55,10 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
         if (!students.length || !marks.length || !assessments.length) return [];
 
         const semesterAssessments = assessments.filter(a => {
+            // New: Filter by Academic Year
+            const matchesYear = !currentYear || a.academicYear === currentYear;
+            if (!matchesYear) return false;
+
             const subject = subjects.find(s => s.name === a.subjectName || s.name === a.subjectname);
             const subjSem = subject?.semester || 'Semester I';
             
@@ -108,7 +115,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
 
     const columns = [
         {
-            title: 'Rank',
+            title: t('admin.rank'),
             key: 'rank',
             width: 80,
             align: 'center',
@@ -124,12 +131,12 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
         { title: t('admin.name'), dataIndex: 'name', key: 'name', render: (text) => <span className="font-bold">{text}</span> },
         { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => <Tag color="blue">{formatGrade(text)}</Tag> },
         { 
-            title: 'Score', 
+            title: t('admin.score'), 
             key: 'score', 
             render: (_, r) => <span className="text-slate-500">{r.totalScore.toFixed(1)} / {r.totalMax}</span> 
         },
         { 
-            title: 'Average', 
+            title: t('admin.average'), 
             dataIndex: 'percentage', 
             key: 'percentage',
             render: (val) => {
@@ -140,7 +147,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
             }
         },
         {
-            title: 'Attendance',
+            title: t('admin.attendance'),
             dataIndex: 'attendanceRate',
             key: 'attendanceRate',
             render: () => <span className="coming-soon-content-blur text-slate-300">88%</span>
@@ -151,22 +158,22 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
         <div className="flex flex-col gap-6 w-full">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <Title level={2} style={{ margin: 0 }}>
+                    <h2 className="text-2xl font-bold m-0 flex items-center">
                         <BarChartOutlined className="mr-3 text-blue-500" />
                         {t('admin.analyticsDashboard', 'Student Analytics')}
-                    </Title>
-                    <Text type="secondary">View top-performing students and class statistics.</Text>
+                    </h2>
+                    <span className="text-slate-500">{t('admin.viewPerformingStudents', 'View top-performing students and class statistics.')}</span>
                 </div>
                 
                 <Space className="bg-white dark:bg-slate-900 p-2 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
                     <Select 
                         value={selectedSemester} 
                         onChange={setSelectedSemester} 
-                        className="w-32" 
+                        className="w-40" 
                         bordered={false}
                     >
-                        <Option value="Semester I">Semester I</Option>
-                        <Option value="Semester II">Semester II</Option>
+                        <Option value="Semester I">{t('admin.semester1')}</Option>
+                        <Option value="Semester II">{t('admin.semester2')}</Option>
                     </Select>
                     <Divider type="vertical" className="h-6" />
                     <Select 
@@ -176,7 +183,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                         bordered={false}
                         showSearch
                     >
-                        <Option value="All">All Subjects</Option>
+                        <Option value="All">{t('admin.allSubjects')}</Option>
                         {[...new Set(subjects.filter(s => s.semester === selectedSemester).map(s => s.name))].map(sub => (
                             <Option key={sub} value={sub}>{sub}</Option>
                         ))}
@@ -185,11 +192,11 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                     <Select 
                         value={selectedGrade} 
                         onChange={setSelectedGrade} 
-                        className="w-40" 
+                        className="w-48" 
                         bordered={false}
                         showSearch
                     >
-                        <Option value="All">Overall School (All Grades)</Option>
+                        <Option value="All">{t('admin.overallSchool')}</Option>
                         {gradeOptions.map(g => (
                             <Option key={g.value} value={g.value}>{g.label}</Option>
                         ))}
@@ -204,9 +211,9 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                             <TrophyOutlined style={{ fontSize: '120px' }} />
                         </div>
                         <div className="relative z-10">
-                            <Text className="text-blue-100 font-bold uppercase tracking-wider text-xs">Category Average</Text>
-                            <div className="text-5xl font-black mt-2 mb-1">{schoolAverage.toFixed(1)}%</div>
-                            <Text className="text-blue-100 text-sm">Target {selectedSemester}</Text>
+                        <span className="text-blue-100 font-bold uppercase tracking-wider text-xs">{t('admin.categoryAverage')}</span>
+                        <div className="text-5xl font-black mt-2 mb-1">{schoolAverage.toFixed(1)}%</div>
+                        <span className="text-blue-100 text-sm">{t('admin.target')} {t(selectedSemester === 'Semester I' ? 'admin.semester1' : 'admin.semester2')}</span>
                         </div>
                     </Card>
                 </Col>
@@ -216,9 +223,9 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                             <TeamOutlined style={{ fontSize: '120px' }} />
                         </div>
                         <div className="relative z-10">
-                            <Text className="text-green-100 font-bold uppercase tracking-wider text-xs">Total Ranked Students</Text>
+                            <span className="text-green-100 font-bold uppercase tracking-wider text-xs">{t('admin.totalRankedStudents')}</span>
                             <div className="text-5xl font-black mt-2 mb-1">{studentRankings.length}</div>
-                            <Text className="text-green-100 text-sm">With recorded marks</Text>
+                            <span className="text-green-100 text-sm">{t('admin.withRecordedMarks')}</span>
                         </div>
                     </Card>
                 </Col>
@@ -228,13 +235,13 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                             <StarOutlined style={{ fontSize: '120px' }} />
                         </div>
                         <div className="relative z-10">
-                            <Text className="text-purple-100 font-bold uppercase tracking-wider text-xs">Top Performer</Text>
+                            <span className="text-purple-100 font-bold uppercase tracking-wider text-xs">{t('admin.topPerformer')}</span>
                             <div className="text-3xl font-black mt-2 mb-1 truncate">
-                                {top10Students.length > 0 ? top10Students[0].name : 'N/A'}
+                                {top10Students.length > 0 ? top10Students[0].name : t('common.na')}
                             </div>
-                            <Text className="text-purple-100 text-sm">
-                                {top10Students.length > 0 ? `${top10Students[0].percentage.toFixed(1)}% Average` : 'No data'}
-                            </Text>
+                            <span className="text-purple-100 text-sm">
+                                {top10Students.length > 0 ? `${top10Students[0].percentage.toFixed(1)}% ${t('admin.average')}` : t('common.noData')}
+                            </span>
                         </div>
                     </Card>
                 </Col>
@@ -246,7 +253,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                         <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
                             <LineChartOutlined className="text-blue-600" />
                         </div>
-                        <span className="font-bold text-lg">Top 10 Students Leaderboard</span>
+                        <span className="font-bold text-lg">{t('admin.top10Leaderboard')}</span>
                         {selectedGrade !== 'All' && <Tag color="blue" className="ml-2">{formatGrade(selectedGrade)}</Tag>}
                     </Space>
                 }
@@ -263,7 +270,10 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                     />
                 ) : (
                     <div className="p-12 text-center text-slate-400">
-                        <Empty description={`No mark data found for ${selectedGrade === 'All' ? 'the school' : formatGrade(selectedGrade)} in ${selectedSemester}`} />
+                        <Empty description={t('common.noMarkDataFound', { 
+                            scope: selectedGrade === 'All' ? t('admin.overallSchool') : formatGrade(selectedGrade),
+                            semester: t(selectedSemester === 'Semester I' ? 'admin.semester1' : 'admin.semester2')
+                        })} />
                     </div>
                 )}
             </Card>

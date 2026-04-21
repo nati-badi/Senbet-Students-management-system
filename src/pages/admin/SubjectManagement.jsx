@@ -44,7 +44,7 @@ export default function SubjectManagement() {
             setIsFormModalOpen(false);
             await syncData().catch(console.error);
         } catch (err) {
-            message.error("Error saving subject");
+            message.error(t('admin.subjectSaveError'));
         }
     };
 
@@ -65,7 +65,7 @@ export default function SubjectManagement() {
             message.success(t('admin.subjectDeleted'));
             await syncData().catch(console.error);
         } catch (err) {
-            message.error("Failed to delete subject");
+            message.error(t('admin.subjectDeleteError'));
         }
     };
 
@@ -196,7 +196,7 @@ export default function SubjectManagement() {
                     pageSizeOptions: ['10', '20', '50', '100'],
                     showQuickJumper: true,
                     position: ['bottomRight'],
-                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} ${t('common.paginationOf')} ${total}`,
                 }}
                 className="shadow-sm rounded-xl overflow-hidden"
             />

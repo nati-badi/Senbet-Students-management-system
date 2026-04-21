@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import dayjs from 'dayjs';
 import { db } from '../../db/database';
 import { formatGrade, normalizeGrade } from '../../utils/gradeUtils';
+import { formatEthiopianDate } from '../../utils/dateUtils';
 
 const { Title, Text } = Typography;
 
@@ -49,11 +50,11 @@ export default function TeacherAssessmentManagement({ teacher }) {
         try {
             // Extra security check: ensure the teacher is actually assigned to this grade/subject
             if (!myGrades.some(g => normalizeGrade(g) === normalizeGrade(values.grade))) {
-                message.error("You are not authorized to create assessments for this grade.");
+                message.error(t('teacher.notAuthorizedGrade'));
                 return;
             }
             if (!mySubjects.some(ms => normalizeSubject(ms) === normalizeSubject(values.subjectName))) {
-                message.error("You are not authorized to create assessments for this subject.");
+                message.error(t('teacher.notAuthorizedSubject'));
                 return;
             }
 
@@ -88,7 +89,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
             setEditingId(null);
             setIsFormModalOpen(false);
         } catch (err) {
-            message.error("Error saving assessment");
+            message.error(t('teacher.saveError'));
         }
     };
 
@@ -107,7 +108,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'assessments', recordId: id });
             message.success(t('admin.assessmentDeleted'));
         } catch (err) {
-            message.error("Failed to delete assessment");
+            message.error(t('teacher.deleteError'));
         }
     };
 
@@ -117,7 +118,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
         { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
         { title: t('admin.maxScore'), dataIndex: 'maxScore', key: 'maxScore' },
         { 
-            title: t('admin.semester', 'Semester'), 
+            title: t('admin.semester'), 
             key: 'semester', 
             render: (_, record) => {
                 const subject = allSubjects.find(s => s.name === record.subjectName && normalizeGrade(s.grade) === normalizeGrade(record.grade));
@@ -125,7 +126,12 @@ export default function TeacherAssessmentManagement({ teacher }) {
                 return <Tag color="gold">{t(`admin.${sem === 'Semester II' ? 'semester2' : 'semester1'}`, sem)}</Tag>;
             }
         },
-        { title: t('teacher.date'), dataIndex: 'date', key: 'date' },
+        { 
+            title: t('teacher.date'), 
+            dataIndex: 'date', 
+            key: 'date',
+            render: (text) => formatEthiopianDate(text)
+        },
         {
             title: t('common.actions'),
             key: 'actions',
@@ -162,8 +168,8 @@ export default function TeacherAssessmentManagement({ teacher }) {
         <div className="flex flex-col gap-6 w-full">
             <div className="flex justify-between items-center bg-white dark:bg-slate-900/50 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
                 <div>
-                    <Title level={2} style={{ margin: 0 }}>{t('teacher.myAssessments', 'My Assessments')}</Title>
-                    <Text type="secondary">{t('teacher.manageClasses', 'Create and manage your class assessments')}</Text>
+                    <Title level={2} style={{ margin: 0 }}>{t('teacher.myAssessments')}</Title>
+                    <Text type="secondary">{t('teacher.manageClasses')}</Text>
                 </div>
                 <Button 
                     type="primary" 
@@ -177,7 +183,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
             </div>
 
             <Modal
-                title={<Title level={3} className="m-0">{editingId ? t('admin.editAssessment') : t('admin.addAssessment')}</Title>}
+                title={<Title level={3} className="m-0">{editingId ? t('teacher.editAssessment') : t('admin.addAssessment')}</Title>}
                 open={isFormModalOpen}
                 onCancel={closeModal}
                 footer={null}
@@ -198,7 +204,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
                                     <Select 
                                         options={availableGradeOptions} 
                                         showSearch 
-                                        placeholder={t('admin.selectGrade', 'Select Grade')}
+                                        placeholder={t('admin.selectGrade')}
                                         onChange={() => {
                                             form.setFieldsValue({ subjectName: undefined });
                                         }}
@@ -252,7 +258,12 @@ export default function TeacherAssessmentManagement({ teacher }) {
                                     name="date"
                                     label={t('teacher.date')}
                                 >
-                                    <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} className="h-10" />
+                                    <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} placeholder={t('admin.selectDate')} className="h-10" />
+                                    {form.getFieldValue('date') && (
+                                        <div className="mt-1 text-xs text-slate-500 italic">
+                                            {formatEthiopianDate(form.getFieldValue('date').toDate())}
+                                        </div>
+                                    )}
                                 </Form.Item>
                             </Col>
                         </Row>
@@ -279,7 +290,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
                     pageSizeOptions: ['10', '20', '50', '100'],
                     showQuickJumper: true,
                     position: ['bottomRight'],
-                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} ${t('admin.target')} ${total}`,
                 }}
                 className="shadow-sm rounded-xl overflow-hidden"
             />

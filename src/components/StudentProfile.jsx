@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Modal, Descriptions, Card, Table, Tag, Space, Typography, Row, Col, Statistic, Empty, Tabs, Alert, Tooltip, Divider } from 'antd';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Modal, Descriptions, Card, Table, Tag, Space, Typography, Row, Col, Statistic, Empty, Tabs, Alert, Tooltip, Divider, Select, Skeleton } from 'antd';
 import {
     UserOutlined,
     CheckCircleOutlined,
@@ -52,6 +52,7 @@ const EthiopianCross = ({ className }) => (
 
 const StudentProfile = ({ studentId, visible, onClose }) => {
     const { t } = useTranslation();
+    const [selectedYear, setSelectedYear] = useState(null);
 
     const student = useLiveQuery(() =>
         studentId ? db.students.get(studentId) : null
@@ -88,6 +89,48 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     const totalAbsent = attendanceRecords?.filter(r => r.status === 'absent').length || 0;
     const totalNoClass = attendanceRecords?.filter(r => r.status === 'no_class').length || 0;
 
+    // Set default year when student loads
+    useEffect(() => {
+        if (student?.academicYear && !selectedYear) {
+            setSelectedYear(student.academicYear);
+        }
+    }, [student, selectedYear]);
+
+    // Discover all years the student has records for
+    const availableYears = useMemo(() => {
+        // Collect all raw year strings from student and marks
+        const rawYears = new Set();
+        if (student?.academicYear) rawYears.add(student.academicYear);
+        marks.forEach(m => {
+            if (m.academicYear) rawYears.add(m.academicYear);
+        });
+
+        // Deduplicate by the RESULT of getEthiopianYear to prevent visual duplicates
+        const yearMap = new Map();
+        rawYears.forEach(y => {
+            const etYear = getEthiopianYear(y);
+            // Skip invalid or placeholder years
+            if (etYear === '—' || !y || String(y).length < 5) return;
+            
+            // Keep only one raw value per Ethiopian Year label
+            if (!yearMap.has(etYear)) {
+                yearMap.set(etYear, y);
+            }
+        });
+
+        // Convert back to array of raw values, sorted by date descending
+        return Array.from(yearMap.values()).sort((a, b) => b.localeCompare(a));
+    }, [student, marks]);
+
+    const activeYearToUse = useMemo(() => {
+        if (selectedYear) return selectedYear;
+        // If student year is valid, use it. Otherwise fallback to global current year.
+        if (student?.academicYear && getEthiopianYear(student.academicYear) !== '—') {
+            return student.academicYear;
+        }
+        return new Date().toISOString(); // Fallback to current system time
+    }, [selectedYear, student?.academicYear]);
+
     // Generate Heatmap Data (Last 90 days)
     const heatmapDays = useMemo(() => {
         if (!attendanceRecords) return [];
@@ -110,12 +153,33 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     // Filter assessments relevant only to this student's grade
     const studentGradeNorm = useMemo(() => normalizeGrade(student?.grade), [student]);
     const gradeAssessments = useMemo(() => {
-        if (!allAssessments || !studentGradeNorm) return [];
+        if (!allAssessments || !studentGradeNorm || !activeYearToUse) return [];
+        const targetYearNum = getEthiopianYear(activeYearToUse);
+
         return allAssessments.filter(a => {
             if (normalizeGrade(a.grade) !== studentGradeNorm) return false;
+            
+            // Resolve the year of the assessment
+            const assessmentYearNum = a.academicYear ? getEthiopianYear(a.academicYear) : null;
+            
+            // INTUITIVE MATCHING: 
+            // 1. If the assessment matches the target year exactly, show it.
+            // 2. If the assessment has NO year, it's a template; show it.
+            // 3. If we are in the current year (2018) and the assessment is from the legacy baseline (2017),
+            //    show it because it serves as the structure for the new year.
+            // 4. If we are in a historical view (e.g. looking back at 2017), only show 2017 data.
+            
+            if (assessmentYearNum === targetYearNum) return true;
+            if (!assessmentYearNum) return true;
+            
+            // Baseline Fallback: 2017 assessments are visible in 2018 as templates
+            if (assessmentYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም') return true;
+
+            return false;
+            
             return !isConductAssessment(a);
         });
-    }, [allAssessments, studentGradeNorm]);
+    }, [allAssessments, studentGradeNorm, activeYearToUse]);
 
     // Map marks to assessments
     const markHistory = useMemo(() => {
@@ -142,12 +206,37 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     }, [gradeAssessments, marks, allSubjects]);
 
     const subjectRows = useMemo(() => {
-        return calculateSubjectRows(student, allAssessments, allMarks, allSubjects, activeSemester);
-    }, [student, allAssessments, allMarks, allSubjects, activeSemester]);
+        if (!student || !activeYearToUse || !gradeAssessments.length) return [];
+        
+        const targetYearNum = getEthiopianYear(activeYearToUse);
+        const yearMarks = allMarks.filter(m => {
+            const mYearNum = m.academicYear ? getEthiopianYear(m.academicYear) : null;
+            // Match exactly OR legacy fallback
+            if (mYearNum === targetYearNum) return true;
+            if (!mYearNum) return true;
+            if (mYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም') return true;
+            return false;
+        });
+        
+        return calculateSubjectRows(student, gradeAssessments, yearMarks, allSubjects, activeSemester);
+    }, [student, gradeAssessments, allMarks, allSubjects, activeSemester, activeYearToUse]);
 
     const rankingInfo = useMemo(() => {
-        return calculateSingleStudentRank(student, allStudents, allAssessments, allMarks, activeSemester, allSubjects);
-    }, [student, allStudents, allAssessments, allMarks, activeSemester, allSubjects]);
+        if (!student || !activeYearToUse || !gradeAssessments.length) {
+            return { classRank: '—', overallRank: '—', totalInClass: 0, totalInGrade: 0 };
+        }
+
+        const targetYearNum = getEthiopianYear(activeYearToUse);
+        const yearMarks = allMarks.filter(m => {
+            const mYearNum = m.academicYear ? getEthiopianYear(m.academicYear) : null;
+            if (mYearNum === targetYearNum) return true;
+            if (!mYearNum) return true;
+            if (mYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም') return true;
+            return false;
+        });
+        
+        return calculateSingleStudentRank(student, allStudents, gradeAssessments, yearMarks, activeSemester, allSubjects);
+    }, [student, allStudents, gradeAssessments, allMarks, activeSemester, allSubjects, activeYearToUse]);
 
     const academicStats = useMemo(() => {
         const stats = rankingInfo.stats || { totalScore: 0, totalMax: 0, percentage: 0 };
@@ -224,6 +313,23 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                         </div>
                     </Col>
                 </Row>
+                {availableYears.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                        <Text strong className="text-xs text-slate-500 uppercase tracking-wider">{t('teacher.viewRecordsForYear')}:</Text>
+                        <Select 
+                            value={activeYearToUse} 
+                            onChange={setSelectedYear} 
+                            className="w-44"
+                            options={availableYears.map(y => {
+                                const etYear = getEthiopianYear(y);
+                                return { 
+                                    value: y, 
+                                    label: `📅 ${etYear} ${t('teacher.yearLabel')}` 
+                                };
+                            }).filter(o => o.label && !o.label.includes('—'))}
+                        />
+                    </div>
+                )}
             </Card>
 
             <Descriptions bordered size="small" column={{ xxl: 2, xl: 2, lg: 2, md: 2, sm: 1, xs: 1 }}>
@@ -300,7 +406,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                     {t('teacher.attendanceModuleStatus', 'Attendance tracking will be enabled in a future update.')}
                 </div>
                 <div className="mt-2 text-slate-500 dark:text-slate-400 text-xs font-medium italic">
-                    Feature currently in development
+                    {t('teacher.devFeatureStatus')}
                 </div>
             </div>
         </div>
@@ -325,7 +431,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
             {sem1Marks.length > 0 && (
                 <>
-                    <Divider orientation="left" plain className="!mt-0">Semester I</Divider>
+                    <Divider orientation="left" plain className="!mt-0">{t('teacher.semesterI')}</Divider>
                     <Table
                         dataSource={sem1Marks}
                         columns={markColumns}
@@ -339,7 +445,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
             {sem2Marks.length > 0 && (
                 <>
-                    <Divider orientation="left" plain className="!mt-2">Semester II</Divider>
+                    <Divider orientation="left" plain className="!mt-2">{t('teacher.semesterII')}</Divider>
                     <Table
                         dataSource={sem2Marks}
                         columns={markColumns}
@@ -352,7 +458,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             )}
 
             {sem1Marks.length === 0 && sem2Marks.length === 0 && (
-                <Empty description="No assessments found in this grade." className="my-8" />
+                <Empty description={t('teacher.noMarksInGrade')} className="my-8" />
             )}
         </div>
     );
@@ -368,14 +474,14 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                     {/* Header */}
                     <div className="flex flex-col items-center pt-12 pb-6 px-12 text-center">
                         <h2 className="text-2xl font-bold text-[#2c1810] mb-2 tracking-wide" style={{ fontFamily: 'serif' }}>
-                            በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት
+                            {t('app.title')}
                         </h2>
                         <p className="text-sm text-[#5c4033] font-semibold tracking-widest uppercase mb-5">
-                            የተማሪዎች ውጤት መግለጫ
+                            {t('teacher.transcriptSubtitle')}
                         </p>
                         <div className="w-24 h-[2px] bg-gradient-to-r from-transparent via-[#d4af37] to-transparent mb-5" />
                         <p className="text-base font-extrabold text-[#1a3a6b] tracking-[0.25em] uppercase">
-                            ACADEMIC TRANSCRIPT
+                            {t('teacher.academicTranscript')}
                         </p>
                     </div>
 
@@ -383,23 +489,23 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                     <div className="px-12 pb-10">
                         <div className="flex justify-between items-end border-b border-[#e8dfce] pb-6 mb-10">
                             <div className="flex flex-col gap-1">
-                                <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">ሙሉ ስም / NAME</span>
+                                <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">{t('teacher.fullNameLabel')} / NAME</span>
                                 <span className="text-2xl font-bold text-[#2c1810] mt-1">{student?.name}</span>
                                 {!!(student?.baptismalName || student?.baptismalname) && (
                                     <span className="text-sm italic text-[#5c4033] mt-1">
-                                        የክርስትና ስም: {student.baptismalName || student.baptismalname}
+                                        {t('teacher.baptismalNameLabel')}: {student.baptismalName || student.baptismalname}
                                     </span>
                                 )}
                             </div>
                             <div className="flex gap-16 text-right">
                                 <div className="flex flex-col gap-1">
-                                    <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">ክፍል / GRADE</span>
+                                    <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">{t('teacher.gradeLabel')} / GRADE</span>
                                     <span className="text-2xl font-bold text-[#2c1810] mt-1">{student?.grade}</span>
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                    <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">ዓ.ም / YEAR</span>
+                                    <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">{t('teacher.yearLabel')} / YEAR</span>
                                     <span className="text-2xl font-bold text-[#2c1810] mt-1">
-                                        {getEthiopianYear(student?.academicYear || dayjs().toISOString())}
+                                        {getEthiopianYear(activeYearToUse || dayjs().toISOString())}
                                     </span>
                                 </div>
                             </div>
@@ -410,16 +516,16 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             <thead>
                                 <tr className="border-b-2 border-[#d4af37]/30">
                                     <th className="py-3.5 px-4 text-left font-bold text-[#8c7361] uppercase tracking-wider text-[11px]">
-                                        የትምህርት አይነት / SUBJECT
+                                        {t('teacher.subjectLabel')} / SUBJECT
                                     </th>
                                     <th className="py-3.5 px-4 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[11px]">
-                                        ፩ኛ መንፈቅ ዓመት /<br/>SEM I
+                                        {t('teacher.semesterI')} /<br/>SEM I
                                     </th>
                                     <th className="py-3.5 px-4 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[11px]">
-                                        ፪ኛ መንፈቅ ዓመት /<br/>SEM II
+                                        {t('teacher.semesterII')} /<br/>SEM II
                                     </th>
                                     <th className="py-3.5 px-4 text-center font-bold text-[#8c7361] uppercase tracking-wider text-[11px]">
-                                        አማካይ / AVG
+                                        {t('teacher.avg')} / AVG
                                     </th>
                                 </tr>
                             </thead>
@@ -427,7 +533,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                                 {subjectRows.length === 0 ? (
                                     <tr>
                                         <td colSpan={4} className="text-center py-12 italic text-[#8c7361] text-base">
-                                            No assessments defined
+                                            {t('teacher.noAssessmentsDefined')}
                                         </td>
                                     </tr>
                                 ) : (
@@ -447,7 +553,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                         <div className="border-t-2 border-[#d4af37]/30 pt-6 mt-4 space-y-4">
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#2c1810] uppercase tracking-widest">
-                                    አጠቃላይ ድምር / GRAND TOTAL
+                                    {t('teacher.grandTotal')} / GRAND TOTAL
                                 </span>
                                 <span className="text-3xl font-black text-[#8b0000]">{averagePercentage}%</span>
                             </div>
@@ -455,7 +561,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             {totalInClass > 0 && (
                                 <div className="flex justify-between items-center">
                                     <span className="text-[12px] font-bold text-[#5c4033] uppercase tracking-widest">
-                                        ክፍል ደረጃ / CLASS RANK
+                                        {t('teacher.classRank')} / CLASS RANK
                                     </span>
                                     <span className="text-lg font-bold text-[#2c1810]">{classRank} / {totalInClass}</span>
                                 </div>
@@ -464,7 +570,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             {totalInGrade > 0 && (
                                 <div className="flex justify-between items-center">
                                     <span className="text-[12px] font-bold text-[#8c7361] uppercase tracking-widest">
-                                        አጠቃላይ ደረጃ / GRADE RANK
+                                        {t('teacher.gradeRank')} / GRADE RANK
                                     </span>
                                     <span className="text-base font-bold text-[#5c4033]">{overallRank} / {totalInGrade}</span>
                                 </div>
@@ -524,8 +630,9 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                 }
             `}</style>
             {(isLoading) ? (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
-                    <span>Loading...</span>
+                <div className="p-8">
+                    <Skeleton active avatar paragraph={{ rows: 4 }} />
+                    <Skeleton active className="mt-6" paragraph={{ rows: 2 }} />
                 </div>
             ) : !student ? (
                 <Empty description={t('teacher.studentNotFound', 'Student not found.')} />

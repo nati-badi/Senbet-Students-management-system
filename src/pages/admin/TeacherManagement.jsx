@@ -69,28 +69,28 @@ export default function TeacherManagement() {
             const mySubjects = values.assignedSubjects || [];
 
             // Check for conflicts with other teachers
-            for (const t of teachers) {
-                if (editingTeacher && t.id === editingTeacher.id) continue;
+            for (const teacher of teachers) {
+                if (editingTeacher && teacher.id === editingTeacher.id) continue;
                 
                 // 1. Identity checks for duplication
-                if (values.accessCode && (t.accessCode === values.accessCode || t.accesscode === values.accessCode)) {
-                    message.error(`Access code "${values.accessCode}" is already in use by ${t.name}`);
+                if (values.accessCode && (teacher.accessCode === values.accessCode || teacher.accesscode === values.accessCode)) {
+                    message.error(t('admin.accessCodeInUse', { code: values.accessCode, name: teacher.name }));
                     return;
                 }
                 
-                if (values.phone && t.phone === values.phone) {
-                    message.error(`Phone number "${values.phone}" is already registered to ${t.name}`);
+                if (values.phone && teacher.phone === values.phone) {
+                    message.error(t('admin.phoneAlreadyRegistered', { phone: values.phone, name: teacher.name }));
                     return;
                 }
 
-                if (t.name.toLowerCase().trim() === values.name.toLowerCase().trim()) {
-                    message.error(`Teacher with name "${values.name}" already exists.`);
+                if (teacher.name.toLowerCase().trim() === values.name.toLowerCase().trim()) {
+                    message.error(t('admin.teacherNameExists', { name: values.name }));
                     return;
                 }
 
                 // 2. Assignment conflicts (same subject/grade pair)
-                const otherGrades = t.assignedGrades || [];
-                const otherSubjects = t.assignedSubjects || [];
+                const otherGrades = teacher.assignedGrades || [];
+                const otherSubjects = teacher.assignedSubjects || [];
 
                 const overlapGrades = otherGrades.filter(og => 
                     myGrades.some(mg => normalizeGrade(mg) === normalizeGrade(og))
@@ -102,7 +102,7 @@ export default function TeacherManagement() {
                 if (overlapGrades.length > 0 && overlapSubjects.length > 0) {
                     const gradeList = overlapGrades.map(g => formatGrade(g)).join(', ');
                     const subjectList = overlapSubjects.join(', ');
-                    message.error(`Conflict: ${t.name} is already assigned to ${subjectList} in ${gradeList}`);
+                    message.error(t('admin.teacherConflict', { name: teacher.name, subjects: subjectList, grades: gradeList }));
                     return; // Block save
                 }
             }
@@ -113,7 +113,7 @@ export default function TeacherManagement() {
                     synced: 0,
                     updated_at: new Date().toISOString()
                 });
-                message.success('Teacher updated successfully');
+                message.success(t('admin.teacherUpdated'));
             } else {
                 await db.teachers.add({
                     id: crypto.randomUUID(),
@@ -121,26 +121,26 @@ export default function TeacherManagement() {
                     synced: 0,
                     updated_at: new Date().toISOString()
                 });
-                message.success('Teacher added successfully');
+                message.success(t('admin.teacherAdded'));
             }
             await syncData().catch(console.error);
             handleCancel();
         } catch (error) {
             console.error('Error saving teacher:', error);
-            message.error('Failed to save teacher');
+            message.error(t('admin.teacherSaveFailed'));
         }
     };
 
     const copyToClipboard = async (text) => {
         const val = String(text || '').trim();
         if (!val || val === 'null' || val === 'undefined') {
-            message.warning('No valid data to copy');
+            message.warning(t('common.noDataToCopy'));
             return;
         }
         try {
             if (navigator.clipboard && window.isSecureContext) {
                 await navigator.clipboard.writeText(val);
-                message.success('Copied');
+                message.success(t('common.copied'));
             } else {
                 const textArea = document.createElement("textarea");
                 textArea.value = val;
@@ -152,10 +152,10 @@ export default function TeacherManagement() {
                 textArea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
-                message.success('Copied');
+                message.success(t('common.copied'));
             }
         } catch {
-            message.error('Copy failed');
+            message.error(t('common.copyFailed'));
         }
     };
 
@@ -165,11 +165,11 @@ export default function TeacherManagement() {
         try {
             await db.teachers.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'teachers', recordId: id });
-            message.success('Teacher deleted successfully');
+            message.success(t('admin.teacherDeleted'));
             await syncData().catch(console.error);
         } catch (error) {
             console.error('Error deleting teacher:', error);
-            message.error('Failed to delete teacher');
+            message.error(t('admin.teacherDeleteFailed'));
         }
     };
 
@@ -186,7 +186,7 @@ export default function TeacherManagement() {
             key: 'phone'
         },
         {
-            title: 'Access Code',
+            title: t('admin.teacherAccessCode'),
             dataIndex: 'accessCode',
             key: 'accessCode',
             width: 140,
@@ -197,7 +197,7 @@ export default function TeacherManagement() {
                 return (
                     <Space size="small">
                         <Tag color="gold" className="font-mono">{actualCode}</Tag>
-                        <Tooltip title="Copy code">
+                        <Tooltip title={t('common.copy')}>
                             <Button 
                                 type="text" 
                                 size="small" 
@@ -210,21 +210,21 @@ export default function TeacherManagement() {
             }
         },
         {
-            title: 'Assigned Grades',
+            title: t('admin.assignedGrades'),
             dataIndex: 'assignedGrades',
             key: 'assignedGrades',
             render: (grades) => grades?.map(g => <Tag color="blue" key={g}>{formatGrade(g)}</Tag>)
         },
         {
-            title: 'Assigned Subjects',
+            title: t('admin.assignedSubjects'),
             dataIndex: 'assignedSubjects',
             key: 'assignedSubjects',
             render: (subs) => subs?.map(s => <Tag color="purple" key={s}>{s}</Tag>)
         },
         {
-            title: 'Permissions',
+            title: t('admin.permissions'),
             key: 'permissions',
-            render: (_, record) => (record.canCreateAssessments || record.cancreateassessments) ? <Tag color="green">Manage Assessments</Tag> : <Tag color="default">View Only</Tag>
+            render: (_, record) => (record.canCreateAssessments || record.cancreateassessments) ? <Tag color="green">{t('admin.manageAssessmentsPermission')}</Tag> : <Tag color="default">{t('admin.viewOnly')}</Tag>
         },
         {
             title: t('common.actions'),
@@ -234,10 +234,10 @@ export default function TeacherManagement() {
                 <Space>
                     <Button type="text" icon={<EditOutlined />} onClick={() => showModal(record)} />
                     <Popconfirm
-                        title="Are you sure you want to delete this teacher?"
+                        title={t('admin.deleteTeacherConfirm')}
                         onConfirm={() => handleDelete(record.id)}
-                        okText="Yes"
-                        cancelText="No"
+                        okText={t('common.yes')}
+                        cancelText={t('common.no')}
                     >
                         <Button type="text" danger icon={<DeleteOutlined />} />
                     </Popconfirm>
@@ -256,7 +256,7 @@ export default function TeacherManagement() {
                     onClick={() => showModal()}
                     className="font-bold rounded-xl"
                 >
-                    Add Teacher
+                    {t('admin.addTeacher')}
                 </Button>
             </div>
 
@@ -289,7 +289,7 @@ export default function TeacherManagement() {
                     <Form.Item
                         name="name"
                         label={t('admin.name')}
-                        rules={[{ required: true, message: 'Please input the teacher name!' }]}
+                        rules={[{ required: true, message: t('admin.teacherNameRequired') }]}
                     >
                         <Input />
                     </Form.Item>
@@ -297,20 +297,20 @@ export default function TeacherManagement() {
                     <Form.Item
                         name="phone"
                         label={t('admin.contact')}
-                        rules={[{ required: true, message: 'Please input the phone number!' }]}
+                        rules={[{ required: true, message: t('admin.teacherPhoneRequired') }]}
                     >
                         <Input type="tel" />
                     </Form.Item>
 
                     <Form.Item
                         name="accessCode"
-                        label="Teacher Access Code"
-                        rules={[{ required: true, message: 'Please set an access code' }]}
-                        extra="Teachers use this code to log in to the Teacher Portal."
+                        label={t('admin.teacherAccessCode')}
+                        rules={[{ required: true, message: t('admin.accessCodeRequired') }]}
+                        extra={t('admin.accessCodeExtra')}
                     >
                         <Input
                             addonBefore={<KeyOutlined />}
-                            placeholder="6-digit code"
+                            placeholder={t('teacher.accessCodePlaceholder')}
                             maxLength={6}
                             suffix={
                                 <Button
@@ -318,7 +318,7 @@ export default function TeacherManagement() {
                                     size="small"
                                     onClick={() => form.setFieldsValue({ accessCode: generateAccessCode() })}
                                 >
-                                    Generate
+                                    {t('common.generate')}
                                 </Button>
                             }
                         />
@@ -326,23 +326,23 @@ export default function TeacherManagement() {
 
                     <Form.Item
                         name="assignedGrades"
-                        label="Assigned Grades"
+                        label={t('admin.assignedGrades')}
                     >
                         <Select 
                             mode="multiple" 
                             options={gradeOptions} 
-                            placeholder="Select grades they teach"
+                            placeholder={t('admin.selectGradesPlaceholder')}
                         />
                     </Form.Item>
 
                     <Form.Item
                         name="assignedSubjects"
-                        label="Assigned Subjects"
+                        label={t('admin.assignedSubjects')}
                     >
                         <Select 
                             mode="multiple" 
                             options={subjectOptions} 
-                            placeholder={watchedGrades.length === 0 ? "Select grades first" : "Select subjects they teach"}
+                            placeholder={watchedGrades.length === 0 ? t('admin.selectGradesFirst') : t('admin.selectSubjectsPlaceholder')}
                             disabled={watchedGrades.length === 0}
                         />
                     </Form.Item>
@@ -350,10 +350,10 @@ export default function TeacherManagement() {
                     <Form.Item
                         name="canCreateAssessments"
                         valuePropName="checked"
-                        label="Assessment Permissions"
-                        extra="Allow teacher to create & manage assessments"
+                        label={t('admin.assessmentPermissions')}
+                        extra={t('admin.assessmentPermissionsExtra')}
                     >
-                        <Switch checkedChildren="Yes" unCheckedChildren="No" />
+                        <Switch checkedChildren={t('common.yes')} unCheckedChildren={t('common.no')} />
                     </Form.Item>
                 </Form>
             </Modal>

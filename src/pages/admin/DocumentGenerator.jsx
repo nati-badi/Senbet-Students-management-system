@@ -186,7 +186,7 @@ export default function DocumentGenerator({ type }) {
                 const filePath = await save({
                     defaultPath: fileName,
                     filters: [{ name: 'PDF Documents', extensions: ['pdf'] }],
-                    title: 'Save Generated Documents',
+                    title: t('admin.saveGenDocs', 'Save Generated Documents'),
                 });
 
                 if (!filePath) {
@@ -306,7 +306,7 @@ export default function DocumentGenerator({ type }) {
                         
                         console.log("[Notification] Sending notification now...");
                         sendNotification({ 
-                            id: `gen-${Date.now()}`,
+                            id: Math.floor(Math.random() * 2147483647),
                             title: 'Senbet Students Management System', 
                             body: `Download Complete! Successfully generated ${studentsToProcess.length} ${docName} for ${gradeText}. Saved to: ${savedFilePath}`,
                             extra: { filePath: savedFilePath }
@@ -319,18 +319,11 @@ export default function DocumentGenerator({ type }) {
                     console.error("[Notification] Error:", notifyErr);
                 }
 
-                // Auto-open the PDF
-                if (shellOpen) {
-                    try {
-                        await shellOpen(savedFilePath);
-                    } catch (openErr) {
-                        console.log("Could not auto-open file:", openErr);
-                    }
-                }
+                // Auto-open removed per user request - manual 'Open File' button is available in success modal.
             }
         } catch (err) {
             console.error("PDF Gen Error:", err);
-            message.error("Failed to generate documents.");
+            message.error(t('admin.docsGenerateFailed', 'Failed to generate documents.'));
         } finally {
             setIsGenerating(false);
         }
@@ -338,91 +331,6 @@ export default function DocumentGenerator({ type }) {
 
     return (
         <div className="flex flex-col gap-6 w-full">
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700&display=swap');
-                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-                
-                .cert-container { font-family: 'Inter', sans-serif; }
-                .cert-amharic { font-family: 'Noto Sans Ethiopic', 'Inter', sans-serif; }
-                .cert-serif { font-family: 'Playfair Display', serif; }
-
-                /* Utility Classes */
-                .cert-label {
-                    font-size: 12px;
-                    text-transform: uppercase;
-                    color: #666;
-                    font-weight: 800;
-                    letter-spacing: 0.08em;
-                    display: block;
-                    margin-bottom: 4px;
-                }
-                .cert-label-sm {
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    color: #666;
-                    font-weight: 700;
-                    letter-spacing: 0.05em;
-                    display: block;
-                    margin-bottom: 2px;
-                }
-                .cert-value {
-                    font-weight: 700;
-                    color: #1A1A1A;
-                }
-                .cert-card {
-                    background: #fff;
-                    border-radius: 16px;
-                    border: 1px solid rgba(201,162,39,0.2);
-                    box-shadow: 0 8px 32px rgba(0,0,0,0.05);
-                    z-index: 10;
-                }
-                .cert-th {
-                    padding: 14px 12px;
-                    text-align: center;
-                    color: #111;
-                    font-weight: 900;
-                    text-transform: uppercase;
-                    letter-spacing: 0.08em;
-                    border-bottom: 2px solid #D1D5DB;
-                    background-color: #FAFAFA;
-                    border-right: 1px solid #eee;
-                }
-                .cert-th:last-child { border-right: none; }
-                .cert-td {
-                    padding: 14px 12px;
-                    border-right: 1px solid #f0f0f0;
-                }
-                .cert-td:last-child { border-right: none; }
-                .cert-badge {
-                    display: inline-block;
-                    min-width: 48px;
-                    height: 30px;
-                    line-height: 30px;
-                    padding: 0 10px;
-                    border-radius: 6px;
-                    font-weight: 900;
-                    font-size: 15px;
-                    letter-spacing: 0.03em;
-                    text-align: center;
-                    vertical-align: middle;
-                    box-sizing: border-box;
-                }
-                .cert-sig-title {
-                    font-size: 10px;
-                    font-weight: 800;
-                    color: #1A1A1A;
-                    text-transform: uppercase;
-                    letter-spacing: 0.1em;
-                    margin-bottom: 2px;
-                }
-                .cert-sig-name {
-                    font-size: 10px;
-                    font-weight: 600;
-                    color: #666;
-                    letter-spacing: 0.1em;
-                }
-            `}</style>
             <div className="max-w-[600px]">
                 <Title level={2}>{type === 'id-card' ? t('admin.idCardGenerator') : t('admin.finalCertificates')}</Title>
                 <Text type="secondary">{type === 'id-card' ? t('admin.idCardDesc') : t('admin.generatorDesc')}</Text>
@@ -518,7 +426,7 @@ export default function DocumentGenerator({ type }) {
                 title={
                     <div className="flex items-center gap-2 text-orange-600 font-serif">
                         <AlertOutlined />
-                        <span className="text-lg font-bold">Data Readiness Report</span>
+                        <span className="text-lg font-bold">{t('admin.dataReadinessReport', 'Data Readiness Report')}</span>
                     </div>
                 }
                 open={isValidationModalOpen}
@@ -535,21 +443,21 @@ export default function DocumentGenerator({ type }) {
                         onClick={() => handleGenerate(validationReport.ready)}
                         disabled={validationReport?.ready.length === 0}
                     >
-                        Generate for {validationReport?.ready.length || 0} Ready Students
+                        {t('admin.generateForReady', { count: validationReport?.ready.length || 0, defaultValue: `Generate for ${validationReport?.ready.length || 0} Ready Students` })}
                     </Button>
                 ]}
             >
                 <div className="flex flex-col gap-4 py-4">
                     <Alert
-                        message="Incomplete Data Detected"
-                        description={`${validationReport?.incomplete.length} students have missing marks or information. Results for these students will be inaccurate.`}
+                        message={t('admin.incompleteDataDetected', 'Incomplete Data Detected')}
+                        description={t('admin.incompleteDataDesc', { count: validationReport?.incomplete.length || 0, defaultValue: `${validationReport?.incomplete.length} students have missing marks or information. Results for these students will be inaccurate.` })}
                         type="warning"
                         showIcon
                     />
                     
                     <div className="max-h-[400px] overflow-y-auto mt-2">
                         <List
-                            header={<Text strong>Students with Issues</Text>}
+                            header={<Text strong>{t('admin.studentsWithIssues', 'Students with Issues')}</Text>}
                             dataSource={validationReport?.incomplete || []}
                             renderItem={item => (
                                 <List.Item className="flex flex-col !items-start gap-1 py-3 border-b border-slate-100">
@@ -567,8 +475,8 @@ export default function DocumentGenerator({ type }) {
                     {validationReport?.ready.length === 0 && (
                         <Alert 
                             type="error"
-                            message="No Complete Data Found"
-                            description="All students in this grade have missing information. Please resolve the issues in the Mark Entry or Student Registration tabs."
+                            message={t('admin.noCompleteData', 'No Complete Data Found')}
+                            description={t('admin.noCompleteDataDesc', 'All students in this grade have missing information. Please resolve the issues in the Mark Entry or Student Registration tabs.')}
                         />
                     )}
                 </div>
@@ -614,12 +522,12 @@ export default function DocumentGenerator({ type }) {
                 }}>
                     {gradeStudents.length > 0 ? (
                         <div style={{ 
-                            transform: type === 'id-card' ? 'scale(1.1)' : 'scale(0.8)', 
+                            transform: type === 'id-card' ? 'scale(1.4)' : 'scale(0.8)', 
                             transformOrigin: 'top center',
                             boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
                             backgroundColor: '#fff',
                             borderRadius: type === 'id-card' ? '12px' : '0',
-                            marginBottom: type === 'id-card' ? '20px' : '-100px' // Compensate for scale whitespace
+                            marginBottom: type === 'id-card' ? '120px' : '-100px' // Compensate for scale whitespace
                         }}>
                              {type === 'id-card' ? (
                                 <IDCardTemplate student={gradeStudents[0]} />
@@ -660,10 +568,12 @@ export default function DocumentGenerator({ type }) {
                             icon={<EyeOutlined />}
                             onClick={async () => {
                                 try {
+                                    console.log("[Modal-Open] Attempting to open:", successModal.fileName);
                                     const { open: shellOpen } = await import('@tauri-apps/plugin-shell');
                                     await shellOpen(successModal.fileName);
                                 } catch (err) {
-                                    message.error("Could not open file.");
+                                    console.error("[Modal-Open] Failed:", err);
+                                    message.error(t('common.couldNotOpenFile', 'Could not open file.'));
                                 }
                             }}
                         >
@@ -732,8 +642,8 @@ function IDCardTemplate({ student }) {
                     
                     <div style={{ display: 'flex', gap: '16px', marginTop: '2px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span className="cert-amharic" style={{ fontSize: '7px', color: '#64748b', fontWeight: '700', letterSpacing: '0.05em' }}>መለያ ቁጥር</span>
-                            <div style={{ fontSize: '10px', fontWeight: '700', color: '#0f172a' }}>{student.id}</div>
+                            <span className="cert-amharic" style={{ fontSize: '7px', color: '#64748b', fontWeight: '700', letterSpacing: '0.05em' }}>የተጠሪ ስልክ</span>
+                            <div style={{ fontSize: '10px', fontWeight: '700', color: '#0f172a' }}>{student.parentContact || '-'}</div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span className="cert-amharic" style={{ fontSize: '7px', color: '#64748b', fontWeight: '700', letterSpacing: '0.05em' }}>ክፍል</span>

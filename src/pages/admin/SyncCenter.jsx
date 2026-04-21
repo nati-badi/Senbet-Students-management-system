@@ -31,24 +31,24 @@ export default function SyncCenter() {
 
                 if (failedTables.length > 0) {
                     notification.warning({
-                        title: 'Sync Partial Success',
-                        description: `Synced successfully but failed for tables: ${failedTables.join(', ')}. Check Supabase schema.`
+                        message: t('admin.syncPartialSuccess', 'Sync Partial Success'),
+                        description: t('admin.syncPartialDesc', { tables: failedTables.join(', '), defaultValue: `Synced successfully but failed for tables: ${failedTables.join(', ')}. Check Supabase schema.` })
                     });
                 } else {
                     notification.success({
-                        title: 'Sync Successful',
-                        description: `Pushed ${result.pushed} records and pulled ${result.pulled} records.`
+                        message: t('admin.syncSuccessful', 'Sync Successful'),
+                        description: t('admin.syncPushedPulled', { pushed: result.pushed, pulled: result.pulled, defaultValue: `Pushed ${result.pushed} records and pulled ${result.pulled} records.` })
                     });
                 }
             } else {
                 notification.error({
-                    title: 'Sync Failed',
+                    message: t('admin.syncFailed', 'Sync Failed'),
                     description: result.error
                 });
             }
         } catch (error) {
             notification.error({
-                title: 'Sync Error',
+                message: t('admin.syncError', 'Sync Error'),
                 description: error.message
             });
         } finally {

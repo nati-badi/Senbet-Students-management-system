@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Typography, Card, List, Avatar, Tag, Empty, Badge, Alert, Row, Col, Statistic, Button, Space, Tooltip, message, Modal, Input } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { WarningOutlined, UserOutlined, ClockCircleOutlined, FormOutlined, AlertOutlined, KeyOutlined, CopyOutlined, PhoneOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -13,6 +14,7 @@ const { Title, Text, Paragraph } = Typography;
 export default function UrgentMatters() {
     const [profileStudentId, setProfileStudentId] = useState(null);
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const students = useLiveQuery(() => db.students.toArray(), []) || [];
     const marks = useLiveQuery(() => db.marks.toArray(), []) || [];
@@ -36,8 +38,9 @@ export default function UrgentMatters() {
 
     // Students missing critical info - Scoped to active grades
     const missingInfoStudents = useMemo(() => students.filter(s => {
-        if (!s.grade) return false; 
-        const isGradeActive = activeGrades.has(String(s.grade).trim()) || activeGrades.has(normalizeGrade(s.grade));
+        if (!s.grade || s.archived === 1) return false; 
+        const gn = normalizeGrade(s.grade);
+        const isGradeActive = activeGrades.has(String(s.grade).trim()) || activeGrades.has(gn);
         if (!isGradeActive) return false;
         return !s.name || (!s.parentContact && !s.parentcontact) || (!s.portalCode && !s.portalcode);
     }), [students, activeGrades]);
@@ -75,7 +78,7 @@ export default function UrgentMatters() {
         });
         
         return students.filter(s => {
-            if (!s.grade) return false;
+            if (!s.grade || s.archived === 1) return false;
             const gn = normalizeGrade(s.grade);
             const isGradeActive = activeGrades.has(String(s.grade).trim()) || activeGrades.has(gn);
             if (!isGradeActive) return false;
@@ -90,6 +93,7 @@ export default function UrgentMatters() {
 
     // Students missing portal codes - Show ALL students missing codes regardless of grade activity
     const missingPortalCode = useMemo(() => students.filter(s => {
+        if (s.archived === 1) return false;
         const code = s.portalCode || s.portalcode;
         return !code || String(code).trim() === '';
     }), [students]);
@@ -123,7 +127,7 @@ export default function UrgentMatters() {
     const copyToClipboard = async (text, successMsg) => {
         const val = String(text || '').trim();
         if (!val || val === 'null' || val === 'undefined') {
-            message.warning('No valid data to copy');
+            message.warning(t('common.noDataToCopy'));
             return;
         }
         try {
@@ -144,7 +148,7 @@ export default function UrgentMatters() {
                 message.success(successMsg);
             }
         } catch (e) {
-            message.error('Copy failed');
+            message.error(t('common.copyFailed'));
         }
     };
 
@@ -173,9 +177,9 @@ export default function UrgentMatters() {
                 });
                 updated++;
             }
-            message.success(`Generated ${updated} portal code${updated !== 1 ? 's' : ''}`);
+            message.success(t('admin.codesGenerated', { count: updated }));
         } catch (e) {
-            message.error('Failed to generate portal codes');
+            message.error(t('admin.codesGenerateFailed'));
         }
     };
 
@@ -196,22 +200,22 @@ export default function UrgentMatters() {
                     <WarningOutlined className="text-2xl text-red-500" />
                 </div>
                 <div>
-                    <Title level={2} style={{ margin: 0 }}>Urgent Matters</Title>
-                    <Text type="secondary">Items that need your immediate attention</Text>
+                    <h2 className="text-2xl font-bold m-0">{t('admin.urgentMatters', 'Urgent Matters')}</h2>
+                    <p className="text-slate-500 m-0">{t('admin.urgentMattersDesc', 'Items that need your immediate attention')}</p>
                 </div>
             </div>
 
             {totalIssues === 0 ? (
                 <Alert
-                    message="Everything looks great!"
-                    description="No urgent matters found. All students have complete data and portal access codes."
+                    message={t('admin.allCaughtUp', 'Everything looks great!')}
+                    description={t('admin.noUrgentMattersAdminDesc', 'No urgent matters found. All students have complete data and portal access codes.')}
                     type="success"
                     showIcon
                     className="rounded-2xl border-none shadow-sm"
                 />
             ) : (
                 <Alert
-                    message={`${totalIssues} issue${totalIssues !== 1 ? 's' : ''} require your attention`}
+                    message={t('admin.issuesRequireAttention', { count: totalIssues, defaultValue: `${totalIssues} issue(s) require your attention` })}
                     type="error"
                     showIcon
                     icon={<AlertOutlined />}
@@ -223,7 +227,7 @@ export default function UrgentMatters() {
                 <Col xs={24} sm={8}>
                     <Card className="rounded-2xl border-none shadow-sm bg-red-50 dark:bg-red-900/20 text-center">
                         <Statistic
-                            title={<span className="text-red-600 font-bold">Missing Student Info</span>}
+                            title={<span className="text-red-600 font-bold">{t('admin.missingStudentInfo', 'Missing Student Info')}</span>}
                             value={missingInfoStudents.length}
                             valueStyle={{ color: '#dc2626', fontWeight: 'bold', fontSize: '2.5rem' }}
                             prefix={<FormOutlined />}
@@ -233,7 +237,7 @@ export default function UrgentMatters() {
                 <Col xs={24} sm={8}>
                     <Card className="rounded-2xl border-none shadow-sm bg-orange-50 dark:bg-orange-900/20 text-center">
                         <Statistic
-                            title={<span className="text-orange-600 font-bold">No Portal Code</span>}
+                            title={<span className="text-orange-600 font-bold">{t('admin.noPortalCode', 'No Portal Code')}</span>}
                             value={missingPortalCode.length}
                             valueStyle={{ color: '#ea580c', fontWeight: 'bold', fontSize: '2.5rem' }}
                             prefix={<UserOutlined />}
@@ -243,7 +247,7 @@ export default function UrgentMatters() {
                 <Col xs={24} sm={8}>
                     <Card className="rounded-2xl border-none shadow-sm bg-yellow-50 dark:bg-yellow-900/20 text-center cursor-pointer hover:bg-yellow-100 transition-colors" onClick={() => navigate('/assessments')}>
                         <Statistic
-                            title={<span className="text-yellow-700 font-bold">Incomplete Marks</span>}
+                            title={<span className="text-yellow-700 font-bold">{t('admin.incompleteMarks', 'Incomplete Marks')}</span>}
                             value={incompleteMarksStudents.length}
                             valueStyle={{ color: '#ca8a04', fontWeight: 'bold', fontSize: '2.5rem' }}
                             prefix={<ClockCircleOutlined />}
@@ -259,7 +263,7 @@ export default function UrgentMatters() {
                             <div className="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center">
                                 <FormOutlined className="text-red-500" />
                             </div>
-                            <span className="font-bold">Students with Missing Information</span>
+                            <span className="font-bold">{t('admin.studentsMissingInfoTitle', 'Students with Missing Information')}</span>
                             <Badge count={missingInfoStudents.length} color="red" />
                         </div>
                     }
@@ -270,32 +274,32 @@ export default function UrgentMatters() {
                         rowKey="id"
                         renderItem={student => {
                             const missing = [];
-                            if (!student.name) missing.push('Name');
-                            if (!student.baptismalName && !student.baptismalname) missing.push('Baptismal Name');
-                            if (!student.grade) missing.push('Grade');
-                            if (!student.parentContact && !student.parentcontact) missing.push('Contact');
-                            if (!student.portalCode && !student.portalcode) missing.push('Portal Code');
+                            if (!student.name) missing.push(t('admin.fullName', 'Name'));
+                            if (!student.baptismalName && !student.baptismalname) missing.push(t('admin.baptismalNameField', 'Baptismal Name'));
+                            if (!student.grade) missing.push(t('admin.gradeClass', 'Grade'));
+                            if (!student.parentContact && !student.parentcontact) missing.push(t('admin.parentContact', 'Contact'));
+                            if (!student.portalCode && !student.portalcode) missing.push(t('admin.portalCode', 'Portal Code'));
                             return (
                                 <List.Item 
                                     className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg"
                                     actions={[
                                         !student.portalCode && (
-                                            <Tooltip key="gen" title="Generate portal code">
+                                            <Tooltip key="gen" title={t('admin.generateCode', 'Generate code')}>
                                                 <Button
                                                     size="small"
                                                     icon={<KeyOutlined />}
                                                     onClick={async (e) => {
                                                         e.stopPropagation();
                                                         const code = await generatePortalCode(student.id);
-                                                        message.success(`Portal code created: ${code}`);
+                                                        message.success(`${t('admin.portalCodeGenerated', 'Portal code created')}: ${code}`);
                                                     }}
                                                 >
-                                                    Generate code
+                                                    {t('admin.generateCode', 'Generate code')}
                                                 </Button>
                                             </Tooltip>
                                         ),
                                         (student.parentContact || student.parentcontact) && (
-                                            <Tooltip key="call" title="Call parent">
+                                            <Tooltip key="call" title={t('admin.callParent', 'Call parent')}>
                                                 <Button
                                                     size="small"
                                                     icon={<PhoneOutlined />}
@@ -305,19 +309,19 @@ export default function UrgentMatters() {
                                                         if (contact) window.open(`tel:${contact}`, '_self');
                                                     }}
                                                 >
-                                                    Call
+                                                    {t('admin.callParent', 'Call parent')}
                                                 </Button>
                                             </Tooltip>
                                         ),
                                         (student.parentContact || student.parentcontact) && (
-                                            <Tooltip key="copy" title="Copy parent contact">
+                                            <Tooltip key="copy" title={t('admin.copyContact', 'Copy parent contact')}>
                                                 <Button
                                                     size="small"
                                                     icon={<CopyOutlined />}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         const contact = student.parentContact || student.parentcontact;
-                                                        if (contact) void copyToClipboard(contact, 'Contact copied');
+                                                        if (contact) void copyToClipboard(contact, t('admin.contactCopied', 'Contact copied'));
                                                     }}
                                                 />
                                             </Tooltip>
@@ -330,7 +334,7 @@ export default function UrgentMatters() {
                                                 goToRegisterAndSearch(student.name);
                                             }}
                                         >
-                                            Fix now
+                                            {t('admin.fixNow', 'Fix now')}
                                         </Button>,
                                         <Button
                                             key="view"
@@ -341,7 +345,7 @@ export default function UrgentMatters() {
                                                 setProfileStudentId(student.id);
                                             }}
                                         >
-                                            View
+                                            {t('admin.view', 'View')}
                                         </Button>
                                     ].filter(Boolean)}
                                     onClick={() => setProfileStudentId(student.id)}
@@ -356,7 +360,7 @@ export default function UrgentMatters() {
                                         }
                                         title={
                                             <Space>
-                                                <span className="font-bold">{student.name || <Text type="danger">No Name</Text>}</span>
+                                                <span className="font-bold">{student.name || <Text type="danger">{t('admin.noName', 'No Name')}</Text>}</span>
                                                 {(student.baptismalName || student.baptismalname) && (
                                                     <Text type="secondary" className="text-xs font-normal italic">
                                                         ({student.baptismalName || student.baptismalname})
@@ -367,7 +371,7 @@ export default function UrgentMatters() {
                                         description={
                                             <div className="flex flex-wrap gap-1 mt-1">
                                                 {missing.map(field => (
-                                                    <Tag key={field} color="error" className="text-xs">Missing: {field}</Tag>
+                                                    <Tag key={field} color="error" className="text-xs">{t('admin.missingField', { field, defaultValue: `Missing: ${field}` })}</Tag>
                                                 ))}
                                                 {student.grade && <Tag color="green">{formatGrade(student.grade)}</Tag>}
                                             </div>
@@ -388,7 +392,7 @@ export default function UrgentMatters() {
                             <div className="w-8 h-8 bg-orange-100 rounded-xl flex items-center justify-center">
                                 <UserOutlined className="text-orange-500" />
                             </div>
-                            <span className="font-bold">Students Without Portal Access Code</span>
+                            <span className="font-bold">{t('admin.studentsWithoutPortalCodeTitle', 'Students Without Portal Access Code')}</span>
                             <Badge count={missingPortalCode.length} color="orange" />
                         </div>
                     }
@@ -396,16 +400,16 @@ export default function UrgentMatters() {
                     extra={
                         <Space wrap>
                             <Button size="small" icon={<KeyOutlined />} onClick={generateAllPortalCodes}>
-                                Generate all
+                                {t('admin.generateAll', 'Generate all')}
                             </Button>
                             <Text type="secondary" className="text-sm">
-                                Bulk-generate missing codes
+                                {t('admin.bulkGenerateCodes', 'Bulk-generate missing codes')}
                             </Text>
                         </Space>
                     }
                 >
                     <Paragraph type="secondary" className="mb-4">
-                        These students' parents cannot log in to the Parent Portal. Assign portal access codes from the Student Registration page.
+                        {t('admin.missingPortalCodeDesc', "These students' parents cannot log in to the Parent Portal. Assign portal access codes from the Student Registration page.")}
                     </Paragraph>
                     <List
                         dataSource={missingPortalCode}
@@ -414,21 +418,21 @@ export default function UrgentMatters() {
                             <List.Item
                                 className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg"
                                 actions={[
-                                    <Tooltip key="gen" title="Generate access code">
+                                    <Tooltip key="gen" title={t('admin.generateCode', 'Generate access code')}>
                                         <Button
                                             size="small"
                                             icon={<KeyOutlined />}
                                             onClick={async (e) => {
                                                 e.stopPropagation();
                                                 const code = await generatePortalCode(student.id);
-                                                message.success(`Portal code created: ${code}`);
+                                                message.success(`${t('admin.portalCodeGenerated', 'Portal code created')}: ${code}`);
                                             }}
                                         >
-                                            Generate
+                                            {t('admin.generateCode', 'Generate')}
                                         </Button>
                                     </Tooltip>,
                                     (student.parentContact || student.parentcontact) && (
-                                        <Tooltip key="call" title="Call parent">
+                                        <Tooltip key="call" title={t('admin.callParent', 'Call parent')}>
                                             <Button
                                                 size="small"
                                                 icon={<PhoneOutlined />}
@@ -438,23 +442,23 @@ export default function UrgentMatters() {
                                                     if (contact) window.open(`tel:${contact}`, '_self');
                                                 }}
                                             >
-                                                Call
+                                                {t('admin.callParent', 'Call parent')}
                                             </Button>
                                         </Tooltip>
                                     ),
                                     (student.parentContact || student.parentcontact) && (
-                                        <Tooltip key="copy" title="Copy parent contact">
+                                        <Tooltip key="copy" title={t('admin.copyContact', 'Copy parent contact')}>
                                             <Button
                                                 size="small"
                                                 icon={<CopyOutlined />}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     const contact = student.parentContact || student.parentcontact;
-                                                    if (contact) void copyToClipboard(contact, 'Contact copied');
+                                                    if (contact) void copyToClipboard(contact, t('admin.contactCopied', 'Contact copied'));
                                                 }}
                                             />
                                         </Tooltip>
-                                    ),
+                                        ),
                                     <Button
                                         key="view"
                                         type="link"
@@ -464,7 +468,7 @@ export default function UrgentMatters() {
                                             setProfileStudentId(student.id);
                                         }}
                                     >
-                                        View
+                                        {t('admin.view', 'View')}
                                     </Button>
                                 ]}
                                 onClick={() => setProfileStudentId(student.id)}
@@ -491,7 +495,10 @@ export default function UrgentMatters() {
                                 />
                             </List.Item>
                         )}
-                        pagination={{ pageSize: 5 }}
+                        pagination={{ 
+                            pageSize: 5, 
+                            locale: { items_per_page: t('common.perPage', '/ page') } 
+                        }}
                     />
                 </Card>
             )}
@@ -503,14 +510,14 @@ export default function UrgentMatters() {
                             <div className="w-8 h-8 bg-yellow-100 rounded-xl flex items-center justify-center">
                                 <ClockCircleOutlined className="text-yellow-600" />
                             </div>
-                            <span className="font-bold">Students with Incomplete Marks</span>
+                            <span className="font-bold">{t('admin.studentsWithIncompleteMarksTitle', 'Students with Incomplete Marks')}</span>
                             <Badge count={incompleteMarksStudents.length} color="gold" />
                         </div>
                     }
                     className="rounded-2xl border-l-4 border-l-yellow-500 shadow-sm"
                 >
                     <Paragraph type="secondary" className="mb-4">
-                        These students have missing assessment marks for <Text strong>{currentSemester}</Text>. Use the Teacher Portal or Mark Entry to record their scores.
+                        {t('admin.incompleteMarksDesc', 'These students have missing assessment marks for')} <Text strong>{currentSemester === 'Semester I' ? t('admin.semester1', 'Semester I') : currentSemester === 'Semester II' ? t('admin.semester2', 'Semester II') : currentSemester}</Text>. {t('admin.useMarkEntryToRecord', 'Use the Teacher Portal or Mark Entry to record their scores.')}
                     </Paragraph>
                     <List
                         dataSource={incompleteMarksStudents}
@@ -527,7 +534,7 @@ export default function UrgentMatters() {
                                             navigate('/teacher');
                                         }}
                                     >
-                                        Open mark entry
+                                        {t('admin.openMarkEntry', 'Open mark entry')}
                                     </Button>,
                                     <Button
                                         key="view"
@@ -538,7 +545,7 @@ export default function UrgentMatters() {
                                             setProfileStudentId(student.id);
                                         }}
                                     >
-                                        View
+                                        {t('admin.view', 'View')}
                                     </Button>
                                 ]}
                                 onClick={() => setProfileStudentId(student.id)}
@@ -556,14 +563,17 @@ export default function UrgentMatters() {
                                 />
                             </List.Item>
                         )}
-                        pagination={{ pageSize: 5 }}
+                        pagination={{ 
+                            pageSize: 5, 
+                            locale: { items_per_page: t('common.perPage', '/ page') } 
+                        }}
                     />
                 </Card>
             )}
 
             {totalIssues === 0 && (
                 <Card className="rounded-2xl border-none shadow-sm">
-                    <Empty description="No urgent matters found. All records are in order." />
+                    <Empty description={t('admin.noUrgentMattersAdminDesc', 'No urgent matters found. All records are in order.')} />
                 </Card>
             )}
 

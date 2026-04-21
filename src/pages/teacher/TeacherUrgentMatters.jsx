@@ -103,9 +103,9 @@ export default function TeacherUrgentMatters({ teacher }) {
                     <WarningOutlined className="text-2xl text-orange-500" />
                 </div>
                 <div>
-                    <Title level={2} style={{ margin: 0 }}>{t('admin.urgentMatters', 'Urgent Matters')}</Title>
+                    <Title level={2} style={{ margin: 0 }}>{t('admin.urgentMatters')}</Title>
                     <Text type="secondary">
-                        Items needing your attention — scoped to your assigned grades &amp; subjects
+                        {t('teacher.urgentMattersDesc')}
                         {allowedGrades.length > 0 && (
                             <span> ({allowedGrades.map(g => formatGrade(g)).join(', ')})</span>
                         )}
@@ -115,11 +115,11 @@ export default function TeacherUrgentMatters({ teacher }) {
 
             {totalIssues === 0 ? (
                 <Alert
-                    message="All caught up!"
+                    message={t('teacher.allCaughtUp')}
                     description={
                         myAssessments.length === 0
-                            ? "No assessments found for your assigned grades/subjects this semester."
-                            : "All your students have marks recorded. Great job!"
+                            ? t('teacher.noAssessmentsThisSemester')
+                            : t('teacher.allMarksRecorded')
                     }
                     type={myAssessments.length === 0 ? "warning" : "success"}
                     showIcon
@@ -127,7 +127,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                 />
             ) : (
                 <Alert
-                    message={`${totalIssues} issue${totalIssues !== 1 ? 's' : ''} require your attention`}
+                    message={t(totalIssues === 1 ? 'teacher.issuesRequireAttention' : 'teacher.issuesRequireAttention_plural', { count: totalIssues })}
                     type="error"
                     showIcon
                     icon={<AlertOutlined />}
@@ -139,7 +139,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                 <Col xs={24} sm={12}>
                     <Card className="rounded-2xl border-none shadow-sm bg-yellow-50 dark:bg-yellow-900/20 text-center">
                         <Statistic
-                            title={<span className="text-yellow-700 font-bold">Students With No Marks</span>}
+                            title={<span className="text-yellow-700 font-bold">{t('teacher.studentsWithNoMarks')}</span>}
                             value={noMarksStudents.length}
                             valueStyle={{ color: '#ca8a04', fontWeight: 'bold', fontSize: '2.5rem' }}
                             prefix={<ClockCircleOutlined />}
@@ -149,7 +149,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                 <Col xs={24} sm={12}>
                     <Card className="rounded-2xl border-none shadow-sm bg-orange-50 dark:bg-orange-900/20 text-center">
                         <Statistic
-                            title={<span className="text-orange-600 font-bold">Assessments With Gaps</span>}
+                            title={<span className="text-orange-600 font-bold">{t('teacher.assessmentsWithGaps')}</span>}
                             value={missingMarksByAssessment.length}
                             valueStyle={{ color: '#ea580c', fontWeight: 'bold', fontSize: '2.5rem' }}
                             prefix={<FormOutlined />}
@@ -165,14 +165,14 @@ export default function TeacherUrgentMatters({ teacher }) {
                             <div className="w-8 h-8 bg-yellow-100 rounded-xl flex items-center justify-center">
                                 <ClockCircleOutlined className="text-yellow-600" />
                             </div>
-                            <span className="font-bold">Students With No Marks Recorded</span>
+                            <span className="font-bold">{t('teacher.noMarksRecordedTitle')}</span>
                             <Badge count={noMarksStudents.length} color="gold" />
                         </div>
                     }
                     className="rounded-2xl border-l-4 border-l-yellow-500 shadow-sm"
                 >
                     <Paragraph type="secondary" className="mb-4">
-                        These students in your classes have not been graded in any of your assessments this semester.
+                        {t('teacher.noMarksRecordedDesc')}
                     </Paragraph>
                     <List
                         dataSource={noMarksStudents}
@@ -191,7 +191,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                                             navigate('/teacher/mark-entry');
                                         }}
                                     >
-                                        Go to Mark Entry
+                                        {t('teacher.goToMarkEntry')}
                                     </Button>
                                 ]}
                             >
@@ -220,14 +220,14 @@ export default function TeacherUrgentMatters({ teacher }) {
                             <div className="w-8 h-8 bg-orange-100 rounded-xl flex items-center justify-center">
                                 <FormOutlined className="text-orange-500" />
                             </div>
-                            <span className="font-bold">Assessments With Missing Student Marks</span>
+                            <span className="font-bold">{t('teacher.missingStudentMarksTitle')}</span>
                             <Badge count={missingMarksByAssessment.reduce((s, a) => s + a.count, 0)} color="orange" />
                         </div>
                     }
                     className="rounded-2xl border-l-4 border-l-orange-500 shadow-sm"
                 >
                     <Paragraph type="secondary" className="mb-4">
-                        These assessments are missing marks for some students. Click "Fix Now" to jump straight to that assessment.
+                        {t('teacher.missingStudentMarksDesc')}
                     </Paragraph>
                     <List
                         dataSource={missingMarksByAssessment}
@@ -253,7 +253,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                                                 });
                                             }}
                                         >
-                                            Fix Now
+                                            {t('teacher.fixNow')}
                                         </Button>
                                     </Tooltip>
                                 ]}
@@ -272,7 +272,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                                             <div className="flex items-center gap-2">
                                                 <Tag color="orange">{assessment.subjectname}</Tag>
                                                 <Tag color="green">{formatGrade(assessment.grade)}</Tag>
-                                                <span className="text-orange-500 font-semibold">{count} students missing marks</span>
+                                                <span className="text-orange-500 font-semibold">{t('teacher.studentsMissingMarks', { count: count })}</span>
                                             </div>
                                             <div className="flex flex-wrap gap-2 mt-1">
                                                 {ungradedStudents.map(st => (
@@ -293,7 +293,7 @@ export default function TeacherUrgentMatters({ teacher }) {
 
             {totalIssues === 0 && myAssessments.length > 0 && (
                 <Card className="rounded-2xl border-none shadow-sm">
-                    <Empty description="No urgent matters. All students are graded for this semester!" />
+                    <Empty description={t('teacher.noUrgentMatters')} />
                 </Card>
             )}
         </div>

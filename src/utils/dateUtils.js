@@ -84,12 +84,24 @@ export const computeEthiopianYear = () => {
  * @returns {string} The Ethiopian year with ዓ.ም suffix.
  */
 export const getEthiopianYear = (dateInput) => {
-    const dateObj = dateInput instanceof Date ? dateInput : new Date(dateInput);
-    if (!dateObj || isNaN(dateObj.getTime())) return '—';
+    if (!dateInput) return '—';
     
-    // Ethiopian New Year is in September
-    const month = dateObj.getMonth();
-    const year = dateObj.getFullYear();
-    const etYear = month >= 8 ? year - 7 : year - 8;
-    return `${etYear} ዓ.ም`;
+    // 1. Try standard date parsing first (handles ISO strings correctly)
+    const dateObj = dateInput instanceof Date ? dateInput : new Date(dateInput);
+    
+    if (dateObj && !isNaN(dateObj.getTime())) {
+        // Ethiopian New Year is in September
+        const month = dateObj.getMonth();
+        const year = dateObj.getFullYear();
+        const etYear = month >= 8 ? year - 7 : year - 8;
+        return `${etYear} ዓ.ም`;
+    }
+
+    // 2. Fallback: If parsing failed, try to extract a 4-digit number from raw text (e.g. "2018 ዓ.ም")
+    if (typeof dateInput === 'string') {
+        const match = dateInput.match(/(\d{4})/);
+        if (match) return `${match[1]} ዓ.ም`;
+    }
+
+    return '—';
 };

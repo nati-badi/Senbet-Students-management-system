@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Row, Col, Card, Form, Input, Select, DatePicker, Button, Table, Tag, Space, Tooltip, Popconfirm, App, Upload, Skeleton, Empty } from 'antd';
-import { SearchOutlined, FilterOutlined, DownloadOutlined, UploadOutlined, EditOutlined, DeleteOutlined, UserOutlined, CopyOutlined, KeyOutlined, UserAddOutlined } from '@ant-design/icons';
+import { Typography, Row, Col, Card, Form, Input, Select, DatePicker, Button, Table, Tag, Space, Tooltip, Popconfirm, App, Upload, Skeleton, Empty, Modal, Tabs, Badge, Alert } from 'antd';
+import { SearchOutlined, FilterOutlined, DownloadOutlined, UploadOutlined, EditOutlined, DeleteOutlined, UserOutlined, CopyOutlined, KeyOutlined, UserAddOutlined, ExportOutlined, ImportOutlined, TeamOutlined, RiseOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import dayjs from 'dayjs';
@@ -10,7 +10,7 @@ import { db } from '../../db/database';
 import { syncData } from '../../utils/sync';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade, disabledDate } from '../../utils/gradeUtils';
 import { validateAmharic, validateEthiopianPhone } from '../../utils/validators';
-import { formatEthiopianDate } from '../../utils/dateUtils';
+import { formatEthiopianDate, getEthiopianYear } from '../../utils/dateUtils';
 import StudentProfile from '../../components/StudentProfile';
 
 const { Title, Text } = Typography;
@@ -18,6 +18,8 @@ const { Title, Text } = Typography;
 export default function StudentRegistration() {
     const [form] = Form.useForm();
     const [editForm] = Form.useForm();
+    const [promoteForm] = Form.useForm();
+    const { t } = useTranslation();
     const { message, notification, modal } = App.useApp();
 
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -32,6 +34,9 @@ export default function StudentRegistration() {
     const [filterGrade, setFilterGrade] = useState('');
     const [isFormValid, setIsFormValid] = useState(false);
     const [profileStudentId, setProfileStudentId] = useState(null);
+    const [activeTab, setActiveTab] = useState('active');
+    const [isPromoteModalVisible, setIsPromoteModalVisible] = useState(false);
+    const [promotingStudent, setPromotingStudent] = useState(null);
 
     const studentsData = useLiveQuery(() => db.students.orderBy('name').toArray());
     const students = studentsData || [];
@@ -66,10 +71,10 @@ export default function StudentRegistration() {
         if (existingWithSameName.length > 0) {
             const confirmed = await new Promise(resolve => {
                 modal.confirm({
-                    title: 'ይህ ስም በዳታባዚ ውስጥ ተመዘግቡዘል',
-                    content: `"‹${values.name}›" ዋነም በዳታባዜው Ꭻሎች ይገኙ። ዘመዘግብዘት ይፈልጋቸሎል?`,
-                    okText: 'ዘመዘግብ (ዱቤል)',
-                    cancelText: 'ተወሃ',
+                    title: t('admin.duplicateNameTitle'),
+                    content: t('admin.duplicateNameContent', { name: values.name }),
+                    okText: t('admin.registerDuplicate'),
+                    cancelText: t('admin.cancelAction'),
                     onOk: () => resolve(true),
                     onCancel: () => resolve(false),
                 });
@@ -90,10 +95,10 @@ export default function StudentRegistration() {
             form.resetFields();
             form.setFieldsValue({ dateOfEntry: dayjs() });
             setIsFormValid(false);
-            message.success('ተማሪ በተሳካ ሁኙ ተመዘግቷል!');
+            message.success(t('admin.studentRegistered'));
             await syncData().catch(console.error);
         } catch (err) {
-            message.error('ተማሪ መዘግበት አልታቸለም።');
+            message.error(t('admin.studentRegisterFailed'));
         }
     };
 
@@ -101,11 +106,46 @@ export default function StudentRegistration() {
         try {
             await db.students.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'students', recordId: id });
-            message.success('Student removed locally. Propagating to cloud...');
+            message.success(t('admin.studentDeleted'));
             await syncData().catch(console.error);
         } catch (err) {
-            message.error('Delete failed.');
+            message.error(t('admin.deleteFailed'));
         }
+    };
+
+    const handleArchive = async (id) => {
+        try {
+            await db.students.update(id, { 
+                archived: 1, 
+                synced: 0, 
+                updated_at: new Date().toISOString() 
+            });
+            message.success(t('admin.studentArchived'));
+            await syncData().catch(console.error);
+        } catch (err) {
+            message.error(t('admin.archiveFailed'));
+        }
+    };
+
+    const handleRestore = async (id, name) => {
+        modal.confirm({
+            title: t('admin.restoreTitle'),
+            content: t('admin.restoreContent', { name }),
+            okText: t('admin.restore'),
+            onOk: async () => {
+                try {
+                    await db.students.update(id, { 
+                        archived: 0, 
+                        synced: 0, 
+                        updated_at: new Date().toISOString() 
+                    });
+                    message.success(t('admin.studentRestored'));
+                    await syncData().catch(console.error);
+                } catch (err) {
+                    message.error(t('admin.restoreFailed'));
+                }
+            }
+        });
     };
 
     const showEditModal = (student) => {
@@ -129,10 +169,53 @@ export default function StudentRegistration() {
                 updated_at: new Date().toISOString()
             });
             setIsEditModalVisible(false);
-            message.success('Student record updated.');
+            message.success(t('admin.studentUpdated'));
             await syncData().catch(console.error);
         } catch (err) {
             console.error("Failed to edit student:", err);
+        }
+    };
+
+    const showPromoteModal = (student) => {
+        setPromotingStudent(student);
+        const currentGradeNum = normalizeGrade(student.grade);
+        const nextGradeNum = currentGradeNum + 1;
+        const nextGradeOption = GRADE_OPTIONS.find(o => normalizeGrade(o.value) === nextGradeNum);
+        
+        // Default to next year if year is in ISO format
+        let nextYear = student.academicYear;
+        try {
+            const date = dayjs(student.academicYear);
+            if (date.isValid()) {
+                nextYear = date.add(1, 'year').toISOString();
+            }
+        } catch (e) {}
+
+        promoteForm.setFieldsValue({
+            grade: nextGradeOption ? nextGradeOption.value : student.grade,
+            academicYear: dayjs(nextYear)
+        });
+        setIsPromoteModalVisible(true);
+    };
+
+    const handlePromoteSave = async () => {
+        try {
+            const values = await promoteForm.validateFields();
+            const academicYear = values.academicYear.toISOString();
+
+            await db.students.update(promotingStudent.id, {
+                grade: values.grade,
+                academicYear,
+                archived: 0, // Ensure they are active if promoted from archive
+                synced: 0,
+                updated_at: new Date().toISOString()
+            });
+            
+            setIsPromoteModalVisible(false);
+            message.success(t('admin.promotedSuccess', { name: promotingStudent.name }));
+            await syncData().catch(console.error);
+        } catch (err) {
+            console.error("Promotion failed:", err);
         }
     };
 
@@ -194,7 +277,7 @@ export default function StudentRegistration() {
             const dateKey = keys.find(k => k.toLowerCase().includes('year') || k.includes('ቀን'));
 
             if (!nameKey || !gradeKey) {
-                notification.error({ title: 'Missing Required Columns' });
+                notification.error({ title: t('admin.missingColumnsError') });
                 return;
             }
 
@@ -224,7 +307,7 @@ export default function StudentRegistration() {
 
         if (bulkStudents.length > 0) {
             await db.students.bulkAdd(bulkStudents);
-            notification.success({ title: `Imported ${bulkStudents.length} students.` });
+            notification.success({ title: t('admin.importSuccess', { count: bulkStudents.length }) });
         }
     };
 
@@ -258,7 +341,7 @@ export default function StudentRegistration() {
             });
             
             if (missing.length === 0) {
-                message.info('All students already have portal codes.');
+                message.info(t('admin.allCodesExist'));
                 return;
             }
 
@@ -280,11 +363,11 @@ export default function StudentRegistration() {
                 });
             }
             
-            message.success(`Generated codes for ${missing.length} students.`);
+            message.success(t('admin.codesGenerated', { count: missing.length }));
             await syncData().catch(console.error);
         } catch (error) {
             console.error('Error generating codes:', error);
-            message.error('Failed to generate codes');
+            message.error(t('admin.codesGenerateFailed'));
         }
     };
 
@@ -301,14 +384,19 @@ export default function StudentRegistration() {
                 synced: 0,
                 updated_at: new Date().toISOString()
             });
-            message.success('Code generated');
+            message.success(t('admin.codeGenerated'));
             await syncData().catch(console.error);
         } catch (error) {
-            message.error('Failed to generate code');
+            message.error(t('admin.codeGenerateFailed'));
         }
     };
 
     const filteredStudents = students.filter(s => {
+        // Filter by Tab (Active vs Archive)
+        const isArchived = s.archived === 1;
+        if (activeTab === 'active' && isArchived) return false;
+        if (activeTab === 'archive' && !isArchived) return false;
+
         const query = (searchQuery || "").toLowerCase();
         const matchesSearch = (s.name || "").toLowerCase().includes(query) ||
             (s.baptismalName || s.baptismalname || "").toLowerCase().includes(query) ||
@@ -352,7 +440,7 @@ export default function StudentRegistration() {
             sorter: (a, b) => normalizeGrade(a.grade) - normalizeGrade(b.grade) 
         },
         { 
-            title: t('admin.portalCode', 'Portal Code'), 
+            title: t('admin.portalCode'), 
             dataIndex: 'portalCode', 
             render: (code, record) => {
                 const actualCode = code || record.portalCode || record.portalcode;
@@ -364,7 +452,7 @@ export default function StudentRegistration() {
                             onClick={() => handleSingleGenerate(record.id)}
                             className="p-0 h-auto text-xs"
                         >
-                            Generate
+                            {t('common.generate')}
                         </Button>
                     );
                 }
@@ -400,7 +488,19 @@ export default function StudentRegistration() {
             title: t('common.actions'), key: 'actions', align: 'right', render: (_, r) => (
                 <Space>
                     <Button type="text" icon={<EditOutlined />} onClick={() => showEditModal(r)} />
-                    <Popconfirm title="Delete?" onConfirm={() => handleDelete(r.id)}><Button type="text" danger icon={<DeleteOutlined />} /></Popconfirm>
+                    {r.archived === 1 ? (
+                        <Tooltip title={t('admin.restoreToActive')}>
+                            <Button type="text" icon={<ImportOutlined className="text-green-500" />} onClick={() => handleRestore(r.id, r.name)} />
+                        </Tooltip>
+                    ) : (
+                        <Tooltip title={t('admin.archiveGraduate')}>
+                            <Button type="text" icon={<ExportOutlined className="text-orange-500" />} onClick={() => handleArchive(r.id)} />
+                        </Tooltip>
+                    )}
+                    <Popconfirm title={t('common.deleteConfirm')} onConfirm={() => handleDelete(r.id)}><Button type="text" danger icon={<DeleteOutlined />} /></Popconfirm>
+                    <Tooltip title={t('admin.promote', 'Promote to Next Grade')}>
+                        <Button type="text" icon={<RiseOutlined className="text-amber-500" />} onClick={() => showPromoteModal(r)} />
+                    </Tooltip>
                     <Button type="text" icon={<UserOutlined className="text-blue-500" />} onClick={() => setProfileStudentId(r.id)} />
                 </Space>
             )
@@ -409,25 +509,25 @@ export default function StudentRegistration() {
 
     return (
         <div className="flex flex-col gap-6 w-full">
-            <Title level={2}>{t('admin.registerNewStudent')}</Title>
+            <h2 className="text-2xl font-bold mb-6">{t('admin.registerNewStudent')}</h2>
             <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                 <Form form={form} onFinish={handleRegister} layout="vertical" initialValues={{ gender: 'Male' }} onValuesChange={handleValuesChange}>
                     <Row gutter={16}>
                         <Col xs={24} md={12}><Form.Item label={t('admin.fullName')} name="name" rules={[{ required: true }, { validator: validateAmharic }]}><Input /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.baptismalNameField')} name="baptismalName" rules={[{ required: true }, { validator: validateAmharic }]}><Input /></Form.Item></Col>
-                        <Col xs={24} md={12}><Form.Item label={t('admin.gender')} name="gender"><Select options={[{ value: 'Male', label: 'Male' }, { value: 'Female', label: 'Female' }]} /></Form.Item></Col>
+                        <Col xs={24} md={12}><Form.Item label={t('admin.gender')} name="gender"><Select options={[{ value: 'Male', label: t('admin.male') }, { value: 'Female', label: t('admin.female') }]} /></Form.Item></Col>
                         <Col xs={24} md={12}>
                             <Form.Item label={t('admin.dateOfEntry')} name="dateOfEntry" initialValue={dayjs()} extra={regDateOfEntry ? <EthiopianDatePreview value={regDateOfEntry} /> : null}>
-                                <DatePicker className="w-full" disabledDate={disabledDate} />
+                                <DatePicker className="w-full" disabledDate={disabledDate} placeholder={t('admin.selectDate')} />
                             </Form.Item>
                         </Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.gradeClass')} name="grade" rules={[{ required: true }]}><Select options={GRADE_OPTIONS} showSearch /></Form.Item></Col>
-                        <Col xs={24} md={12}><Form.Item label={t('admin.portalCode', 'Portal Access Code')} name="portalCode" tooltip="6-digit access code for parent login. Leave empty to auto-generate."><Input placeholder="Auto-generates if empty" maxLength={6} /></Form.Item></Col>
+                        <Col xs={24} md={12}><Form.Item label={t('admin.portalAccessCode')} name="portalCode" tooltip={t('admin.portalCodeTooltip')}><Input placeholder={t('admin.autoGeneratePlaceholder')} maxLength={6} /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.parentContact')} name="parentContact" rules={[{ required: true }, { validator: validateEthiopianPhone }]}><Input maxLength={10} /></Form.Item></Col>
                     </Row>
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
                         <Button icon={<DownloadOutlined />} onClick={downloadTemplate}>
-                            {t('admin.downloadTemplate', 'Download Import Template')}
+                            {t('admin.downloadTemplate')}
                         </Button>
                         <Upload showUploadList={false} beforeUpload={handleImportFile}><Button icon={<UploadOutlined />}>{t('admin.importData')}</Button></Upload>
                         <Button type="primary" htmlType="submit" disabled={!isFormValid}>{t('common.save')}</Button>
@@ -438,12 +538,12 @@ export default function StudentRegistration() {
             <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
                     <FilterOutlined className="text-slate-500" />
-                    <Text type="secondary" strong className="text-sm uppercase tracking-wide">Filter Students</Text>
+                    <span className="text-slate-500 font-bold text-sm uppercase tracking-wide">{t('admin.filterStudents')}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
                     <Input prefix={<SearchOutlined />} placeholder={t('admin.searchPlaceholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} allowClear className="max-w-md" />
                     <Select
-                        placeholder={`← ${t('admin.allGrades', 'All Grades')} (Filter by Grade)`}
+                        placeholder={`← ${t('admin.allGrades')} ${t('admin.filterByGrade')}`}
                         value={filterGrade}
                         onChange={setFilterGrade}
                         allowClear
@@ -457,10 +557,36 @@ export default function StudentRegistration() {
                         onClick={handleGenerateAllCodes}
                         className="bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 rounded-xl"
                     >
-                        {t('admin.fixMissingCodes', 'Fix Missing Codes')}
+                        {t('admin.fixMissingCodes')}
                     </Button>
                 </div>
             </div>
+
+            <Tabs 
+                activeKey={activeTab} 
+                onChange={setActiveTab}
+                className="mt-4"
+                items={[
+                    {
+                        key: 'active',
+                        label: (
+                            <span className="flex items-center gap-2 px-2">
+                                <TeamOutlined /> {t('admin.activeStudents', 'Active Students')}
+                                <Badge count={students.filter(s => !s.archived).length} className="ml-1" overflowCount={999} style={{ backgroundColor: '#10b981' }} />
+                            </span>
+                        )
+                    },
+                    {
+                        key: 'archive',
+                        label: (
+                            <span className="flex items-center gap-2 px-2">
+                                <ExportOutlined /> {t('admin.archiveGraduated', 'Archive (Graduated)')}
+                                <Badge count={students.filter(s => s.archived === 1).length} className="ml-1" overflowCount={999} style={{ backgroundColor: '#f59e0b' }} />
+                            </span>
+                        )
+                    }
+                ]}
+            />
 
             <Table
                 columns={columns}
@@ -473,7 +599,7 @@ export default function StudentRegistration() {
                     pageSizeOptions: ['10', '20', '50', '100'],
                     showQuickJumper: true,
                     position: ['bottomRight'],
-                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} ${t('common.paginationOf')} ${total}`,
                 }}
             />
 
@@ -486,6 +612,33 @@ export default function StudentRegistration() {
                         <Col xs={24} md={12}><Form.Item label={t('admin.portalCode', 'Portal Access Code')} name="portalCode" rules={[{ required: true }]}><Input maxLength={6} /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.parentContact')} name="parentContact" rules={[{ required: true }]}><Input /></Form.Item></Col>
                     </Row>
+                </Form>
+            </Modal>
+
+            <Modal title={<span><RiseOutlined className="text-amber-500 mr-2" /> {t('admin.promoteStudent', 'Promote Student')}</span>} open={isPromoteModalVisible} onOk={handlePromoteSave} onCancel={() => setIsPromoteModalVisible(false)} forceRender={true} okText={t('admin.promote', 'Promote')}>
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                    <div className="text-xs text-amber-700 uppercase font-bold tracking-wider mb-1">{t('admin.promotingStudent')}</div>
+                    <div className="text-lg font-bold text-slate-800">{promotingStudent?.name}</div>
+                    <div className="text-xs text-slate-500 mt-1">{t('admin.currentGradeLabel')} {promotingStudent?.grade} ({getEthiopianYear(promotingStudent?.academicYear)})</div>
+                </div>
+                <Form form={promoteForm} layout="vertical">
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item label={t('admin.promoteToGrade', 'Promote to Grade')} name="grade" rules={[{ required: true }]}>
+                                <Select options={GRADE_OPTIONS} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={24}>
+                            <Form.Item label={t('admin.newAcademicYear', 'Effective Academic Year')} name="academicYear" rules={[{ required: true }]} extra={<EthiopianDatePreview value={Form.useWatch('academicYear', promoteForm)} />}>
+                                <DatePicker className="w-full" disabledDate={disabledDate} placeholder={t('admin.selectDate')} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    <Alert 
+                        type="info" 
+                        showIcon 
+                        message={t('admin.promoteAlertInfo')} 
+                    />
                 </Form>
             </Modal>
             <StudentProfile studentId={profileStudentId} visible={!!profileStudentId} onClose={() => setProfileStudentId(null)} />

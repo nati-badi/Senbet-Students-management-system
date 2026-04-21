@@ -127,117 +127,75 @@ db.version(18).stores({
   settings: "key, value, updated_at"
 });
 
-db.version(20).stores({
+db.version(22).stores({
   students: "++id, name, baptismalName, gender, academicYear, grade, parentContact, portalCode, synced, updated_at",
   attendance: "++id, studentId, date, status, semester, synced, updated_at, [studentId+date]",
-  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, semester, synced, updated_at, [studentId+assessmentId]",
+  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, semester, academicYear, synced, updated_at, [studentId+assessmentId]",
   subjects: "++id, name, semester, synced, updated_at",
-  assessments: "++id, name, subjectName, grade, maxScore, date, semester, synced, updated_at",
+  assessments: "++id, name, subjectName, grade, maxScore, date, semester, academicYear, synced, updated_at",
   teachers: "++id, name, phone, accessCode, assignedGrades, assignedSubjects, synced, updated_at",
   settings: "key, value, updated_at",
   deleted_records: "++id, tableName, recordId"
 }).upgrade(async trans => {
-  const genUUID = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  };
-
-  const studentMap = new Map();
-  const teacherMap = new Map();
-  const assessmentMap = new Map();
-  const subjectMap = new Map();
-
-  // 1. Primary entities
-  const migrateTable = async (tableName, map) => {
-    const records = await trans[tableName].toArray();
-    for (const record of records) {
-      const oldId = record.id;
-      if (typeof oldId === 'number' || !String(oldId).includes('-')) {
-        const newId = genUUID();
-        map.set(oldId, newId);
-        await trans[tableName].delete(oldId);
-        await trans[tableName].add({ ...record, id: newId });
-      }
-    }
-  };
-
-  await migrateTable('students', studentMap);
-  await migrateTable('teachers', teacherMap);
-  await migrateTable('subjects', subjectMap);
-  await migrateTable('assessments', assessmentMap);
-
-  // 2. Marks (Update FKs)
-  const allMarks = await trans.marks.toArray();
-  for (const m of allMarks) {
-    let changed = false;
-    const oldId = m.id;
-    if (studentMap.has(m.studentId)) { m.studentId = studentMap.get(m.studentId); changed = true; }
-    if (assessmentMap.has(m.assessmentId)) { m.assessmentId = assessmentMap.get(m.assessmentId); changed = true; }
-    
-    // Convert own ID if numeric
-    if (typeof oldId === 'number' || !String(oldId).includes('-')) {
-      const newId = genUUID();
-      await trans.marks.delete(oldId);
-      await trans.marks.add({ ...m, id: newId });
-    } else if (changed) {
-      await trans.marks.put(m);
-    }
-  }
-
-  // 3. Attendance (Update FKs)
-  const allAtt = await trans.attendance.toArray();
-  for (const a of allAtt) {
-    let changed = false;
-    const oldId = a.id;
-    if (studentMap.has(a.studentId)) { a.studentId = studentMap.get(a.studentId); changed = true; }
-    
-    // Convert own ID if numeric
-    if (typeof oldId === 'number' || !String(oldId).includes('-')) {
-      const newId = genUUID();
-      await trans.attendance.delete(oldId);
-      await trans.attendance.add({ ...a, id: newId });
-    } else if (changed) {
-      await trans.attendance.put(a);
-    }
-  }
-
-  // 4. Deleted records (Update recordId and own ID)
-  const allDel = await trans.deleted_records.toArray();
-  for (const dr of allDel) {
-    const oldId = dr.id;
-    let changed = false;
-    const map = dr.tableName === 'students' ? studentMap : 
-                dr.tableName === 'teachers' ? teacherMap :
-                dr.tableName === 'assessments' ? assessmentMap :
-                dr.tableName === 'subjects' ? subjectMap : null;
-    
-    if (map && map.has(dr.recordId)) {
-      dr.recordId = map.get(dr.recordId);
-      changed = true;
-    }
-
-    if (typeof oldId === 'number' || !String(oldId).includes('-')) {
-      const newId = genUUID();
-      await trans.deleted_records.delete(oldId);
-      await trans.deleted_records.add({ ...dr, id: newId });
-    } else if (changed) {
-      await trans.deleted_records.put(dr);
-    }
-  }
+  // Backfill existing assessments and marks with the current year from settings if possible, 
+  // or a default fallback based on date or computeEthiopianYear.
+  const settings = await trans.settings.toArray();
+  const currentYear = settings.find(s => s.key === 'currentAcademicYear')?.value || new Date().getFullYear().toString();
+  
+  await trans.assessments.toCollection().modify(a => {
+    if (!a.academicYear) a.academicYear = currentYear;
+  });
+  
+  await trans.marks.toCollection().modify(m => {
+    if (!m.academicYear) m.academicYear = currentYear;
+  });
 });
 
-db.version(21).upgrade(async trans => {
-  // Force a one-time re-sync for all tables that migrated to UUIDs in v20.
-  // This ensures the server gets the new UUID identities.
-  const tablesToReset = ['students', 'teachers', 'subjects', 'assessments', 'marks', 'attendance'];
-  for (const tableName of tablesToReset) {
-    if (trans[tableName]) {
-      await trans[tableName].toCollection().modify({ synced: 0 });
+
+db.version(23).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, archived, parentContact, portalCode, synced, updated_at",
+  attendance: "++id, studentId, date, status, semester, synced, updated_at, [studentId+date]",
+  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, semester, academicYear, synced, updated_at, [studentId+assessmentId]",
+  subjects: "++id, name, semester, synced, updated_at",
+  assessments: "++id, name, subjectName, grade, maxScore, date, semester, academicYear, synced, updated_at",
+  teachers: "++id, name, phone, accessCode, assignedGrades, assignedSubjects, synced, updated_at",
+  settings: "key, value, updated_at",
+  deleted_records: "++id, tableName, recordId"
+}).upgrade(async trans => {
+  // Migrate students in Grade 13 (Graduated) to the new archived flag
+  await trans.students.toCollection().modify(s => {
+    if (String(s.grade) === '13') {
+        s.archived = 1;
+    } else {
+        s.archived = 0;
     }
-  }
+  });
+});
+
+db.version(24).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, archived, parentContact, portalCode, synced, updated_at",
+  attendance: "++id, studentId, date, status, semester, academicYear, synced, updated_at, [studentId+date]",
+  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, semester, academicYear, synced, updated_at, [studentId+assessmentId]",
+  subjects: "++id, name, semester, synced, updated_at",
+  assessments: "++id, name, subjectName, grade, maxScore, date, semester, academicYear, synced, updated_at",
+  teachers: "++id, name, phone, accessCode, assignedGrades, assignedSubjects, synced, updated_at",
+  settings: "key, value, updated_at",
+  deleted_records: "++id, tableName, recordId"
+}).upgrade(async trans => {
+  // We use a safe default year if none found (Start of 2017 E.C.)
+  const fallbackYear = "2017-09-11T00:00:00.000Z"; 
+  
+  await trans.marks.toCollection().modify(m => {
+    if (!m.academicYear) m.academicYear = fallbackYear;
+  });
+  
+  await trans.assessments.toCollection().modify(a => {
+    if (!a.academicYear) a.academicYear = fallbackYear;
+  });
+
+  await trans.attendance.toCollection().modify(a => {
+    if (!a.academicYear) a.academicYear = fallbackYear;
+  });
 });
 
 // Attempt to open and gracefully recover if a fatal schema conflict occurs 

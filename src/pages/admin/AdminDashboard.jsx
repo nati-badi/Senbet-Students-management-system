@@ -80,7 +80,7 @@ export default function AdminDashboard() {
     const navigate = useNavigate();
     const { t } = useTranslation();
 
-    const menuItems = [
+    const menuItems = React.useMemo(() => [
         {
             type: 'group',
             label: <span className="text-xs uppercase tracking-widest text-slate-400 px-2">{t('admin.menu')}</span>,
@@ -126,11 +126,6 @@ export default function AdminDashboard() {
                     label: t('admin.idCards')
                 },
                 {
-                    key: '/admin/data',
-                    icon: <DatabaseOutlined />,
-                    label: t('admin.systemData')
-                },
-                {
                     key: '/admin/reports',
                     icon: <DatabaseOutlined />,
                     label: t('admin.reportsBackups', 'Reports & Backups')
@@ -159,7 +154,7 @@ export default function AdminDashboard() {
 
             ]
         },
-    ];
+    ], [t]);
 
     return (
         <div className="flex flex-col w-full h-full">

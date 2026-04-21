@@ -43,16 +43,16 @@ export default function SystemDataManagement() {
             }
 
             notification.success({
-                title: 'Database Erased',
-                description: 'All data has been erased from both this device and the cloud server. Mobile devices will be cleared on next sync.',
+                message: t('admin.databaseErased', 'Database Erased'),
+                description: t('admin.databaseErasedDesc', 'All data has been erased from both this device and the cloud server. Mobile devices will be cleared on next sync.'),
                 placement: 'topRight',
                 duration: 5,
             });
         } catch (error) {
             console.error('Wipe error:', error);
             notification.error({
-                title: 'Wipe Failed',
-                description: 'Failed to completely wipe the database. ' + (error?.message || ''),
+                message: t('admin.wipeFailedTitle', 'Wipe Failed'),
+                description: t('admin.wipeFailedDesc', 'Failed to completely wipe the database. ') + (error?.message || ''),
                 placement: 'topRight',
             });
         }

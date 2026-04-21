@@ -15,40 +15,42 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
     
     console.log(`${SYNC_LOG_PREFIX} Pulling ${cloudData.length} updates for ${tableName}...`);
     
-    // Fetch local unsynced records to detect conflicts
-    // Bypass potential IndexedDB index corruption by filtering in-memory
+    // Map all local records to detect existence and state
     const allTableRecords = await tableDb.toArray();
-    const currentUnsynced = allTableRecords.filter(r => r.synced === 0);
-    const unsyncedMap = new Map(currentUnsynced.map(r => [r.id, r]));
+    const localMap = new Map(allTableRecords.map(r => [r.id, r]));
     
     const localReadyData = [];
     
     for (const serverRecord of cloudData) {
         let shouldApply = false;
-        const localRecord = unsyncedMap.get(serverRecord.id);
+        const localRecord = localMap.get(serverRecord.id);
         
         if (!localRecord) {
-            // No local record exists, definitely apply it
+            // New record from cloud, definitely apply
             shouldApply = true;
         } else {
-            // Conflict! Check which one is newer. 
-            // Fallback to created_at if updated_at is missing (e.g. if SQL migration not yet run)
+            // Local record already exists
             const serverTime = (serverRecord.updated_at || serverRecord.created_at) 
                 ? new Date(serverRecord.updated_at || serverRecord.created_at).getTime() 
                 : 1;
             
             const localTime = localRecord.updated_at ? new Date(localRecord.updated_at).getTime() : 0;
             
-            // Conflict Buffer: If the times are nearly identical (within 2 seconds), trust the local data 
-            // if the local record was unsynced, as it likely means the user just saved it.
-            const TIME_BUFFER_MS = 2000;
-            
-            if (serverTime > (localTime + TIME_BUFFER_MS)) {
-                console.log(`${SYNC_LOG_PREFIX} Conflict resolved: Server is newer for ${tableName}:${serverRecord.id}`);
-                shouldApply = true;
+            if (localRecord.synced === 1) {
+                // If it was already synced, only apply if server is strictly newer
+                if (serverTime > localTime) {
+                    shouldApply = true;
+                }
             } else {
-                console.log(`${SYNC_LOG_PREFIX} Conflict resolved: Local is newer or too close for ${tableName}:${serverRecord.id} (Keeping local)`);
-                shouldApply = false;
+                // Conflict! Local has unsynced changes
+                const TIME_BUFFER_MS = 2000;
+                if (serverTime > (localTime + TIME_BUFFER_MS)) {
+                    console.log(`${SYNC_LOG_PREFIX} Conflict resolved: Server is newer for ${tableName}:${serverRecord.id}`);
+                    shouldApply = true;
+                } else {
+                    console.log(`${SYNC_LOG_PREFIX} Conflict resolved: Local is newer or too close for ${tableName}:${serverRecord.id} (Keeping local)`);
+                    shouldApply = false;
+                }
             }
         }
         
@@ -66,8 +68,10 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
             } else if (tableName === 'assessments') {
                 if (serverRecord.subjectname !== undefined) { mapped.subjectName = serverRecord.subjectname; delete mapped.subjectname; }
                 if (serverRecord.maxscore !== undefined) { mapped.maxScore = serverRecord.maxscore; delete mapped.maxscore; }
+                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete serverRecord.academicyear; }
             } else if (tableName === 'attendance') {
                 if (serverRecord.studentid !== undefined) { mapped.studentId = serverRecord.studentid; delete mapped.studentid; }
+                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete serverRecord.academicyear; }
                 if (serverRecord.last_modified_by !== undefined) { mapped.markedBy = serverRecord.last_modified_by; }
             } else if (tableName === 'marks') {
                 if (serverRecord.studentid !== undefined) { mapped.studentId = serverRecord.studentid; delete mapped.studentid; }
@@ -76,6 +80,8 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
                 if (serverRecord.assessmentid !== undefined) { mapped.assessmentId = serverRecord.assessmentid; delete mapped.assessmentid; }
                 if (serverRecord.assessmentId !== undefined && mapped.assessmentId === undefined) { mapped.assessmentId = serverRecord.assessmentId; }
                 
+                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete serverRecord.academicyear; }
+
                 if (serverRecord.assessmentdate !== undefined) { mapped.assessmentDate = serverRecord.assessmentdate; delete mapped.assessmentdate; }
                 if (serverRecord.subject !== undefined) { mapped.subject = serverRecord.subject; }
                 if (serverRecord.semester !== undefined) { mapped.semester = serverRecord.semester; }
@@ -293,6 +299,7 @@ export async function syncData({ force = false } = {}) {
                                 parentcontact: record.parentContact || record.parentcontact,
                                 academicyear: record.academicYear || record.academicyear,
                                 portalcode: record.portalCode || record.portalcode,
+                                archived: record.archived || 0,
                                 updated_at: record.updated_at
                             };
                         } else if (tableName === 'assessments') {
@@ -304,6 +311,7 @@ export async function syncData({ force = false } = {}) {
                                 date: record.date,
                                 subjectname: record.subjectName || record.subjectname,
                                 maxscore: record.maxScore || record.maxscore,
+                                academicyear: record.academicYear || record.academicyear,
                                 updated_at: record.updated_at
                             };
                         } else if (tableName === 'marks') {
@@ -315,6 +323,7 @@ export async function syncData({ force = false } = {}) {
                                 studentid: record.studentId || record.studentid,
                                 assessmentid: record.assessmentId || record.assessmentid,
                                 assessmentdate: record.assessmentDate || record.assessmentdate,
+                                academicyear: record.academicYear || record.academicyear,
                                 last_modified_by: record.markedBy || record.markedby || record.last_modified_by,
                                 updated_at: record.updated_at
                             };
@@ -325,6 +334,7 @@ export async function syncData({ force = false } = {}) {
                                 status: record.status,
                                 semester: record.semester,
                                 studentid: record.studentId || record.studentid,
+                                academicyear: record.academicYear || record.academicyear,
                                 last_modified_by: record.markedBy || record.markedby || record.last_modified_by,
                                 updated_at: record.updated_at
                             };

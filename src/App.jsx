@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Layout, Menu, Button, Space, Typography, ConfigProvider, theme, Badge, Tooltip, App as AntApp } from 'antd';
+import enUS from 'antd/locale/en_US';
 import {
   BookOutlined,
   UserOutlined,
@@ -32,6 +33,14 @@ function AppContent({ isDarkMode, toggleTheme }) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAdminAuth, setIsAdminAuth] = useState(() => sessionStorage.getItem('admin_auth') === 'true');
+  const [teacherSession, setTeacherSession] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('senbet_teacher_auth');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
   const [activeRole, setActiveRole] = useState(() => sessionStorage.getItem('active_role') || null);
   const [lastSync, setLastSync] = useState(() => localStorage.getItem('last_sync_time') || null);
   const location = useLocation();
@@ -64,12 +73,23 @@ function AppContent({ isDarkMode, toggleTheme }) {
     }
   };
 
+  const navigate = useNavigate();
   const handleAdminLogout = () => {
     setIsAdminAuth(false);
     sessionStorage.removeItem('admin_auth');
     sessionStorage.removeItem('active_role');
     setActiveRole(null);
+    navigate('/');
     message.info(t('parent.loggedOut'));
+  };
+
+  const handleTeacherLogout = () => {
+    setTeacherSession(null);
+    sessionStorage.removeItem('senbet_teacher_auth');
+    sessionStorage.removeItem('active_role');
+    setActiveRole(null);
+    navigate('/');
+    message.info(t('common.logout', 'Logged out'));
   };
 
   const handleSync = useCallback(async ({ silent = false, force = false } = {}) => {
@@ -110,7 +130,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
   }, [isOnline, handleSync]);
 
   return (
-    <Layout className="min-h-screen flex-1 w-full flex flex-col bg-slate-50 dark:bg-slate-950">
+    <Layout className="min-h-screen w-full flex flex-col bg-slate-50 dark:bg-slate-950" style={{ minHeight: '100vh' }}>
       <Header
         className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-50 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800"
         style={{ height: '64px' }}
@@ -118,9 +138,20 @@ function AppContent({ isDarkMode, toggleTheme }) {
         <Space align="center" size="small">
           <Link to="/" className="flex items-center gap-2 notranslate" translate="no">
             <img src="/logo.png" alt="Logo" className="w-9 h-9 object-cover rounded-full shadow-sm flex-shrink-0" />
-            <Title level={4} style={{ margin: 0, fontSize: '1rem', maxWidth: '220px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }} className="hidden sm:block">
+            <span 
+              className="hidden lg:block font-bold text-slate-800 dark:text-slate-100"
+              style={{ 
+                margin: 0, 
+                fontSize: '1.1rem', 
+                maxWidth: '500px', 
+                overflow: 'hidden', 
+                whiteSpace: 'nowrap', 
+                textOverflow: 'ellipsis',
+                letterSpacing: '-0.01em'
+              }}
+            >
               በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት
-            </Title>
+            </span>
           </Link>
         </Space>
 
@@ -168,9 +199,9 @@ function AppContent({ isDarkMode, toggleTheme }) {
               {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
             </Button>
 
-            {isAdminAuth && (
+            {(isAdminAuth || teacherSession) && (
                <Button
-                  onClick={handleAdminLogout}
+                  onClick={isAdminAuth ? handleAdminLogout : handleTeacherLogout}
                   icon={<LogoutOutlined />}
                   type="primary"
                   danger
@@ -183,7 +214,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
         </div>
       </Header>
 
-      <Content className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+      <Content className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full min-h-[70vh]">
         <Routes>
           <Route path="/" element={<Home activeRole={activeRole} isDesktop={!!window.__TAURI_INTERNALS__} />} />
           <Route 
@@ -192,7 +223,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
           />
           <Route 
             path="/teacher/*" 
-            element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <TeacherDashboard />} 
+            element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <TeacherDashboard teacherSession={teacherSession} setTeacherSession={setTeacherSession} />} 
           />
           <Route 
             path="/parent" 
@@ -210,6 +241,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
 }
 
 export default function SenbetApp() {
+  const { t, i18n } = useTranslation();
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
   const themeTransitionTimeoutRef = useRef(null);
 
@@ -233,8 +265,38 @@ export default function SenbetApp() {
     setIsDarkMode(v => !v);
   };
 
+  const isAmharic = i18n.language.startsWith('am');
+  const antdLocale = isAmharic ? {
+    ...enUS,
+    Pagination: {
+      ...enUS.Pagination,
+      items_per_page: t('common.perPage', ' / ገጽ'),
+      jump_to: 'ወደ',
+      jump_to_confirm: 'አረጋግጥ',
+      page: 'ገጽ',
+      prev_page: 'ያለፈው ገጽ',
+      next_page: 'ቀጣዩ ገጽ',
+      prev_5: 'ያለፉት 5 ገጾች',
+      next_5: 'ቀጣይ 5 ገጾች',
+      prev_3: 'ያለፉት 3 ገጾች',
+      next_3: 'ቀጣይ 3 ገጾች',
+    },
+    Table: {
+      ...enUS.Table,
+      filterTitle: 'ማጣሪያ',
+      filterConfirm: 'እሺ',
+      filterReset: 'አጽዳ',
+      selectAll: 'ሁሉንም ምረጥ',
+      selectInvert: 'ምርጫውን ገልብጥ',
+    },
+    Empty: {
+      description: 'ምንም መረጃ የለም'
+    }
+  } : enUS;
+
   return (
     <ConfigProvider
+      locale={antdLocale}
       theme={{
         algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
         cssVar: true,
@@ -269,7 +331,7 @@ export default function SenbetApp() {
 function Home({ activeRole, isDesktop }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
+    <div className="flex flex-col items-center justify-center min-h-[75vh] text-center p-4">
       {/* Bilingual title — always show both languages */}
       <Title level={1} style={{ marginBottom: '16px' }}>ወደ በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት እንኳን በደህና መጡ</Title>
       <Text type="secondary" style={{ fontSize: '1.125rem', maxWidth: '600px', marginBottom: '32px' }}>
@@ -310,7 +372,7 @@ function Home({ activeRole, isDesktop }) {
 function AdminLogin({ onLogin }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center justify-center min-h-[50vh]">
+    <div className="flex-1 flex items-center justify-center w-full py-12">
       <Card 
         className="w-full max-w-md shadow-2xl rounded-3xl overflow-hidden border-slate-100 dark:border-slate-800"
         title={

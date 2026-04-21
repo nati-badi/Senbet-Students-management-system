@@ -42,5 +42,10 @@
     ],
     "publisher": "Finote Birhan Senbet School",
     "category": "Education"
+  },
+  "plugins": {
+    "shell": {
+      "open": ".*"
+    }
   }
 }

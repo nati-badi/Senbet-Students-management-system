@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import dayjs from 'dayjs';
 import { db } from '../../db/database';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
+import { formatEthiopianDate } from '../../utils/dateUtils';
 import { supabase } from '../../utils/supabaseClient';
 import { syncData } from '../../utils/sync';
 
@@ -31,7 +32,12 @@ export default function AssessmentManagement() {
                    String(s.grade).trim() === String(selectedGrade).trim();
         })
         .sort((a, b) => (a.name || '').localeCompare(b.name || '', i18n.language === 'am' ? 'am' : 'en'));
-    const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
+    const settings = useLiveQuery(() => db.settings.toArray()) || [];
+    const currentYear = settings.find(s => s.key === 'currentAcademicYear')?.value;
+
+    const allAssessments = useLiveQuery(() => db.assessments.toArray()) || [];
+    // Filter to only show assessments for the active academic year
+    const assessments = (allAssessments || []).filter(a => !currentYear || a.academicYear === currentYear);
 
     const handleSave = async (values) => {
         try {
@@ -45,6 +51,7 @@ export default function AssessmentManagement() {
                 maxScore: parseFloat(values.maxScore),
                 date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
                 semester: semester,
+                academicYear: currentYear || computeEthiopianYear().toString(),
                 synced: 0
             };
 
@@ -67,7 +74,7 @@ export default function AssessmentManagement() {
             setIsFormModalOpen(false);
             await syncData().catch(console.error);
         } catch (err) {
-            message.error("Error saving assessment");
+            message.error(t('admin.assessmentSaveError'));
         }
     };
 
@@ -87,7 +94,7 @@ export default function AssessmentManagement() {
             message.success(t('admin.assessmentDeleted'));
             await syncData().catch(console.error);
         } catch (err) {
-            message.error("Failed to delete assessment");
+            message.error(t('admin.assessmentDeleteError'));
         }
     };
 
@@ -104,7 +111,7 @@ export default function AssessmentManagement() {
                         {t('admin.dangerous.confirmType')} <Text code strong className="text-red-600 dark:text-red-400">RESET</Text>
                     </Paragraph>
                     <Input 
-                        placeholder="Type RESET here" 
+                        placeholder={t('admin.dangerous.resetPlaceholder', 'Type RESET here')} 
                         className="dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                         onChange={(e) => window._wipeConfirm = e.target.value}
                     />
@@ -164,7 +171,12 @@ export default function AssessmentManagement() {
                 return <Tag color="gold">{t(`admin.${sem === 'Semester II' ? 'semester2' : 'semester1'}`, sem)}</Tag>;
             }
         },
-        { title: t('teacher.date'), dataIndex: 'date', key: 'date' },
+        { 
+            title: t('teacher.date'), 
+            dataIndex: 'date', 
+            key: 'date',
+            render: (text) => formatEthiopianDate(text)
+        },
         {
             title: t('common.actions'),
             key: 'actions',
@@ -202,8 +214,8 @@ export default function AssessmentManagement() {
             {contextHolder}
             <div className="flex justify-between items-center bg-white dark:bg-slate-900/50 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
                 <div>
-                    <Title level={2} style={{ margin: 0 }}>{t('admin.assessments')}</Title>
-                    <Text type="secondary">{t('admin.manageAssessments')}</Text>
+                    <h2 className="text-2xl font-bold m-0">{t('admin.assessments')}</h2>
+                    <span className="text-slate-500">{t('admin.manageAssessments')}</span>
                 </div>
                 <Button 
                     type="primary" 
@@ -217,7 +229,7 @@ export default function AssessmentManagement() {
             </div>
 
             <Modal
-                title={<Title level={3} className="m-0">{editingId ? t('admin.editAssessment') : t('admin.addAssessment')}</Title>}
+                title={<h3 className="text-lg font-bold m-0">{editingId ? t('admin.editAssessment') : t('admin.addAssessment')}</h3>}
                 open={isFormModalOpen}
                 onCancel={closeModal}
                 footer={null}
@@ -292,7 +304,12 @@ export default function AssessmentManagement() {
                                     name="date"
                                     label={t('teacher.date')}
                                 >
-                                    <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} className="h-10" />
+                                    <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} placeholder={t('admin.selectDate')} className="h-10" />
+                                    {form.getFieldValue('date') && (
+                                        <div className="mt-1 text-xs text-slate-500 italic">
+                                            {formatEthiopianDate(form.getFieldValue('date').toDate())}
+                                        </div>
+                                    )}
                                 </Form.Item>
                             </Col>
                         </Row>
