@@ -406,10 +406,10 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
       await AsyncStorage.setItem('last_sync_time', now);
       await AsyncStorage.setItem('last_sync_iso', nextAnchor);
 
-      if (!isBackground) showToast('✅ ' + t('common.syncComplete', 'Sync complete'), 'success');
+      if (!isBackground) showToast(t('common.syncComplete', 'Sync complete'), 'success');
     } catch (err: any) {
       console.error('Sync error', err);
-      if (!isBackground) showToast('⚠️ ' + t('common.syncFailed', 'Sync failed'), 'error');
+      if (!isBackground) showToast(t('common.syncFailed', 'Sync failed'), 'error');
     } finally {
       if (!isBackground) setSyncing(false);
     }
@@ -527,11 +527,6 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
                     <Text style={s.sidebarText}>{isDark ? t('common.lightMode') : t('common.darkMode')}</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity onPress={() => { syncData(); props.navigation.closeDrawer(); }} style={[s.sidebarItem, { marginTop: 12 }]}>
-                    <View style={[s.sidebarIcon, { backgroundColor: C.green + '10' }]}><RefreshCw size={18} color={C.green} /></View>
-                    <Text style={[s.sidebarText, { flex: 1 }]}>{t('common.sync')}</Text>
-                    {syncing && <ActivityIndicator size="small" color={C.accent} />}
-                  </TouchableOpacity>
                 </View>
               </DrawerContentScrollView>
             )
@@ -632,7 +627,7 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
                   listeners={{
                     tabPress: (e) => {
                       e.preventDefault();
-                      showToast('📅 ' + t('common.comingSoon', 'Coming Soon'), 'info');
+                      showToast(t('common.comingSoon', 'Coming Soon'), 'info');
                     },
                   }}
                 >

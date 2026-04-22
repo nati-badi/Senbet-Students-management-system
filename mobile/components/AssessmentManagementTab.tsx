@@ -91,7 +91,7 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
       const { error } = await supabase.from('assessments').upsert(record, { onConflict: 'id' });
       if (error) throw error;
 
-      showToast(editingId ? '✅ Assessment updated' : '✅ Assessment created', 'success');
+      showToast(editingId ? 'Assessment updated' : 'Assessment created', 'success');
       setModalVisible(false);
       setName(''); setMaxScore(''); setEditingId(null); setModalError(null);
       if (onRefresh) onRefresh();
@@ -106,11 +106,11 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
     try {
       const { error } = await supabase.from('assessments').delete().eq('id', id);
       if (error) throw error;
-      showToast(`🗑️ ${t('assessment.deletedSuccess')}`, 'success');
+      showToast(`${t('assessment.deletedSuccess')}`, 'success');
       setDeleteConfirmId(null);
       if (onRefresh) onRefresh();
     } catch (err: any) {
-      showToast(`❌ ${err.message || t('common.error')}`, 'error');
+      showToast(`${err.message || t('common.error')}`, 'error');
     }
   };
 

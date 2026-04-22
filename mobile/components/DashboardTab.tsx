@@ -69,28 +69,6 @@ export const DashboardTab = React.memo(({ teacher, students: allStudents, assess
             <Text style={{ color: C.muted, fontSize: 12 }}>{lastSync ? `${t('common.synced')} ${lastSync}` : t('common.notSynced')}</Text>
           </View>
         </View>
-        <TouchableOpacity 
-          onPress={() => {
-              showToast?.(t('common.syncing', 'Syncing...'), 'info');
-              onSync();
-          }} 
-          disabled={isSyncing}
-          activeOpacity={0.7}
-          style={{ 
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: C.accent + '15', 
-              justifyContent: 'center',
-              alignItems: 'center',
-          }}
-        >
-          {isSyncing ? (
-            <ActivityIndicator size="small" color={C.accent} />
-          ) : (
-            <RefreshCw size={24} color={C.accent} strokeWidth={2.5} />
-          )}
-        </TouchableOpacity>
       </View>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
