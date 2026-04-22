@@ -528,6 +528,13 @@ function ProfileSection({ student, onLogout, toggleTheme, toggleLanguage, isDark
 
 function LoginSection({ onLogin }) {
     const { t } = useTranslation();
+    const [form] = Form.useForm();
+
+    const handleSubmit = (values) => {
+        onLogin(values);
+        form.resetFields();
+    };
+
     return (
         <div className="max-w-md mx-auto py-12">
             <Card className="shadow-2xl border-slate-100 dark:border-slate-800 rounded-3xl overflow-hidden">
@@ -537,7 +544,7 @@ function LoginSection({ onLogin }) {
                     <Paragraph className="text-white/80">{t('parent.loginDesc')}</Paragraph>
                 </div>
                 <div className="p-8">
-                    <Form layout="vertical" onFinish={onLogin} size="large">
+                    <Form form={form} layout="vertical" onFinish={handleSubmit} size="large">
                         <Form.Item 
                             label={t('common.studentName')} 
                             name="studentName" 

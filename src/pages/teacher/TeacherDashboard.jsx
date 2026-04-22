@@ -419,6 +419,7 @@ function TeacherLogin({ onLogin }) {
             message.error(t('teacher.loginError'));
             return;
         }
+        form.resetFields();
         sessionStorage.setItem('senbet_teacher_auth', JSON.stringify(match));
         onLogin(match);
         message.success(t('teacher.loginSuccess'));

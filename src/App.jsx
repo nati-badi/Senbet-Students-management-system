@@ -426,6 +426,13 @@ function Home({ activeRole, isDesktop }) {
 
 function AdminLogin({ onLogin }) {
   const { t } = useTranslation();
+  const [form] = Form.useForm();
+
+  const handleSubmit = (values) => {
+    onLogin(values.password);
+    form.resetFields();
+  };
+
   return (
     <div className="flex-1 flex items-center justify-center w-full py-12">
       <Card 
@@ -439,8 +446,9 @@ function AdminLogin({ onLogin }) {
         }
       >
         <Form 
+          form={form}
           layout="vertical" 
-          onFinish={(v) => onLogin(v.password)}
+          onFinish={handleSubmit}
           requiredMark={false}
         >
           <Form.Item 

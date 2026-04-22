@@ -143,6 +143,9 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
         setRes.data.forEach((r: any) => { sMap[r.key] = r.value; });
         setSettings(sMap);
       }
+      // Clear login fields after success
+      setStudentName('');
+      setAccessCode('');
     } catch (err: any) {
       Alert.alert('Error', err.message);
     } finally {
@@ -585,6 +588,9 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, toggleTheme, 
         setErrorMsg(t('auth.invalidLogin', 'Invalid name or access code.'));
         return;
       }
+      // Clear login fields after success
+      setName('');
+      setCode('');
       onLogin(data);
     } catch (err: any) {
       setErrorMsg(err.message || t('auth.loginFailed', 'Login failed.'));
