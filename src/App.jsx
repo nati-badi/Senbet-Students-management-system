@@ -130,6 +130,14 @@ function AppContent({ isDarkMode, toggleTheme }) {
     return () => clearInterval(interval);
   }, [isOnline, handleSync]);
 
+  if (location.pathname.startsWith('/verify/')) {
+    return (
+      <Routes>
+        <Route path="/verify/:id" element={<VerifyCertificate />} />
+      </Routes>
+    );
+  }
+
   return (
     <Layout className="min-h-screen w-full flex flex-col bg-slate-50 dark:bg-slate-950" style={{ minHeight: '100vh' }}>
       <Header
@@ -233,7 +241,6 @@ function AppContent({ isDarkMode, toggleTheme }) {
             path="/parent" 
             element={window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <ParentPortal toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} handleSync={handleSync} isDarkMode={isDarkMode} />} 
           />
-          <Route path="/verify/:id" element={<VerifyCertificate />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Content>
@@ -242,6 +249,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
         በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት ©{new Date().getFullYear()}
       </Footer>
     </Layout>
+
   );
 }
 
