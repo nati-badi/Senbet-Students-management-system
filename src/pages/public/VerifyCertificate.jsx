@@ -8,7 +8,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { supabase } from '../../utils/supabaseClient';
 import { calculateSubjectRows, calculateSingleStudentRank } from '../../utils/analyticsEngine';
-import { getEthiopianYear } from '../../utils/dateUtils';
+import { getEthiopianYear, formatEthiopianDate } from '../../utils/dateUtils';
 
 const { Text } = Typography;
 
@@ -269,9 +269,12 @@ export default function VerifyCertificate() {
                 <div style={{ padding: '8px', background: 'white', borderRadius: '8px', border: '1.5px solid #C9A227' }}>
                     <QRCodeCanvas value={`https://senbet-students-management-system.vercel.app/verify/${student.id}`} size={64} level="H" />
                 </div>
-                <div style={{ maxWidth: '140px' }}>
+                <div style={{ maxWidth: '160px' }}>
                     <span className="cert-amharic" style={{ fontSize: '12px', fontWeight: '800', color: '#0F3A2B', display: 'block' }}>ትክክለኛ ዲጂታል ማስረጃ</span>
-                    <span style={{ fontSize: '9px', color: '#666' }}>Verified official document record.</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+                        <span className="cert-amharic" style={{ fontSize: '9px', color: '#666', fontWeight: '700' }}>የተሰጠበት ቀን፦ {formatEthiopianDate(new Date())}</span>
+                        <span style={{ fontSize: '9px', color: '#888' }}>ID: {student.id.slice(0,8)}</span>
+                    </div>
                 </div>
             </div>
             <div style={{ display: 'flex', gap: '48px' }}>

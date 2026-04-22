@@ -63,7 +63,7 @@ const EthiopicClockWidget = () => {
                         <span className="text-6xl font-light tracking-tight text-slate-800 dark:text-white">{etTime}</span>
                         <span className="text-2xl text-slate-400 dark:text-slate-500 font-normal">{etSuffix}</span>
                     </div>
-                    <span className="text-slate-400 dark:text-slate-500 mt-2 text-base tracking-wide">{gregDateStr}</span>
+                    <span className="text-slate-400 dark:text-slate-500 mt-2 text-base tracking-wide">{formatEthiopianDate(timeObj)}</span>
                 </div>
 
                 <div className="w-px h-16 bg-slate-200 dark:bg-slate-700/50 mx-4"></div>

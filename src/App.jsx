@@ -49,11 +49,53 @@ function AppContent({ isDarkMode, toggleTheme }) {
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
+    
+    // Fullscreen toggle on F11
+    const handleKeyDown = async (e) => {
+      if (e.key === 'F11') {
+        console.log('F11 pressed');
+        e.preventDefault();
+        
+        // Try Tauri Native Fullscreen first
+        if (window.__TAURI_INTERNALS__) {
+          console.log('Tauri internals detected');
+          try {
+            const { getCurrentWindow } = await import('@tauri-apps/api/window');
+            const appWindow = getCurrentWindow();
+            const isFullscreen = await appWindow.isFullscreen();
+            console.log('Current fullscreen state:', isFullscreen);
+            await appWindow.setFullscreen(!isFullscreen);
+            console.log('Native fullscreen toggle requested');
+            return;
+          } catch (err) {
+            console.warn('Native Tauri fullscreen failed, falling back to Web API:', err);
+          }
+        }
+
+        console.log('Falling back to Web Fullscreen API');
+        // Web API Fallback
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().then(() => {
+            console.log('Web fullscreen enabled');
+          }).catch(err => {
+            console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+          });
+        } else {
+          document.exitFullscreen().then(() => {
+            console.log('Web fullscreen disabled');
+          });
+        }
+      }
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 

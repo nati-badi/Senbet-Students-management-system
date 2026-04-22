@@ -895,7 +895,7 @@ function CertificateTemplate({ student, marks, subjects = [], assessments = [], 
                         <span className="cert-amharic" style={{ fontSize: '9px', color: '#666', maxWidth: '140px', lineHeight: 1.4, fontWeight: '500' }}>ትክክለኛነቱን ለማረጋገጥ ይህንን ይጠቀሙ።</span>
                         <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #E5E7EB' }}>
                             <span className="cert-amharic" style={{ fontSize: '9px', color: '#666', fontWeight: '800', letterSpacing: '0.05em' }}>የተሰጠበት ቀን፦ </span>
-                            <span className="cert-amharic" style={{ fontSize: '10px', fontWeight: '600', color: '#0A0A0A' }}>{dayjs().format('MMM D, YYYY')}</span>
+                            <span className="cert-amharic" style={{ fontSize: '10px', fontWeight: '600', color: '#0A0A0A' }}>{formatEthiopianDate(new Date())}</span>
                         </div>
                     </div>
                 </div>

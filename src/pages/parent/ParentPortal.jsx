@@ -233,8 +233,8 @@ function HomeSection({ onNavigate, handleSync }) {
                         <List
                             itemLayout="horizontal"
                             dataSource={[
-                                { title: 'Semester Exams Schedule', date: 'March 15, 2026', desc: 'The upcoming semester exams are scheduled to begin on April 1st.', color: 'blue' },
-                                { title: 'Parent-Teacher Meeting', date: 'March 20, 2026', desc: 'Join us for a discussion on student progress this Friday at 4 PM.', color: 'green' }
+                                { title: 'Semester Exams Schedule', date: formatEthiopianDate('2026-03-15'), desc: 'The upcoming semester exams are scheduled to begin on April 1st.', color: 'blue' },
+                                { title: 'Parent-Teacher Meeting', date: formatEthiopianDate('2026-03-20'), desc: 'Join us for a discussion on student progress this Friday at 4 PM.', color: 'green' }
                             ]}
                             renderItem={item => (
                                 <List.Item className="px-4 py-5 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors border-none">

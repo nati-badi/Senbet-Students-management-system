@@ -45,13 +45,13 @@ export const EthiopicClockWidget = React.memo(({ C }: { C: any }) => {
             <Text style={{ fontSize: 38, fontWeight: '700', color: C.text, letterSpacing: -1 }}>{etTime}</Text>
             <Text style={{ fontSize: 14, fontWeight: '600', color: C.muted, marginLeft: 6 }}>{etSuffix}</Text>
           </View>
-          <Text style={{ fontSize: 13, color: C.muted, marginTop: 2, fontWeight: '500' }}>{gregDateStr}</Text>
+          <Text style={{ fontSize: 13, color: C.muted, marginTop: 2, fontWeight: '500' }}>{ethDayName}</Text>
         </View>
 
         <View style={{ width: 1, height: 40, backgroundColor: C.border, marginHorizontal: 12 }} />
 
         <View style={{ alignItems: 'flex-end', flex: 1 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.accent, marginBottom: 2 }}>{ethDayName}</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: C.accent, marginBottom: 2 }}>{ethDayName}</Text>
           <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>{ethpoianDateStr}</Text>
         </View>
       </View>

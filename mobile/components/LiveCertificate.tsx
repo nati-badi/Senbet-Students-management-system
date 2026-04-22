@@ -4,6 +4,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { useTranslation } from 'react-i18next';
 import { Student, Assessment, isConduct } from '../utils';
 import { calculateSingleStudentRank, calculateSubjectRows } from '../analyticsEngine';
+import { formatEthiopianDate } from '../dateUtils';
 
 export const LiveCertificate = React.memo(({ 
   student, 
@@ -172,8 +173,8 @@ export const LiveCertificate = React.memo(({
                         backgroundColor="#fdfbf7" 
                     />
                     <View style={styles.verifyInfo}>
-                        <Text style={styles.verifyTitle}>OFFICIAL RECORD</Text>
-                        <Text style={styles.verifySub}>Digitally verified academic transcript. {new Date().toLocaleDateString()}</Text>
+                        <Text style={styles.verifyTitle}>ትክክለኛ ዲጂታል ማስረጃ</Text>
+                        <Text style={styles.verifySub}>ትክክለኛነቱ በዲጂታል የተረጋገጠ የውጤት መግለጫ። {formatEthiopianDate(new Date())}</Text>
                     </View>
                 </View>
             </View>

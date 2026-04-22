@@ -5,7 +5,7 @@ import {
     FileProtectOutlined
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import { getEthiopianYear } from '../utils/dateUtils';
+import { getEthiopianYear, formatEthiopianDate } from '../utils/dateUtils';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -151,6 +151,28 @@ const LiveCertificate = ({ student, subjectRows, rankingInfo, missingAssessments
                                 <span className="text-base md:text-lg font-bold text-[#5c4033]">{overallRank} / {totalInGrade}</span>
                             </div>
                         )}
+                    </div>
+                    
+                    {/* Record Date & QR Info */}
+                    <div className="flex flex-col md:flex-row justify-between items-center mt-10 pt-6 border-t border-[#e8dfce]/50 gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className="p-2 bg-white rounded-lg border border-[#d4af37]/20">
+                                <div className="w-10 h-10 flex items-center justify-center text-[#d4af37]">
+                                    <FileProtectOutlined style={{ fontSize: '24px' }} />
+                                </div>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-[#5c4033] uppercase tracking-widest leading-none mb-1">ትክክለኛ ዲጂታል ማስረጃ</span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-[9px] text-[#8c7361] font-bold uppercase tracking-tighter">የተመዘገበበት ቀን፦</span>
+                                    <span className="text-[11px] font-bold text-[#2c1810]">{formatEthiopianDate(new Date())}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="text-[9px] text-[#8c7361] italic max-w-[200px] text-center md:text-right leading-relaxed">
+                            {t('parent.liveCertDisclaimer', 'This digital record is updated in real-time as assessments are graded by teachers.')}
+                        </div>
                     </div>
                 </div>
 

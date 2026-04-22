@@ -44,7 +44,7 @@ export default function ReportsAndBackups() {
             // 2. Add Info Header
             worksheet.mergeCells('A3:G3');
             const infoCell = worksheet.getCell('A3');
-            infoCell.value = `Report Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+            infoCell.value = `ሪፖርቱ የተዘጋጀበት ቀን፦ ${formatEthiopianDate(new Date())} ${formatEthiopianTime(new Date())}`;
             infoCell.font = { italic: true };
             infoCell.alignment = { horizontal: 'right' };
 

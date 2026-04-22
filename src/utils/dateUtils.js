@@ -6,16 +6,16 @@ import i18next from 'i18next';
  * @param {boolean} forceAmharic - Whether to force the output to be in Amharic regardless of current locale.
  * @returns {string} The formatted Ethiopian date.
  */
-export const formatEthiopianDate = (dateInput, forceAmharic = false) => {
+export const formatEthiopianDate = (dateInput, forceAmharic = true) => {
     const dateObj = (dateInput && typeof dateInput === 'string' && dateInput.includes('T'))
         ? new Date(dateInput)
         : (dateInput instanceof Date ? dateInput : (dateInput ? new Date(dateInput) : new Date()));
 
     if (!dateObj || isNaN(dateObj.getTime())) return dateInput || '—';
 
-    const currentLang = i18next.language || 'am';
-    const isAmharic = forceAmharic || currentLang.startsWith('am');
-    const locale = isAmharic ? 'am-ET-u-ca-ethiopic' : 'en-ET-u-ca-ethiopic';
+    // Default to 'am' locale for Ethiopian calendar if not specified
+    const locale = forceAmharic ? 'am-ET-u-ca-ethiopic' : (i18next.language?.startsWith('am') ? 'am-ET-u-ca-ethiopic' : 'en-ET-u-ca-ethiopic');
+    const isAmharic = forceAmharic || (i18next.language?.startsWith('am'));
 
     try {
         const formatter = new Intl.DateTimeFormat(locale, {

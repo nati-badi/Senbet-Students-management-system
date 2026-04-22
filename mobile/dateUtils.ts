@@ -22,18 +22,16 @@ export const formatEthiopianDate = (dateInput: string | Date | any): string => {
             day: 'numeric'
         });
         
-        // Use formatToParts to avoid "ERA1" artifacts and force a consistent order
-        const parts = formatter.formatToParts(dateObj);
-        const day = parts.find(p => p.type === 'day')?.value || '';
-        const month = parts.find(p => p.type === 'month')?.value || '';
-        const year = parts.find(p => p.type === 'year')?.value || '';
-
-        return `${month} ${day}, ${year}`;
+        let formatted = formatter.format(dateObj);
+        // Remove ERA artifacts and ensure ዓ.ም suffix
+        formatted = formatted.replace(/(AM|PM|ERA\d|ERA)/gi, '').trim() + ' ዓ.ም';
+        
+        return formatted;
     } catch (e) {
-        // Fallback for environments that don't support formatToParts or the locale properly
+        // Fallback for environments that don't support the locale properly
         try {
             const formatter = new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long', day: 'numeric' });
-            return formatter.format(dateObj).replace(/(ERA\d|ERA|AM|PM)/gi, '').trim();
+            return formatter.format(dateObj).replace(/(ERA\d|ERA|AM|PM)/gi, '').trim() + ' ዓ.ም';
         } catch (inner) {
             return String(dateInput || '—');
         }
