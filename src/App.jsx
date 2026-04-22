@@ -21,6 +21,7 @@ import { Form, Input, Card, Result } from 'antd';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import ParentPortal from './pages/parent/ParentPortal';
+import VerifyCertificate from './pages/public/VerifyCertificate';
 import { syncData } from './utils/sync';
 import { formatEthiopianTime } from './utils/dateUtils';
 
@@ -232,6 +233,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
             path="/parent" 
             element={window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <ParentPortal toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} handleSync={handleSync} isDarkMode={isDarkMode} />} 
           />
+          <Route path="/verify/:id" element={<VerifyCertificate />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Content>

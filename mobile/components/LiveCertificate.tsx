@@ -166,7 +166,7 @@ export const LiveCertificate = React.memo(({
                 {/* Verification Section */}
                 <View style={styles.verification}>
                     <QRCode 
-                        value={student.id} 
+                        value={`https://senbet-students-management-system.vercel.app/verify/${student.id}`} 
                         size={60} 
                         color="#2c1810" 
                         backgroundColor="#fdfbf7" 

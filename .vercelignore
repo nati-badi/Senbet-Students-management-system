@@ -1,0 +1,9 @@
+node_modules
+mobile
+src-tauri
+target
+.expo
+android
+ios
+*.db
+*.sqlite

@@ -654,7 +654,7 @@ function IDCardTemplate({ student }) {
                 
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                     <div style={{ padding: '6px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #f1f5f9' }}>
-                        <QRCodeCanvas value={student.id} size={42} level="H" />
+                        <QRCodeCanvas value={`https://senbet-students-management-system.vercel.app/verify/${student.id}`} size={42} level="H" />
                     </div>
                     <span className="cert-amharic" style={{ fontSize: '6px', fontWeight: '800', color: '#94a3b8', letterSpacing: '0.05em' }}>የተረጋገጠ</span>
                 </div>
@@ -888,7 +888,7 @@ function CertificateTemplate({ student, marks, subjects = [], assessments = [], 
                 {/* Official QR Code & Issue Date */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div style={{ padding: '8px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid rgba(201,162,39,0.4)' }}>
-                        <QRCodeCanvas value={`verify:${student.id}|yr:${getEthiopianYear(student.academicYear || dayjs().toISOString())}`} size={64} level="M" />
+                        <QRCodeCanvas value={`https://senbet-students-management-system.vercel.app/verify/${student.id}`} size={64} level="M" />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <span className="cert-amharic" style={{ fontSize: '12px', fontWeight: '800', color: '#0F3A2B', letterSpacing: '0.05em' }}>ትክክለኛ ማስረጃ</span>
