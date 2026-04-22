@@ -182,22 +182,25 @@ function AppContent({ isDarkMode, toggleTheme }) {
               />
             </Tooltip>
 
-            <Button
-              onClick={toggleTheme}
-              icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
-              className="cursor-pointer"
-              type="text"
-              size="small"
-            />
+            {/* Global Settings (Hidden on mobile portals, moved into portal sidebars/settings) */}
+            <div className="hidden lg:flex items-center gap-2">
+              <Button
+                onClick={toggleTheme}
+                icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
+                className="cursor-pointer"
+                type="text"
+                size="small"
+              />
 
-            <Button
-              onClick={toggleLanguage}
-              icon={<GlobalOutlined />}
-              className="font-bold cursor-pointer"
-              size="small"
-            >
-              {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
-            </Button>
+              <Button
+                onClick={toggleLanguage}
+                icon={<GlobalOutlined />}
+                className="font-bold cursor-pointer"
+                size="small"
+              >
+                {i18n.language.startsWith('am') ? 'EN' : 'አማ'}
+              </Button>
+            </div>
 
             {(isAdminAuth || teacherSession) && (
                <Button
@@ -223,11 +226,11 @@ function AppContent({ isDarkMode, toggleTheme }) {
           />
           <Route 
             path="/teacher/*" 
-            element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <TeacherDashboard teacherSession={teacherSession} setTeacherSession={setTeacherSession} />} 
+            element={!window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <TeacherDashboard teacherSession={teacherSession} setTeacherSession={setTeacherSession} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} handleSync={handleSync} isDarkMode={isDarkMode} />} 
           />
           <Route 
             path="/parent" 
-            element={window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <ParentPortal />} 
+            element={window.__TAURI_INTERNALS__ ? <Navigate to="/" replace /> : <ParentPortal toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} handleSync={handleSync} isDarkMode={isDarkMode} />} 
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

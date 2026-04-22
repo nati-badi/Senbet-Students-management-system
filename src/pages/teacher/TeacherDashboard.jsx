@@ -20,7 +20,11 @@ import {
     WarningOutlined,
     SyncOutlined,
     CloudSyncOutlined,
-    ClearOutlined
+    ClearOutlined,
+    GlobalOutlined,
+    MoonOutlined,
+    SunOutlined,
+    LogoutOutlined
 } from '@ant-design/icons';
 import {
     Layout,
@@ -42,7 +46,11 @@ import {
     Badge,
     Skeleton,
     Empty,
-    App
+    App,
+    Switch,
+    Segmented,
+    Descriptions,
+    Radio
 } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -56,8 +64,9 @@ import StudentProfile from '../../components/StudentProfile';
 import StudentAnalytics from '../admin/StudentAnalytics';
 import TeacherUrgentMatters from './TeacherUrgentMatters';
 import TeacherAssessmentManagement from './TeacherAssessmentManagement';
-import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
+import { formatGrade, normalizeGrade, GRADE_OPTIONS } from '../../utils/gradeUtils';
 import { Navigate } from 'react-router-dom';
+import BottomNavBar from '../../components/BottomNavBar';
 
 const { Title, Text, Paragraph } = Typography;
 const { Sider, Content } = Layout;
@@ -104,9 +113,8 @@ const EthiopicClockWidget = () => {
     );
 };
 
-export default function TeacherDashboard({ teacherSession, setTeacherSession }) {
-    const location = useLocation();
-    const { t } = useTranslation();
+export default function TeacherDashboard({ teacherSession, setTeacherSession, toggleTheme, toggleLanguage, handleSync, isDarkMode }) {
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const { message, notification, modal } = App.useApp();
     const [profileStudentId, setProfileStudentId] = useState(null);
@@ -181,6 +189,18 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession }) 
             ),
             disabled: true
         },
+        {
+            key: '/teacher/profile',
+            icon: <UserOutlined />,
+            label: t('teacher.profile', 'Profile & Settings')
+        },
+    ];
+
+    const mobileNavItems = [
+        { key: '/teacher/mark-entry', icon: <EditOutlined />, label: t('teacher.markEntry') },
+        { key: '/teacher/analytics', icon: <BarChartOutlined />, label: t('admin.analytics') },
+        { key: '/teacher/urgent', icon: <WarningOutlined />, label: t('admin.urgent') },
+        { key: '/teacher/profile', icon: <UserOutlined />, label: t('teacher.profile') },
     ];
 
     return (
@@ -221,16 +241,87 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession }) 
                     </div>
                 </div>
             </Card>
-            {/* Mobile Navigation */}
-            <div className="lg:hidden bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-                <Menu
-                    mode="horizontal"
-                    selectedKeys={[location.pathname]}
-                    items={menuItems}
-                    onClick={({ key }) => navigate(key)}
-                    className="border-none w-full overflow-x-auto flex-nowrap hide-scrollbar"
-                />
-            </div>
+
+            <Routes>
+                <Route path="/profile" element={
+                    <div className="space-y-6">
+                        <Card 
+                            title={<Space><GlobalOutlined className="text-blue-600" /> <span className="font-bold">{t('common.settings', 'Portal Settings')}</span></Space>}
+                            className="shadow-xl border-none rounded-[2rem]"
+                        >
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl">
+                                    <Space>
+                                        <span className="text-xl">{isDarkMode ? <MoonOutlined className="text-blue-400" /> : <SunOutlined className="text-amber-500" />}</span>
+                                        <span className="font-bold text-sm">{t('common.darkMode', 'Dark Mode')}</span>
+                                    </Space>
+                                    <Switch checked={isDarkMode} onChange={toggleTheme} />
+                                </div>
+
+                                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl">
+                                    <Space>
+                                         <GlobalOutlined className="text-forest-600 text-xl" />
+                                         <span className="font-bold text-sm">{t('common.language', 'Language')}</span>
+                                    </Space>
+                                    <Segmented 
+                                        value={i18n.language.startsWith('am') ? 'am' : 'en'} 
+                                        onChange={(v) => i18n.changeLanguage(v)}
+                                        options={[
+                                            { label: 'አማ', value: 'am' },
+                                            { label: 'EN', value: 'en' }
+                                        ]}
+                                        className="bg-slate-200 dark:bg-slate-700 h-9"
+                                    />
+                                </div>
+
+                                <Button 
+                                    type="primary"
+                                    size="large"
+                                    block 
+                                    icon={<SyncOutlined />} 
+                                    onClick={() => handleSync()}
+                                    className="h-14 font-black rounded-2xl mt-4 shadow-lg shadow-forest-500/20 bg-forest-600 border-none"
+                                >
+                                    {t('common.syncNow', 'Manual Sync')}
+                                </Button>
+
+                                <Button 
+                                    danger 
+                                    block 
+                                    size="large" 
+                                    icon={<LogoutOutlined />} 
+                                    onClick={() => {
+                                        setTeacherSession(null);
+                                        sessionStorage.removeItem('senbet_teacher_auth');
+                                        navigate('/');
+                                    }}
+                                    className="h-14 font-black rounded-2xl mt-2 shadow-lg shadow-red-500/10 border-none"
+                                >
+                                    {t('common.logout')}
+                                </Button>
+                            </div>
+                        </Card>
+
+                        <Card 
+                            className="shadow-xl border-none rounded-[2rem] overflow-hidden"
+                            title={<Space><UserOutlined className="text-forest-600" /> <span className="font-bold">{t('teacher.profile')}</span></Space>}
+                        >
+                             <Descriptions column={1} className="px-2">
+                                <Descriptions.Item label={t('admin.name')}>{activeTeacher?.name}</Descriptions.Item>
+                                <Descriptions.Item label={t('admin.gender')}>{activeTeacher?.gender}</Descriptions.Item>
+                                <Descriptions.Item label={t('parent.accessCode')}>{activeTeacher?.accessCode || activeTeacher?.accesscode}</Descriptions.Item>
+                            </Descriptions>
+                        </Card>
+                    </div>
+                } />
+            </Routes>
+
+            {/* Mobile Bottom Navigation (Visible on lg-) */}
+            <BottomNavBar 
+                activeKey={location.pathname}
+                items={mobileNavItems}
+                onChange={(key) => navigate(key)}
+            />
 
             {/* Desktop: Sidebar + Content */}
             <div className="flex flex-row gap-6 items-start">

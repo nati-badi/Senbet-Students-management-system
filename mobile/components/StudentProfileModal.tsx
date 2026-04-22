@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Info, CalendarCheck, TrendingUp, Users } from 'lucide-react-native';
 import { Student, Assessment, normG, normS, isConduct } from '../utils';
 import { calculateSingleStudentRank, calculateSubjectRows } from '../analyticsEngine';
+import { LiveCertificate } from './LiveCertificate';
 
 export const StudentProfileModal = React.memo(({ student, onClose, assessments, marks, allStudents, subjects, settings, C, s }: {
   student: Student | null, onClose: () => void, assessments: Assessment[], marks: any[], allStudents: Student[], subjects: any[], settings: any, C: any, s: any
@@ -129,91 +130,15 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
                   </View>
                 )}
                 {subTab === 'cert' && (
-                  <View style={{ alignItems: 'center' }}>
-                    <View style={{ width: '100%', minHeight: 480, backgroundColor: '#fdfbf7', padding: 24, borderWidth: 1, borderColor: '#e8dfce', position: 'relative' }}>
-                      <View style={{ position: 'absolute', top: 12, left: 12, width: 16, height: 16, borderTopWidth: 1, borderLeftWidth: 1, borderColor: '#d4af37' }} />
-                      <View style={{ position: 'absolute', top: 12, right: 12, width: 16, height: 16, borderTopWidth: 1, borderRightWidth: 1, borderColor: '#d4af37' }} />
-                      <View style={{ position: 'absolute', bottom: 12, left: 12, width: 16, height: 16, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: '#d4af37' }} />
-                      <View style={{ position: 'absolute', bottom: 12, right: 12, width: 16, height: 16, borderBottomWidth: 1, borderRightWidth: 1, borderColor: '#d4af37' }} />
-
-                      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 24, gap: 12 }}>
-                        <Image source={require('../assets/logo.png')} style={{ width: 42, height: 42, resizeMode: 'contain' }} />
-                        <View style={{ alignItems: 'center' }}>
-                          <Text style={{ textAlign: 'center', color: '#2c1810', fontSize: 16, fontWeight: '900', marginBottom: 2 }}>በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት</Text>
-                          <Text style={{ textAlign: 'center', color: '#5c4033', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>የተማሪዎች ውጤት መግለጫ</Text>
-                        </View>
-                      </View>
-                      <View style={{ alignItems: 'center', marginBottom: 24 }}>
-                        <View style={{ width: 40, height: 1, backgroundColor: '#d4af37', marginBottom: 12 }} />
-                        <Text style={{ textAlign: 'center', color: '#8b0000', fontSize: 12, fontWeight: '900', letterSpacing: 1 }}>ACADEMIC TRANSCRIPT</Text>
-                      </View>
-
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', borderBottomWidth: 1, borderBottomColor: '#e8dfce', paddingBottom: 12, marginBottom: 24 }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>ሙሉ ስም / NAME</Text>
-                          <Text style={{ fontSize: 16, color: '#2c1810', fontWeight: '800', marginTop: 2 }}>{student.name}</Text>
-                          {!!(student.baptismalName || student.baptismalname) && (
-                            <Text style={{ fontSize: 12, color: '#5c4033', fontStyle: 'italic', marginTop: 2 }}>የክርስትና ስም: {student.baptismalName || student.baptismalname}</Text>
-                          )}
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                           <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>ክፍል / GRADE</Text>
-                           <Text style={{ fontSize: 14, color: '#2c1810', fontWeight: '800', marginTop: 2, marginBottom: 8 }}>{student.grade}</Text>
-                           <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>ዓ.ም / YEAR</Text>
-                           <Text style={{ fontSize: 14, color: '#2c1810', fontWeight: '800', marginTop: 2 }}>{getEthiopianYear(student.academicYear || student.academicyear)}</Text>
-                        </View>
-                      </View>
-
-                      <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(212, 175, 55, 0.3)', paddingBottom: 8, marginBottom: 8 }}>
-                          <Text style={{ flex: 2, fontSize: 9, color: '#8c7361', fontWeight: '800' }}>የትምህርት አይነት / SUBJECT</Text>
-                          <Text style={{ flex: 1, fontSize: 8, color: '#8c7361', fontWeight: '800', textAlign: 'center' }}>፩ኛ መንፈቀ ዓመት / SEM I</Text>
-                          <Text style={{ flex: 1, fontSize: 8, color: '#8c7361', fontWeight: '800', textAlign: 'center' }}>፪ኛ መንፈቀ ዓመት / SEM II</Text>
-                          <Text style={{ flex: 1, fontSize: 9, color: '#8c7361', fontWeight: '800', textAlign: 'center' }}>አማካይ / AVG</Text>
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        {subjectRows.length === 0 ? (
-                            <Text style={{ textAlign: 'center', padding: 24, fontStyle: 'italic', color: '#8c7361', fontSize: 12 }}>No assessments defined.</Text>
-                        ) : (
-                          subjectRows.map((row, i) => (
-                            <View key={i} style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(232, 223, 206, 0.5)' }}>
-                              <Text style={{ flex: 2, fontSize: 11, color: '#2c1810', fontWeight: '600' }}>{row.subject}</Text>
-                              <Text style={{ flex: 1, fontSize: 11, color: '#5c4033', textAlign: 'center' }}>{row.semI}</Text>
-                              <Text style={{ flex: 1, fontSize: 11, color: '#5c4033', textAlign: 'center' }}>{row.semII}</Text>
-                              <Text style={{ flex: 1, fontSize: 11, color: '#2c1810', textAlign: 'center', fontWeight: '800' }}>{row.avg}</Text>
-                            </View>
-                          ))
-                        )}
-                      </View>
-
-                      <View style={{ marginTop: 24 }}>
-                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#e8dfce' }}>
-                             <Text style={{ fontSize: 10, color: '#2c1810', fontWeight: '800', letterSpacing: 1 }}>አጠቃላይ ድምር / GRAND TOTAL</Text>
-                             <Text style={{ fontSize: 18, color: '#8b0000', fontWeight: '900' }}>{overallAvg}%</Text>
-                         </View>
-                         {totalInClass > 0 && (
-                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                                 <Text style={{ fontSize: 9, color: '#5c4033', fontWeight: '800', letterSpacing: 1 }}>ክፍል ደረጃ / CLASS RANK</Text>
-                                 <Text style={{ fontSize: 14, color: '#2c1810', fontWeight: '800' }}>{classRank} / {totalInClass}</Text>
-                             </View>
-                         )}
-                         {totalInGrade > 0 && (
-                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                                 <Text style={{ fontSize: 9, color: '#8c7361', fontWeight: '800', letterSpacing: 1 }}>አጠቃላይ ደረጃ / GRADE RANK</Text>
-                                 <Text style={{ fontSize: 12, color: '#5c4033', fontWeight: '700' }}>{overallRank} / {totalInGrade}</Text>
-                             </View>
-                         )}
-
-                         <View style={{ marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#e8dfce', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                           <QRCode value={student.id} size={48} color="#2c1810" backgroundColor="#fdfbf7" />
-                           <View style={{ flex: 1 }}>
-                             <Text style={{ fontSize: 9, fontWeight: '900', color: '#2c1810', letterSpacing: 1 }}>OFFICIAL RECORD</Text>
-                             <Text style={{ fontSize: 8, color: '#8c7361', marginTop: 2 }}>Digitally verified academic transcript.</Text>
-                           </View>
-                         </View>
-                      </View>
-                    </View>
-                  </View>
+                  <LiveCertificate 
+                    student={student}
+                    assessments={assessments}
+                    marks={marks}
+                    allStudents={allStudents}
+                    subjects={subjects}
+                    settings={settings}
+                    C={C}
+                  />
                 )}
                 {subTab === 'attendance' && (
                   <View style={{ alignItems: 'center', marginTop: 60, opacity: 0.8 }}>

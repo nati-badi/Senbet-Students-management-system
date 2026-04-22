@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Typography, Card, Table, Button, Space, Modal, Form, Input, Select, Popconfirm, message, Tag, Tooltip, Switch } from 'antd';
-import { UserAddOutlined, EditOutlined, DeleteOutlined, KeyOutlined, CopyOutlined } from '@ant-design/icons';
+import { UserAddOutlined, EditOutlined, DeleteOutlined, KeyOutlined, CopyOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { syncData } from '../../utils/sync';
@@ -195,17 +195,15 @@ export default function TeacherManagement() {
                 if (!actualCode) return <Tag color="default">—</Tag>;
                 
                 return (
-                    <Space size="small">
-                        <Tag color="gold" className="font-mono">{actualCode}</Tag>
-                        <Tooltip title={t('common.copy')}>
-                            <Button 
-                                type="text" 
-                                size="small" 
-                                icon={<CopyOutlined />} 
-                                onClick={() => copyToClipboard(actualCode)} 
-                            />
-                        </Tooltip>
-                    </Space>
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                        <Text copyable={{ 
+                            text: actualCode,
+                            icon: [<CopyOutlined key="copy-icon" className="text-slate-400 hover:text-blue-500 transition-colors" />, <CheckCircleOutlined key="check-icon" className="text-green-500" />],
+                            tooltips: [t('common.copy', 'Copy Code'), t('common.copied', 'Copied!')]
+                        }} style={{ fontFamily: 'monospace', fontWeight: '800', letterSpacing: '0.5px' }} className="bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded border border-amber-100 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
+                            {actualCode}
+                        </Text>
+                    </div>
                 );
             }
         },

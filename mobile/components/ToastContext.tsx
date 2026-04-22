@@ -36,6 +36,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode, themes: any, i
     ]).start(() => setToast(prev => ({ ...prev, visible: false })));
   }, [toastOp]);
 
+  const bgColor = isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const borderColor = toast.type === 'error' ? C.red : (toast.type === 'info' ? C.amber : C.green);
+
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
@@ -46,22 +49,34 @@ export const ToastProvider: React.FC<{ children: React.ReactNode, themes: any, i
             bottom: Platform.OS === 'ios' ? 110 : 90, 
             alignSelf: 'center', 
             opacity: toastOp,
-            backgroundColor: toast.type === 'error' ? 
-              (isDark ? '#ef4444' : '#dc2626') : 
-              (toast.type === 'info' ? (isDark ? '#f59e0b' : '#d97706') : (isDark ? '#22c55e' : '#16a34a')),
-            paddingHorizontal: 24, 
-            paddingVertical: 14, 
-            borderRadius: 30, 
+            backgroundColor: bgColor,
+            paddingHorizontal: 20, 
+            paddingVertical: 12, 
+            borderRadius: 16, 
+            borderWidth: 1,
+            borderColor: borderColor + '40',
             elevation: 10,
             shadowColor: '#000', 
-            shadowOffset: { width: 0, height: 4 }, 
-            shadowOpacity: 0.3, 
-            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 8 }, 
+            shadowOpacity: 0.2, 
+            shadowRadius: 12,
             flexDirection: 'row', 
             alignItems: 'center', 
-            zIndex: 99999
+            zIndex: 99999,
           }}>
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.5 }}>{toast.msg}</Text>
+            <View style={{ 
+              width: 8, 
+              height: 8, 
+              borderRadius: 4, 
+              backgroundColor: borderColor, 
+              marginRight: 12 
+            }} />
+            <Text style={{ 
+              color: C.text, 
+              fontWeight: '700', 
+              fontSize: 14, 
+              letterSpacing: 0.3 
+            }}>{toast.msg}</Text>
           </Animated.View>
         )}
       </Portal>

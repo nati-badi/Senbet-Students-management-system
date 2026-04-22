@@ -198,6 +198,18 @@ db.version(24).stores({
   });
 });
 
+db.version(25).stores({
+  students: "++id, name, baptismalName, gender, academicYear, grade, archived, parentContact, portalCode, synced, updated_at",
+  attendance: "++id, studentId, date, status, semester, academicYear, synced, updated_at, [studentId+date]",
+  marks: "++id, studentId, assessmentDate, subject, score, assessmentId, semester, academicYear, synced, updated_at, [studentId+assessmentId]",
+  subjects: "++id, name, semester, synced, updated_at",
+  assessments: "++id, name, subjectName, grade, maxScore, date, semester, academicYear, synced, updated_at",
+  teachers: "++id, name, phone, accessCode, assignedGrades, assignedSubjects, synced, updated_at",
+  settings: "key, value, updated_at",
+  deleted_records: "++id, tableName, recordId",
+  announcements: "++id, title_en, title_am, content_en, content_am, date, priority, active, synced, updated_at"
+});
+
 // Attempt to open and gracefully recover if a fatal schema conflict occurs 
 // (e.g., intermediate devices stuck between 'id' and '++id' primary key migration).
 db.open().catch(async err => {

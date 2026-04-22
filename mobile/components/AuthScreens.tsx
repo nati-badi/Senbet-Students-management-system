@@ -1,10 +1,22 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Image as RNImage, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, ActivityIndicator, Alert } from 'react-native';
+import { 
+    View, Text, ScrollView, TouchableOpacity, TextInput, Image as RNImage, 
+    KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, 
+    ActivityIndicator, Alert 
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Key, Users, ArrowLeft, Search, Eye, EyeOff, User, CalendarCheck, Clock, BarChart3, Info } from 'lucide-react-native';
+import { 
+    Key, Users, ArrowLeft, Search, Eye, EyeOff, User, CalendarCheck, Clock, 
+    BarChart3, Info, Home, Languages, Sun, Moon, RefreshCw, LogOut, Save, Edit, Phone,
+    Bell, MessageSquare
+} from 'lucide-react-native';
+import { LiveCertificate } from './LiveCertificate';
+import { SchoolInfoTab } from './SchoolInfoTab';
+import { EthiopicClockWidget } from './EthiopicClockWidget';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../supabase';
 import { THEMES, Teacher, Student, Assessment, fmtGrade } from '../utils';
+import { formatEthiopianDate } from '../dateUtils';
 
 export const LandingPage = React.memo(({ onSelectMode, isDark, t, C, s }: { onSelectMode: (m: 'teacher' | 'parent') => void, isDark: boolean, t: any, C: any, s: any }) => {
   return (
@@ -44,9 +56,10 @@ export const LandingPage = React.memo(({ onSelectMode, isDark, t, C, s }: { onSe
   );
 });
 
-export const ParentPortal = React.memo(({ isDark, onBack, isOnline, s }: { isDark: boolean, onBack: () => void, isOnline: boolean, s: any }) => {
-  const { t } = useTranslation();
+export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme, toggleLanguage, s }: { isDark: boolean, onBack: () => void, isOnline: boolean, toggleTheme: () => void, toggleLanguage: () => void, s: any }) => {
+  const { t, i18n } = useTranslation();
   const C = isDark ? THEMES.dark : THEMES.light;
+  const [activeTab, setActiveTab] = useState<'home' | 'marks' | 'info' | 'profile'>('home');
   
   const [studentName, setStudentName] = useState('');
   const [accessCode, setAccessCode] = useState('');
@@ -57,6 +70,19 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, s }: { isDar
   const [marks, setMarks] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [allStudentsInGrade, setAllStudentsInGrade] = useState<Student[]>([]);
+  const [allMarksInGrade, setAllMarksInGrade] = useState<any[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [loadingAnns, setLoadingAnns] = useState(false);
+
+  // CRUD State
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editableName, setEditableName] = useState('');
+  const [baptName, setBaptName] = useState('');
+  const [parentContact, setParentContact] = useState('');
 
   const doSearch = async () => {
     if (!isOnline) {
@@ -78,19 +104,106 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, s }: { isDar
       if (error) throw error;
       if (!data) return Alert.alert(t('parent.notFound', 'Student Not Found'), t('parent.loginFailed', 'Incorrect name or portal access code. Please try again.'));
 
+      setLoadingAnns(true);
       setStudent(data);
+      setEditableName(data.name || '');
+      setBaptName(data.baptismalname || '');
+      setParentContact(data.parentcontact || '');
       
-      const [mRes, aRes, attRes] = await Promise.all([
+      const [mRes, aRes, attRes, subRes, setRes, allStudentsRes] = await Promise.all([
         supabase.from('marks').select('*').eq('studentid', data.id),
         supabase.from('assessments').select('*').eq('grade', data.grade),
-        supabase.from('attendance').select('*').eq('studentid', data.id).order('date', { ascending: false })
+        supabase.from('attendance').select('*').eq('studentid', data.id).order('date', { ascending: false }),
+        supabase.from('subjects').select('*'),
+        supabase.from('settings').select('*'),
+        supabase.from('students').select('*').eq('grade', data.grade)
       ]);
       
+      const studentsInGrade = allStudentsRes.data || [];
+      const studentIdsInGrade = studentsInGrade.map(s => s.id);
+      
+      const allMarksRes = await supabase
+        .from('marks')
+        .select('*')
+        .in('studentid', studentIdsInGrade);
+
       setMarks(mRes.data || []);
       setAssessments(aRes.data || []);
       setAttendance(attRes.data || []);
+      setSubjects(subRes.data || []);
+      setAllStudentsInGrade(studentsInGrade);
+      setAllMarksInGrade(allMarksRes.data || []);
+      
+      supabase.from('announcements').select('*').eq('active', 1).order('date', { ascending: false })
+        .then(({ data }) => setAnnouncements(data || []))
+        .finally(() => setLoadingAnns(false));
+      
+      if (setRes.data) {
+        const sMap: any = {};
+        setRes.data.forEach((r: any) => { sMap[r.key] = r.value; });
+        setSettings(sMap);
+      }
     } catch (err: any) {
       Alert.alert('Error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!student || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const [mRes, aRes, attRes, subRes, setRes, allStudentsRes, annRes] = await Promise.all([
+        supabase.from('marks').select('*').eq('studentid', student.id),
+        supabase.from('assessments').select('*').eq('grade', student.grade),
+        supabase.from('attendance').select('*').eq('studentid', student.id).order('date', { ascending: false }),
+        supabase.from('subjects').select('*'),
+        supabase.from('settings').select('*'),
+        supabase.from('students').select('*').eq('grade', student.grade),
+        supabase.from('announcements').select('*').eq('active', 1).order('date', { ascending: false })
+      ]);
+      
+      const studentsInGrade = allStudentsRes.data || [];
+      const studentIdsInGrade = studentsInGrade.map(s => s.id);
+      const allMarksRes = await supabase.from('marks').select('*').in('studentid', studentIdsInGrade);
+
+      setMarks(mRes.data || []);
+      setAssessments(aRes.data || []);
+      setAttendance(attRes.data || []);
+      setSubjects(subRes.data || []);
+      setAllStudentsInGrade(studentsInGrade);
+      setAllMarksInGrade(allMarksRes.data || []);
+      setAnnouncements(annRes.data || []);
+      
+      if (setRes.data) {
+          const sMap: any = {};
+          setRes.data.forEach((r: any) => { sMap[r.key] = r.value; });
+          setSettings(sMap);
+      }
+      Alert.alert('✅ ' + t('common.syncComplete'));
+    } catch (e) {
+      Alert.alert('❌ ' + t('common.syncFailed'));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!student) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('students')
+        .update({ name: editableName, baptismalname: baptName, parentcontact: parentContact, updated_at: new Date().toISOString() })
+        .eq('id', student.id);
+      
+      if (error) throw error;
+      setStudent({ ...student, name: editableName, baptismalname: baptName, parentcontact: parentContact });
+      setEditingProfile(false);
+      Alert.alert('✅ ' + t('common.saveSuccess'));
+    } catch (e: any) {
+      Alert.alert('❌ Error', e.message);
     } finally {
       setLoading(false);
     }
@@ -154,16 +267,249 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, s }: { isDar
     </ScrollView>
   );
 
+  const renderDashboard = () => {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? t('common.goodMorning') : hour < 18 ? t('common.goodAfternoon') : t('common.goodEvening');
+
+    return (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+          <EthiopicClockWidget C={C} />
+          
+          <View style={[s.dashboardCard, { marginBottom: 24, padding: 0, backgroundColor: C.card, overflow: 'hidden', borderWidth: 1, borderColor: C.border }]}>
+               <View style={{ padding: 24 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                    <View style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}>
+                      <User size={38} color={C.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{greeting}</Text>
+                      <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', marginTop: 2 }}>{student?.name}</Text>
+                      {student?.baptismalname && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                           <Info size={14} color={C.accent} />
+                           <Text style={{ color: C.muted, fontSize: 14, fontWeight: '600' }}>{student.baptismalname}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+               </View>
+               
+               <View style={{ flexDirection: 'row', backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 14, paddingHorizontal: 24, justifyContent: 'space-between', alignItems: 'center' }}>
+                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={{ backgroundColor: C.accent + '15', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                         <Text style={{ color: C.accent, fontSize: 12, fontWeight: '800' }}>{fmtGrade(student?.grade || '')}</Text>
+                      </View>
+                      <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+                      <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700' }}>{student?.portalcode}</Text>
+                   </View>
+                   <View style={{ backgroundColor: 'rgba(74, 222, 128, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(74, 222, 128, 0.3)' }}>
+                       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#4ADE80' }} />
+                       <Text style={{ color: '#4ADE80', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('common.active', 'Active')}</Text>
+                   </View>
+               </View>
+          </View>
+
+         <Text style={s.sectionTitle}>{t('parent.latestAnnouncements', 'Announcements')}</Text>
+         
+         {isSyncing || loadingAnns ? (
+            <View style={[s.dashboardCard, { padding: 20, marginBottom: 16 }]}>
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: C.muted, opacity: 0.3 }} />
+                    <View style={{ flex: 1, justifyContent: 'center' }}>
+                        <View style={{ width: '60%', height: 16, backgroundColor: C.muted, borderRadius: 4, opacity: 0.3, marginBottom: 6 }} />
+                        <View style={{ width: '30%', height: 12, backgroundColor: C.muted, borderRadius: 4, opacity: 0.2 }} />
+                    </View>
+                </View>
+                <View style={{ width: '100%', height: 14, backgroundColor: C.muted, borderRadius: 4, opacity: 0.2, marginBottom: 6 }} />
+                <View style={{ width: '80%', height: 14, backgroundColor: C.muted, borderRadius: 4, opacity: 0.2 }} />
+            </View>
+         ) : announcements.length === 0 ? (
+            <View style={[s.dashboardCard, { padding: 32, alignItems: 'center', opacity: 0.6 }]}>
+                <MessageSquare size={40} color={C.muted} />
+                <Text style={{ color: C.muted, marginTop: 12, fontWeight: '600' }}>{t('parent.noAnnouncements', 'No recent announcements')}</Text>
+            </View>
+         ) : (
+            announcements.map((ann, idx) => {
+                const title = ann.title_am || ann.title_en;
+                const content = ann.content_am || ann.content_en;
+                const colors = { high: C.red, medium: C.accent, low: C.muted };
+                const accentColor = colors[ann.priority as keyof typeof colors] || C.accent;
+
+                return (
+                    <View key={ann.id || idx} style={[s.dashboardCard, { padding: 20, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: accentColor }]}>
+                        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: accentColor + '15', justifyContent: 'center', alignItems: 'center' }}>
+                                <Bell size={20} color={accentColor} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: C.text, fontWeight: '800', fontSize: 16 }}>{title}</Text>
+                                <Text style={{ color: C.muted, fontSize: 11, marginTop: 2, fontWeight: '700' }}>{formatEthiopianDate(ann.date)}</Text>
+                            </View>
+                        </View>
+                        <Text style={{ color: C.muted, fontSize: 14, lineHeight: 22 }}>{content}</Text>
+                    </View>
+                );
+            })
+         )}
+    </ScrollView>
+    );
+  };
+
+  const renderMarks = () => (
+    <View style={{ flex: 1, padding: 16 }}>
+        <LiveCertificate 
+            student={student!}
+            marks={allMarksInGrade.length > 0 ? allMarksInGrade : marks}
+            assessments={assessments}
+            allStudents={allStudentsInGrade}
+            subjects={subjects}
+            settings={settings}
+            C={C}
+        />
+    </View>
+  );
+
+  const renderSchoolInfo = () => (
+    <SchoolInfoTab C={C} s={s} />
+  );
+
+  const renderProfile = () => (
+    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
+        <View style={[s.dashboardCard, { padding: 24, marginBottom: 24 }]}>
+             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: C.text }}>{t('teacher.profile', 'Student Profile')}</Text>
+                {!editingProfile && (
+                     <TouchableOpacity onPress={() => setEditingProfile(true)}>
+                        <Edit size={20} color={C.accent} />
+                    </TouchableOpacity>
+                )}
+             </View>
+
+             {editingProfile ? (
+                 <View>
+                    <Text style={s.inputLabel}>{t('admin.studentName', 'Student Full Name')}</Text>
+                    <TextInput 
+                        style={[s.loginInput, { marginBottom: 16 }]} 
+                        value={editableName} 
+                        onChangeText={setEditableName} 
+                    />
+                    <Text style={s.inputLabel}>{t('admin.baptismalName')}</Text>
+                    <TextInput 
+                        style={s.loginInput} 
+                        value={baptName} 
+                        onChangeText={setBaptName} 
+                    />
+                    <Text style={[s.inputLabel, { marginTop: 16 }]}>{t('admin.parentContact')}</Text>
+                    <TextInput 
+                        style={s.loginInput} 
+                        value={parentContact} 
+                        onChangeText={setParentContact} 
+                        keyboardType="phone-pad"
+                    />
+                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+                        <TouchableOpacity 
+                            style={[s.loginBtn, { flex: 1, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border }]} 
+                            onPress={() => setEditingProfile(false)}
+                        >
+                            <Text style={{ color: C.text }}>{t('common.cancel')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[s.loginBtn, { flex: 1, backgroundColor: C.accent }]} 
+                            onPress={handleUpdateProfile}
+                        >
+                            <Text style={s.loginBtnText}>{t('common.save')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                 </View>
+             ) : (
+                 <View>
+                    <View style={{ marginBottom: 16 }}>
+                        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('admin.studentName', 'Student Full Name')}</Text>
+                        <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.name}</Text>
+                    </View>
+                    <View style={{ marginBottom: 16 }}>
+                        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('admin.baptismalName')}</Text>
+                        <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.baptismalname || '—'}</Text>
+                    </View>
+                    <View style={{ marginBottom: 16 }}>
+                        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('admin.parentContact')}</Text>
+                        <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.parentcontact || '—'}</Text>
+                    </View>
+                    <View>
+                        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('parent.portalCode')}</Text>
+                        <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.portalcode}</Text>
+                    </View>
+                 </View>
+             )}
+        </View>
+
+        <View style={[s.dashboardCard, { padding: 24 }]}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: C.text, marginBottom: 20 }}>{t('common.settings', 'Settings')}</Text>
+            
+            <TouchableOpacity onPress={toggleLanguage} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}>
+                        <Languages size={18} color={C.accent} />
+                    </View>
+                    <Text style={{ color: C.text, fontWeight: '600' }}>{t('common.language', 'Language')}</Text>
+                </View>
+                <Text style={{ color: C.accent, fontWeight: '800' }}>{i18n.language === 'en' ? 'EN' : 'አማ'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={toggleTheme} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.amber + '15', justifyContent: 'center', alignItems: 'center' }}>
+                        {isDark ? <Sun size={18} color={C.amber} /> : <Moon size={18} color={C.slate} />}
+                    </View>
+                    <Text style={{ color: C.text, fontWeight: '600' }}>{isDark ? t('common.lightMode') : t('common.darkMode')}</Text>
+                </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+                onPress={() => { setStudent(null); setActiveTab('home'); }} 
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 24, paddingVertical: 12 }}
+            >
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.red + '15', justifyContent: 'center', alignItems: 'center' }}>
+                    <LogOut size={18} color={C.red} />
+                </View>
+                <Text style={{ color: C.red, fontWeight: '800' }}>{t('common.logout', 'Sign Out')}</Text>
+            </TouchableOpacity>
+        </View>
+    </ScrollView>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border }}>
-          <ArrowLeft size={20} color={C.text} />
-        </TouchableOpacity>
-        <Text style={{ color: C.text, fontSize: 18, fontWeight: '900' }}>{t('parent.title', 'Parent Portal')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      {!student ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
+          <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border }}>
+            <ArrowLeft size={20} color={C.text} />
+          </TouchableOpacity>
+          <Text style={{ color: C.text, fontSize: 18, fontWeight: '900' }}>{t('parent.title', 'Parent Portal')}</Text>
+          <View style={{ width: 40 }} />
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 40, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+             <View style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2, padding: 2 }}>
+                <RNImage source={require('../assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="contain" />
+             </View>
+             <View>
+                <Text style={{ color: C.text, fontSize: 14, fontWeight: '900' }}>በግ/ደ/አ/ቅ/አርሴማ</Text>
+                <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700' }}>ፍኖተ ብርሃን ሰ/ቤት</Text>
+             </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity onPress={handleSync} disabled={isSyncing} style={{ padding: 8, borderRadius: 10, backgroundColor: C.accent + '10' }}>
+              {isSyncing ? <ActivityIndicator size="small" color={C.accent} /> : <RefreshCw size={18} color={C.accent} />}
+            </TouchableOpacity>
+             <TouchableOpacity onPress={() => { setStudent(null); setActiveTab('home'); }} style={{ padding: 8, borderRadius: 10, backgroundColor: C.red + '10' }}>
+              <LogOut size={18} color={C.red} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {!student ? (
         Platform.OS === 'web' ? (
@@ -174,112 +520,38 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, s }: { isDar
           </KeyboardAvoidingView>
         )
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
-            <View style={[s.dashboardCard, { marginBottom: 24, alignItems: 'center', padding: 24 }]}>
-               <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-                 <User size={44} color={C.accent} />
-               </View>
-               <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', textAlign: 'center' }}>{student.name}</Text>
-               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 10 }}>
-                 <View style={{ backgroundColor: C.accent + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}>
-                   <Text style={{ color: C.accent, fontSize: 13, fontWeight: '800' }}>{fmtGrade(student.grade)}</Text>
-                 </View>
-                 <Text style={{ color: C.muted }}>•</Text>
-                 <Text style={{ color: C.muted, fontWeight: '700', fontSize: 13 }}>ID: {student.portalcode || student.id.slice(0, 8)}</Text>
-               </View>
-               
-               <TouchableOpacity 
-                 style={{ marginTop: 28, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, backgroundColor: C.accent + '10' }} 
-                 onPress={() => setStudent(null)}
-               >
-                 <Text style={{ color: C.accent, fontWeight: '900', fontSize: 14 }}>{t('parent.searchAnother', 'Search Another Student')}</Text>
-               </TouchableOpacity>
-            </View>
-            
-            <View style={{ marginBottom: 32 }}>
-               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
-                 <CalendarCheck size={20} color={C.muted} />
-                 <Text style={[s.sectionTitle, { marginBottom: 0, color: C.muted }]}>{t('profile.attendance', 'Attendance')}</Text>
-                 <View style={{ backgroundColor: C.amber + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                    <Text style={{ color: C.amber, fontSize: 10, fontWeight: '900' }}>COMING SOON</Text>
-                 </View>
-               </View>
+            <View style={{ flex: 1 }}>
+                {activeTab === 'home' && renderDashboard()}
+                {activeTab === 'marks' && renderMarks()}
+                {activeTab === 'info' && renderSchoolInfo()}
+                {activeTab === 'profile' && renderProfile()}
 
-               <View style={[s.dashboardCard, { padding: 16, opacity: 0.6 }]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, opacity: 0.5 }}>
-                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: C.accent, fontSize: 24, fontWeight: '900' }}>—%</Text>
-                        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Attendance Rate</Text>
-                     </View>
-                     <View style={{ width: 1, height: '80%', backgroundColor: C.border, alignSelf: 'center' }} />
-                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: C.red, fontSize: 24, fontWeight: '900' }}>—</Text>
-                        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Absences</Text>
-                     </View>
-                     <View style={{ width: 1, height: '80%', backgroundColor: C.border, alignSelf: 'center' }} />
-                     <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: C.amber, fontSize: 24, fontWeight: '900' }}>—</Text>
-                        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>Lates</Text>
-                     </View>
-                  </View>
-
-                  <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingTop: 16, alignItems: 'center' }}>
-                     <Clock size={20} color={C.muted} opacity={0.5} />
-                     <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginTop: 8, textAlign: 'center' }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
-                  </View>
-               </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
-              <BarChart3 size={20} color={C.accent} />
-              <Text style={[s.sectionTitle, { marginBottom: 0 }]}>{t('parent.results', 'Academic Results')}</Text>
-            </View>
-            
-            {assessments.length === 0 ? (
-              <View style={{ padding: 40, alignItems: 'center' }}>
-                <Info size={40} color={C.muted} opacity={0.5} />
-                <Text style={[s.empty, { marginTop: 12 }]}>{t('parent.noAssessments', 'No assessments recorded yet.')}</Text>
-              </View>
-            ) : (
-              Object.entries(
-                assessments.reduce((acc, a) => {
-                  if (!acc[a.subjectname]) acc[a.subjectname] = [];
-                  acc[a.subjectname].push(a);
-                  return acc;
-                }, {} as Record<string, Assessment[]>)
-              ).map(([subject, subjectAssessments]) => (
-                <View key={subject} style={{ marginBottom: 20 }}>
-                  <Text style={{ color: C.muted, fontSize: 13, fontWeight: '800', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>{subject}</Text>
-                  {subjectAssessments.map(a => {
-                    const mark = marks.find(m => m.assessmentid === a.id);
-                    return (
-                      <View key={a.id} style={[s.studentCard, { justifyContent: 'space-between', padding: 18, marginBottom: 8 }]}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[s.studentName, { fontSize: 15 }]}>{a.name}</Text>
-                        </View>
-                         <View style={{ alignItems: 'flex-end', backgroundColor: C.bg, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, minWidth: 70 }}>
-                          <Text style={{ color: mark ? C.accent : C.muted, fontSize: 22, fontWeight: '900' }}>{mark ? mark.score : '-'}</Text>
-                          <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', marginTop: -4 }}>/ {a.maxscore}</Text>
-                        </View>
-                      </View>
-                    );
-                  })}
+                <View style={{ 
+                    position: 'absolute', bottom: 24, left: 20, right: 20, height: 64, 
+                    backgroundColor: C.card, borderRadius: 20, flexDirection: 'row', 
+                    justifyContent: 'space-around', alignItems: 'center', elevation: 10,
+                    shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
+                    shadowOpacity: 0.1, shadowRadius: 15, borderWidth: 1, borderColor: C.border
+                }}>
+                    {[
+                        { id: 'home', icon: <Home size={22} color={activeTab === 'home' ? C.accent : C.muted} />, label: t('parent.home', 'Home') },
+                        { id: 'marks', icon: <BarChart3 size={22} color={activeTab === 'marks' ? C.accent : C.muted} />, label: t('teacher.marks', 'Marks') },
+                        { id: 'info', icon: <Info size={22} color={activeTab === 'info' ? C.accent : C.muted} />, label: t('parent.schoolInfo', 'Info') },
+                        { id: 'profile', icon: <User size={22} color={activeTab === 'profile' ? C.accent : C.muted} />, label: t('teacher.profile', 'Profile') },
+                    ].map(item => (
+                        <TouchableOpacity key={item.id} onPress={() => setActiveTab(item.id as any)} style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                            {item.icon}
+                            <Text style={{ fontSize: 9, fontWeight: '800', marginTop: 4, color: activeTab === item.id ? C.accent : C.muted }}>{item.label}</Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
-              ))
-            )}
-
-            <View style={{ marginTop: 24, padding: 24, backgroundColor: C.card, borderRadius: 24, alignItems: 'center' }}>
-               <CalendarCheck size={36} color={C.muted} opacity={0.3} />
-               <Text style={{ color: C.muted, textAlign: 'center', marginTop: 16, fontWeight: '700', fontSize: 14, lineHeight: 22 }}>{t('parent.attendanceSoon', 'Detailed attendance history integration coming soon.')}</Text>
             </View>
-            <View style={{ height: 40 }} />
-        </ScrollView>
       )}
     </View>
   );
 });
 
-export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, isOnline, s }: { onLogin: (t: Teacher) => void, onBack: () => void, isDark: boolean, isOnline: boolean, s: any }) => {
+export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, toggleTheme, toggleLanguage, isOnline, s }: { onLogin: (t: Teacher) => void, onBack: () => void, isDark: boolean, toggleTheme: () => void, toggleLanguage: () => void, isOnline: boolean, s: any }) => {
   const { t } = useTranslation();
   const C = isDark ? THEMES.dark : THEMES.light;
   const [name, setName] = useState('');
@@ -313,7 +585,6 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, isOnline, s }
         setErrorMsg(t('auth.invalidLogin', 'Invalid name or access code.'));
         return;
       }
-
       onLogin(data);
     } catch (err: any) {
       setErrorMsg(err.message || t('auth.loginFailed', 'Login failed.'));
@@ -326,17 +597,16 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, isOnline, s }
     <ScrollView
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: 24, paddingTop: 96, paddingBottom: 250 }}
-      keyboardShouldPersistTaps={Platform.OS === 'web' ? undefined : "handled"}
+      keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
-      keyboardDismissMode={Platform.OS === 'web' ? "none" : "on-drag"}
+      keyboardDismissMode="on-drag"
     >
-      <View style={{ alignItems: 'center', marginBottom: 32 }}>
-        <View style={{ width: 104, height: 104, borderRadius: 26, padding: 6, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 6, marginBottom: 20 }}>
-          {/* @ts-ignore */}
-          <RNImage source={require('../assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 22 }} resizeMode="contain" />
+      <View style={{ alignItems: 'center', marginBottom: 40 }}>
+        <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}>
+          <Key size={48} color={C.accent} />
         </View>
-        <Text style={[s.loginTitle, { fontSize: 26 }]}>በግ/ደ/አ/ቅ/አርሴማ</Text>
-        <Text style={[s.loginSub, { fontSize: 16, marginTop: 4 }]}>ፍኖተ ብርሃን ሰ/ቤት</Text>
+        <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', marginTop: 20, textAlign: 'center' }}>{t('teacher.portalLogin', 'Teacher Portal')}</Text>
+        <Text style={{ color: C.muted, textAlign: 'center', marginTop: 10, fontSize: 15, lineHeight: 22 }}>Enter your full name and the 6-digit access code provided by the school admin.</Text>
       </View>
 
       <View style={s.loginCard}>
@@ -372,10 +642,7 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, isOnline, s }
             returnKeyType="go"
             onSubmitEditing={doLogin}
           />
-          <TouchableOpacity 
-            onPress={() => setShowCode(!showCode)} 
-            style={{ position: 'absolute', right: 15, top: 12 }}
-          >
+          <TouchableOpacity onPress={() => setShowCode(!showCode)} style={{ position: 'absolute', right: 15, top: 12 }}>
             {showCode ? <EyeOff size={24} color={C.muted} /> : <Eye size={24} color={C.muted} />}
           </TouchableOpacity>
         </View>
@@ -390,7 +657,7 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, isOnline, s }
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
-      <View style={{ position: 'absolute', top: 32, left: 24, zIndex: 100 }}>
+      <View style={{ position: 'absolute', top: Platform.OS === 'ios' ? 48 : 32, left: 24, zIndex: 100 }}>
          <TouchableOpacity onPress={onBack} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, elevation: 2 }}>
            <ArrowLeft size={22} color={C.text} />
          </TouchableOpacity>

@@ -107,6 +107,14 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
                         mapped.grade = serverRecord.grade; 
                     }
                 }
+            } else if (tableName === 'announcements') {
+                if (serverRecord.title_en !== undefined) { mapped.title_en = serverRecord.title_en; }
+                if (serverRecord.title_am !== undefined) { mapped.title_am = serverRecord.title_am; }
+                if (serverRecord.content_en !== undefined) { mapped.content_en = serverRecord.content_en; }
+                if (serverRecord.content_am !== undefined) { mapped.content_am = serverRecord.content_am; }
+                if (serverRecord.date !== undefined) { mapped.date = serverRecord.date; }
+                if (serverRecord.priority !== undefined) { mapped.priority = serverRecord.priority; }
+                if (serverRecord.active !== undefined) { mapped.active = serverRecord.active; }
             }
 
             localReadyData.push(mapped);
@@ -177,7 +185,8 @@ export async function syncData({ force = false } = {}) {
             'assessments',
             'attendance',
             'marks',
-            'teachers'
+            'teachers',
+            'announcements'
         ];
 
         let pushedTotal = 0;
@@ -355,6 +364,18 @@ export async function syncData({ force = false } = {}) {
                                 name: record.name,
                                 semester: record.semester,
                                 grade: record.grade,
+                                updated_at: record.updated_at
+                            };
+                        } else if (tableName === 'announcements') {
+                            toPush = {
+                                id: record.id,
+                                title_en: record.title_en,
+                                title_am: record.title_am,
+                                content_en: record.content_en,
+                                content_am: record.content_am,
+                                date: record.date,
+                                priority: record.priority || 'medium',
+                                active: record.active !== undefined ? record.active : 1,
                                 updated_at: record.updated_at
                             };
                         } else if (tableName === 'settings') {

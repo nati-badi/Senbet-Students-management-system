@@ -20,6 +20,8 @@ const resources = {
         "searchPlaceholder": "e.g. Abebe or S001...",
         "notFound": "Student Not Found",
         "notFoundDesc": "We couldn't find a student with that name or ID.",
+        "latestAnnouncements": "Latest Announcements",
+        "noAnnouncements": "No recent announcements",
         "results": "Academic Results",
         "noAssessments": "No assessments recorded yet.",
         "attendanceSoon": "Detailed attendance history integration coming soon.",
@@ -35,6 +37,26 @@ const resources = {
         "namePlaceholder": "e.g. Abebe Kebede",
         "loginFieldsRequired": "Both Student Name and Access Code are required.",
         "loginFailed": "Incorrect name or portal access code. Please try again.",
+        "home": "Home",
+        "portalCode": "Portal Code",
+        "schoolInfo": "School Info"
+      },
+      "school": {
+        "aboutUs": "About Our School",
+        "spiritualGrowth": "Spiritual Growth",
+        "spiritualDesc": "Deepening the connection with Orthodox Tewahedo teachings and heritage.",
+        "academicExcellence": "Academic Excellence",
+        "academicDesc": "Providing a balanced curriculum that fosters both worldly and spiritual wisdom.",
+        "characterBuilding": "Character Building",
+        "characterDesc": "Instilling values of integrity, respect, and community service in every student.",
+        "motto": "Wisdom, Faith, and Service",
+        "mainDesc": "Our school is dedicated to nurturing student success through a rich blend of traditional spiritual education and modern academic standards. We believe in creating a supportive community where every child can grow in faith and knowledge.",
+        "spiritualHeritage": "Rich Spiritual Heritage",
+        "heritageDesc": "Preserving ancient wisdom for future generations through dedicated Ge’ez and liturgical studies.",
+        "modernLearning": "Standardized Learning",
+        "learningDesc": "Combining traditional values with modern educational tools to ensure student success in all fields.",
+        "visitUs": "Get in Touch",
+        "callNow": "Call Office"
       },
       "common": {
         "save": "Save",
@@ -75,7 +97,17 @@ const resources = {
         "comingSoon": "Coming Soon",
         "underDevelopment": "Feature under development. Stay tuned for updates!",
         "underMaintenance": "UNDER MAINTENANCE",
-        "stayTuned": "STAY TUNED"
+        "stayTuned": "STAY TUNED",
+        "syncNow": "Sync Now",
+        "syncComplete": "Sync Complete",
+        "syncFailed": "Sync Failed",
+        "saveSuccess": "Saved successfully!",
+        "language": "Language",
+        "settings": "Settings",
+        "welcome": "Welcome back",
+        "goodMorning": "Good Morning",
+        "goodAfternoon": "Good Afternoon",
+        "goodEvening": "Good Evening"
       },
       "teacher": {
         "portalLogin": "Portal Login",
@@ -123,6 +155,7 @@ const resources = {
         "clearAllMarks": "Clear All Marks",
         "confirmClearAll": "Are you sure you want to clear all marks for this assessment?",
         "login": "Login",
+        "profile": "Profile"
       },
       "urgent": {
         "everyoneUpToDate": "Everything is up to date!",
@@ -197,6 +230,11 @@ const resources = {
         "missingInfo": "Name and access code are required.",
         "invalidLogin": "Invalid name or access code.",
         "loginFailed": "Login failed.",
+      },
+      "admin": {
+        "studentName": "Student Full Name",
+        "baptismalName": "Baptismal Name",
+        "parentContact": "Parent Contact"
       }
     }
   },
@@ -217,6 +255,8 @@ const resources = {
         "searchPlaceholder": "ምሳሌ፡ አበበ ወይም S001...",
         "notFound": "ተማሪው አልተገኘም",
         "notFoundDesc": "በዚህ ስም ወይም መለያ ቁጥር የተመዘገበ ተማሪ አላገኘንም።",
+        "latestAnnouncements": "የቅርብ ጊዜ ማሳሰቢያዎች",
+        "noAnnouncements": "ምንም አዲስ ማሳሰቢያ የለም",
         "results": "የትምህርት ውጤቶች",
         "noAssessments": "እስካሁን ምንም አይነት የምዘና ውጤት አልተመዘገበም።",
         "attendanceSoon": "ዝርዝር የክትትል ታሪክ በቅርቡ ይካተታል።",
@@ -232,6 +272,26 @@ const resources = {
         "namePlaceholder": "ምሳሌ፡ አበበ ከበደ",
         "loginFieldsRequired": "የተማሪው ስም እና የመለያ ኮድ ያስፈልጋል።",
         "loginFailed": "የተሳሳተ ስም ወይም የመግቢያ ኮድ። እባክዎ እንደገና ይሞክሩ።",
+        "home": "መነሻ",
+        "portalCode": "የመግቢያ ኮድ",
+        "schoolInfo": "ስለ ትምህርት ቤቱ"
+      },
+      "school": {
+        "aboutUs": "ስለ ሰንበት ትምህርት ቤታችን",
+        "spiritualGrowth": "መንፈሳዊ እድገት",
+        "spiritualDesc": "ከኦርቶዶክስ ተዋሕዶ ትምህርቶች እና ቅርሶች ጋር ያለውን ግንኙነት ማጠናከር።",
+        "academicExcellence": "የትምህርት ጥራት",
+        "academicDesc": "ምድራዊ እና መንፈሳዊ ጥበብን የሚያቀናጅ የተመጣጠነ ሥርዓተ ትምህርት መስጠት።",
+        "characterBuilding": "መልካም ስነ-ምግባር",
+        "characterDesc": "በእያንዳንዱ ተማሪ ውስጥ ቅንነትን፣ መከባበርን እና ማህበራዊ አገልግሎትን ማዳበር።",
+        "motto": "ጥበብ፣ እምነት እና አገልግሎት",
+        "mainDesc": "ትምህርት ቤታችን ጥንታዊ መንፈሳዊ ትምህርቶችን ከዘመናዊ የትምህርት ደረጃዎች ጋር በማጣመር የተማሪዎችን ስኬት ለማረጋገጥ ቁርጠኛ ነው።",
+        "spiritualHeritage": "የበለጸገ መንፈሳዊ ቅርስ",
+        "heritageDesc": "ለቀጣዩ ትውልድ ጥንታዊ ጥበቦችን በግዕዝ እና በዜማ ትምህርቶች ማስተላለፍ።",
+        "modernLearning": "ደረጃውን የጠበቀ ትምህርት",
+        "learningDesc": "ተማሪዎች በሁሉም ዘርፍ ስኬታማ እንዲሆኑ ባህላዊ እሴቶችን ከዘመናዊ የመማሪያ መሳሪያዎች ጋር ማጣመር።",
+        "visitUs": "ያግኙን",
+        "callNow": "ለቢሮ ይደውሉ"
       },
       "common": {
         "save": "አስቀምጥ",
@@ -272,7 +332,17 @@ const resources = {
         "comingSoon": "በቅርቡ ይጠበቃል",
         "underDevelopment": "ይህ አገልግሎት በመበልጸግ ላይ ነው። ለተጨማሪ መረጃ ይጠብቁ!",
         "underMaintenance": "በማሻሻያ ላይ ነው",
-        "stayTuned": "ይጠብቁ"
+        "stayTuned": "ይጠብቁ",
+        "syncNow": "አሁን አመሳስል",
+        "syncComplete": "ማመሳሰል ተጠናቅቋል",
+        "syncFailed": "ማመሳሰል አልተሳካም",
+        "saveSuccess": "በተሳካ ሁኔታ ተቀምጧል!",
+        "language": "ቋንቋ",
+        "settings": "ቅንብሮች",
+        "welcome": "እንኳን ደህና መጡ",
+        "goodMorning": "እንደምን አደሩ",
+        "goodAfternoon": "እንደምን ዋሉ",
+        "goodEvening": "እንደምን አመሹ"
       },
       "teacher": {
         "portalLogin": "የመምህራን መግቢያ",
@@ -320,6 +390,7 @@ const resources = {
         "clearAllMarks": "ሁሉንም ውጤቶች አጥፋ",
         "confirmClearAll": "ለዚህ ምዘና የተመዘገቡ ሁሉንም ውጤቶች ለማጥፋት እርግጠኛ ነዎት?",
         "login": "ግባ",
+        "profile": "መገለጫ"
       },
       "urgent": {
         "everyoneUpToDate": "ሁሉም ነገር ወቅታዊ ነው!",
@@ -394,6 +465,11 @@ const resources = {
         "missingInfo": "ስም እና የመግቢያ ኮድ ያስፈልጋል።",
         "invalidLogin": "የተሳሳተ ስም ወይም የመግቢያ ኮድ።",
         "loginFailed": "መግባት አልተሳካም።",
+      },
+      "admin": {
+        "studentName": "የተማሪው ሙሉ ስም",
+        "baptismalName": "የክርስትና ስም",
+        "parentContact": "የወላጅ ስልክ"
       }
     }
   }

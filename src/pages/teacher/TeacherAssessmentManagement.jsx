@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, message, Row, Col, Select, DatePicker, Tag, InputNumber, Modal } from 'antd';
+import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, Row, Col, Select, DatePicker, Tag, InputNumber, Modal, App } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -14,6 +14,7 @@ const normalizeSubject = (str) => String(str || '').toLowerCase().trim();
 
 export default function TeacherAssessmentManagement({ teacher }) {
     const { t, i18n } = useTranslation();
+    const { message } = App.useApp();
     const [form] = Form.useForm();
     const [editingId, setEditingId] = useState(null);
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);

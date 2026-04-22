@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Typography, Card, List, Avatar, Tag, Empty, Badge, Alert, Row, Col, Statistic, Button, Space, Tooltip, message, Modal, Input } from 'antd';
+import { Typography, Card, List, Avatar, Tag, Empty, Badge, Alert, Row, Col, Statistic, Button, Space, Tooltip, Modal, Input, App } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { WarningOutlined, UserOutlined, ClockCircleOutlined, FormOutlined, AlertOutlined, KeyOutlined, CopyOutlined, PhoneOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +12,7 @@ import { supabase } from '../../utils/supabaseClient';
 const { Title, Text, Paragraph } = Typography;
 
 export default function UrgentMatters() {
+    const { message } = App.useApp();
     const [profileStudentId, setProfileStudentId] = useState(null);
     const navigate = useNavigate();
     const { t } = useTranslation();

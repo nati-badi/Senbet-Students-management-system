@@ -18,6 +18,8 @@ config.resolver.nodeModulesPaths = [
 // 3. Force Metro to resolve the @shared alias to the actual folder
 config.resolver.extraNodeModules = {
   '@shared': path.resolve(workspaceRoot, 'shared'),
+  'react-native-reanimated/plugin': path.resolve(projectRoot, 'node_modules/react-native-reanimated/plugin'),
+  'react-native-worklets/plugin': path.resolve(projectRoot, 'node_modules/react-native-worklets/plugin'),
 };
 
 module.exports = config;

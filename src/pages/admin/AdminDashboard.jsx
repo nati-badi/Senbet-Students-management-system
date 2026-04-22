@@ -10,7 +10,8 @@ import {
     CloudSyncOutlined,
     WarningOutlined,
     EditOutlined,
-    CheckCircleOutlined
+    CheckCircleOutlined,
+    NotificationOutlined
 } from '@ant-design/icons';
 import { Layout, Menu, Typography, Badge, Tag } from 'antd';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +30,7 @@ import AcademicSetup from './AcademicSetup';
 import TeacherManagement from './TeacherManagement';
 import ReportsAndBackups from './ReportsAndBackups';
 import StudentAnalytics from './StudentAnalytics';
+import AnnouncementManagement from './AnnouncementManagement';
 
 
 const { Text } = Typography;
@@ -109,6 +111,11 @@ export default function AdminDashboard() {
                     key: '/admin/subjects',
                     icon: <BookOutlined />,
                     label: t('admin.subjects')
+                },
+                {
+                    key: '/admin/announcements',
+                    icon: <NotificationOutlined />,
+                    label: t('admin.announcements', 'Announcements')
                 },
                 {
                     key: '/admin/assessments',
@@ -214,6 +221,7 @@ export default function AdminDashboard() {
                     <Route path="/teachers" element={<TeacherManagement />} />
                     <Route path="/reports" element={<ReportsAndBackups />} />
                     <Route path="/analytics" element={<StudentAnalytics />} />
+                    <Route path="/announcements" element={<AnnouncementManagement />} />
                     <Route path="/sync" element={<SyncCenter />} />
 
                     <Route path="/academic-setup" element={<AcademicSetup />} />

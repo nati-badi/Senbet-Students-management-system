@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Row, Col, Card, Form, Input, Select, DatePicker, Button, Table, Tag, Space, Tooltip, Popconfirm, App, Upload, Skeleton, Empty, Modal, Tabs, Badge, Alert } from 'antd';
-import { SearchOutlined, FilterOutlined, DownloadOutlined, UploadOutlined, EditOutlined, DeleteOutlined, UserOutlined, CopyOutlined, KeyOutlined, UserAddOutlined, ExportOutlined, ImportOutlined, TeamOutlined, RiseOutlined } from '@ant-design/icons';
+import { SearchOutlined, FilterOutlined, DownloadOutlined, UploadOutlined, EditOutlined, DeleteOutlined, UserOutlined, CopyOutlined, KeyOutlined, UserAddOutlined, ExportOutlined, ImportOutlined, TeamOutlined, RiseOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import dayjs from 'dayjs';
@@ -442,6 +442,8 @@ export default function StudentRegistration() {
         { 
             title: t('admin.portalCode'), 
             dataIndex: 'portalCode', 
+            key: 'portalCode',
+            width: 140,
             render: (code, record) => {
                 const actualCode = code || record.portalCode || record.portalcode;
                 if (!actualCode || String(actualCode).trim() === '') {
@@ -458,18 +460,15 @@ export default function StudentRegistration() {
                 }
                 
                 return (
-                    <Space size="middle">
-                        <Text style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{actualCode}</Text>
-                        <Tooltip title={t('common.copy', 'Copy')}>
-                            <Button 
-                                type="text" 
-                                size="small" 
-                                icon={<CopyOutlined />} 
-                                onClick={() => copyToClipboard(actualCode)}
-                                className="text-slate-400 hover:text-blue-500"
-                            />
-                        </Tooltip>
-                    </Space>
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                        <Text copyable={{ 
+                            text: actualCode,
+                            icon: [<CopyOutlined key="copy-icon" className="text-slate-400 hover:text-blue-500 transition-colors" />, <CheckCircleOutlined key="check-icon" className="text-green-500" />],
+                            tooltips: [t('common.copy', 'Copy Code'), t('common.copied', 'Copied!')]
+                        }} style={{ fontFamily: 'monospace', fontWeight: '800', letterSpacing: '0.5px' }} className="bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300">
+                            {actualCode}
+                        </Text>
+                    </div>
                 );
             }
         },
