@@ -37,6 +37,9 @@ export default function StudentRegistration() {
     const [activeTab, setActiveTab] = useState('active');
     const [isPromoteModalVisible, setIsPromoteModalVisible] = useState(false);
     const [promotingStudent, setPromotingStudent] = useState(null);
+    const [importPreview, setImportPreview] = useState([]);
+    const [isImportPreviewVisible, setIsImportPreviewVisible] = useState(false);
+    const [importErrors, setImportErrors] = useState(0);
 
     const studentsData = useLiveQuery(() => db.students.orderBy('name').toArray());
     const students = studentsData || [];
@@ -284,14 +287,26 @@ export default function StudentRegistration() {
             const name = String(row[nameKey] ?? '').trim();
             const grade = normalizeGrade(row[gradeKey]);
 
-            if (!name || !grade) { errorCount++; continue; }
+            // Track validation issues per row
+            const issues = [];
+            if (!name) issues.push(t('admin.missingName', 'Missing name'));
+            if (!grade) issues.push(t('admin.missingGrade', 'Missing grade'));
 
             let gender = String(row[genderKey] ?? '').trim().toLowerCase().startsWith('f') ? 'Female' : 'Male';
             let contact = String(row[contactKey] ?? '').trim();
             if (contact.length === 9 && !contact.startsWith('0')) contact = '0' + contact;
+            if (contact && (contact.length !== 10 || !contact.startsWith('0'))) {
+                issues.push(t('admin.invalidPhone', 'Invalid phone'));
+            }
 
             const academicYear = dateKey ? String(row[dateKey] ?? '').trim() : new Date().toISOString();
             if (!academicYear) missingDateCount++;
+
+            // Check for duplicates in existing students
+            const isDuplicate = name && students.some(s => s.name.trim().toLowerCase() === name.toLowerCase() && normalizeGrade(s.grade) === grade);
+            if (isDuplicate) issues.push(t('admin.duplicateStudent', 'Duplicate'));
+
+            if (!name || !grade) { errorCount++; }
 
             bulkStudents.push({
                 id: crypto.randomUUID(),
@@ -301,14 +316,15 @@ export default function StudentRegistration() {
                 academicYear,
                 grade,
                 parentContact: contact,
-                synced: 0
+                synced: 0,
+                _issues: issues,
             });
         }
 
-        if (bulkStudents.length > 0) {
-            await db.students.bulkAdd(bulkStudents);
-            notification.success({ title: t('admin.importSuccess', { count: bulkStudents.length }) });
-        }
+        // Show preview instead of committing directly
+        setImportPreview(bulkStudents);
+        setImportErrors(errorCount);
+        setIsImportPreviewVisible(true);
     };
 
     const handleImportFile = (file) => {
@@ -640,6 +656,96 @@ export default function StudentRegistration() {
                     />
                 </Form>
             </Modal>
+
+            {/* ── Import Preview Modal ── */}
+            <Modal
+                title={<span className="flex items-center gap-2"><ImportOutlined /> {t('admin.importPreviewTitle', 'Preview Import Data')}</span>}
+                open={isImportPreviewVisible}
+                onCancel={() => { setIsImportPreviewVisible(false); setImportPreview([]); }}
+                width={900}
+                footer={[
+                    <Button key="cancel" onClick={() => { setIsImportPreviewVisible(false); setImportPreview([]); }}>
+                        {t('admin.cancelAction', 'Cancel')}
+                    </Button>,
+                    <Button
+                        key="confirm"
+                        type="primary"
+                        disabled={importPreview.filter(r => !r._issues?.length || r._issues.every(i => i.includes('Duplicate') || i.includes('ተመሳሳይ'))).length === 0}
+                        onClick={async () => {
+                            const validRows = importPreview.filter(r => r.name && r.grade);
+                            const cleaned = validRows.map(({ _issues, ...rest }) => rest);
+                            if (cleaned.length > 0) {
+                                await db.students.bulkAdd(cleaned);
+                                notification.success({ message: t('admin.importSuccess', { count: cleaned.length }) });
+                            }
+                            setIsImportPreviewVisible(false);
+                            setImportPreview([]);
+                        }}
+                    >
+                        <CheckCircleOutlined /> {t('admin.confirmImport', 'Confirm Import')} ({importPreview.filter(r => r.name && r.grade).length})
+                    </Button>,
+                ]}
+            >
+                {importErrors > 0 && (
+                    <Alert
+                        type="warning"
+                        showIcon
+                        className="mb-4"
+                        message={t('admin.importWarningRows', { count: importErrors }) || `${importErrors} rows have issues and will be skipped.`}
+                    />
+                )}
+                <Table
+                    dataSource={importPreview}
+                    rowKey="id"
+                    size="small"
+                    pagination={{ pageSize: 10 }}
+                    scroll={{ x: 700 }}
+                    rowClassName={(record) => record._issues?.length ? 'bg-red-50 dark:bg-red-950/20' : 'bg-green-50 dark:bg-green-950/20'}
+                    columns={[
+                        {
+                            title: '#',
+                            width: 50,
+                            render: (_, __, i) => i + 1,
+                        },
+                        {
+                            title: t('admin.fullName'),
+                            dataIndex: 'name',
+                            render: (v) => v || <Text type="danger">—</Text>,
+                        },
+                        {
+                            title: t('admin.baptismalNameField', 'Baptismal'),
+                            dataIndex: 'baptismalName',
+                            render: (v) => v || <Text type="secondary">—</Text>,
+                        },
+                        {
+                            title: t('admin.gradeClass'),
+                            dataIndex: 'grade',
+                            width: 90,
+                            render: (v) => v ? formatGrade(v) : <Text type="danger">—</Text>,
+                        },
+                        {
+                            title: t('admin.gender', 'Gender'),
+                            dataIndex: 'gender',
+                            width: 80,
+                        },
+                        {
+                            title: t('admin.parentContact'),
+                            dataIndex: 'parentContact',
+                            width: 120,
+                        },
+                        {
+                            title: t('admin.status', 'Status'),
+                            dataIndex: '_issues',
+                            width: 180,
+                            render: (issues) => {
+                                if (!issues || issues.length === 0) return <Tag color="green">{t('admin.valid', 'Valid')}</Tag>;
+                                return issues.map((issue, i) => <Tag key={i} color={issue.includes('Duplicate') || issue.includes('ተመሳሳይ') ? 'orange' : 'red'}>{issue}</Tag>);
+                            },
+                        },
+                    ]}
+                />
+            </Modal>
+
             <StudentProfile studentId={profileStudentId} visible={!!profileStudentId} onClose={() => setProfileStudentId(null)} />
         </div>
     );

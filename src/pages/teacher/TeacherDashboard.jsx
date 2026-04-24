@@ -499,6 +499,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const [isSaving, setIsSaving] = useState(false);
     const lastRoutedNonce = useRef(null);
     const [modal, contextHolder] = Modal.useModal();
+    const { message } = App.useApp();
 
     // Keep sessionStorage in sync
     useEffect(() => { sessionStorage.setItem('sem_mark_grade', selectedGrade); }, [selectedGrade]);
@@ -1321,6 +1322,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
 function AttendanceModule({ setProfileStudentId, teacher }) {
     const { t } = useTranslation();
+    const { message } = App.useApp();
 
     // Persist selection state in sessionStorage so navigation between sidebar items doesn't reset it
     const [selectedGrade, setSelectedGrade] = useState(() => sessionStorage.getItem('sem_att_grade') || '');

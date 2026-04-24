@@ -12,6 +12,7 @@ import { supabase } from './supabase';
 import { formatEthiopianDate, formatEthiopianTime, computeEthiopianYear } from './dateUtils';
 import { useTranslation } from 'react-i18next';
 import './i18n';
+import { initDB, clearDB, insertStudents, insertAssessments, insertMarks, insertAttendance, insertSubjects, insertSettings, getAllStudents, getAllAssessments, getAllMarks, getAllAttendance, getAllSubjects, getAllSettings } from './db';
 
 // Premium Navigation
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
@@ -235,30 +236,53 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
   useEffect(() => {
     (async () => {
       try {
-        const [savedAuth, savedTheme, savedStudents, savedAssessments, savedMarks, savedSubjects, savedSettings, savedLastSync] = await Promise.all([
+        initDB(); // Initialize SQLite DB on boot (no-op on web)
+        
+        const [savedAuth, savedTheme, savedLastSync, savedLastSyncIso] = await Promise.all([
           AsyncStorage.getItem('senbet_teacher_auth'),
           AsyncStorage.getItem('senbet_theme'),
-          AsyncStorage.getItem('cached_students'),
-          AsyncStorage.getItem('cached_assessments'),
-          AsyncStorage.getItem('cached_marks'),
-          AsyncStorage.getItem('cached_subjects'),
-          AsyncStorage.getItem('cached_settings'),
           AsyncStorage.getItem('last_sync_time'),
           AsyncStorage.getItem('last_sync_iso'),
         ]);
 
         if (savedAuth) setTeacher(JSON.parse(savedAuth));
         if (savedTheme) setIsDark(savedTheme === 'dark');
-        if (savedStudents) setStudents(JSON.parse(savedStudents));
-        if (savedAssessments) setAssessments(JSON.parse(savedAssessments));
-        if (savedMarks) setMarks(JSON.parse(savedMarks));
+        
+        // Try loading from SQLite first (native). If empty, fall back to AsyncStorage (web).
+        const sqlStudents = getAllStudents();
+        if (sqlStudents.length > 0) {
+          // Native path — data lives in SQLite
+          setStudents(sqlStudents);
+          setAssessments(getAllAssessments());
+          setMarks(getAllMarks());
+          setAttendance(getAllAttendance());
+          setSubjects(getAllSubjects());
+          const settingsRows = getAllSettings();
+          if (settingsRows.length > 0) {
+            const nextSet: Record<string, string> = {};
+            settingsRows.forEach((r: any) => { nextSet[r.key] = r.value; });
+            setSettings(nextSet);
+          }
+        } else {
+          // Web fallback — load from AsyncStorage
+          const [savedStudents, savedAssessments, savedMarks, savedSubjects, savedSettings] = await Promise.all([
+            AsyncStorage.getItem('cached_students'),
+            AsyncStorage.getItem('cached_assessments'),
+            AsyncStorage.getItem('cached_marks'),
+            AsyncStorage.getItem('cached_subjects'),
+            AsyncStorage.getItem('cached_settings'),
+          ]);
+          if (savedStudents) setStudents(JSON.parse(savedStudents));
+          if (savedAssessments) setAssessments(JSON.parse(savedAssessments));
+          if (savedMarks) setMarks(JSON.parse(savedMarks));
+          try { if (savedSubjects) setSubjects(JSON.parse(savedSubjects)); } catch (e) { }
+          try { if (savedSettings) setSettings(JSON.parse(savedSettings)); } catch (e) { }
+          const savedAttendance = await AsyncStorage.getItem('cached_attendance');
+          if (savedAttendance) setAttendance(JSON.parse(savedAttendance));
+        }
 
-        try { if (savedSubjects) setSubjects(JSON.parse(savedSubjects)); } catch (e) { }
-        try { if (savedSettings) setSettings(JSON.parse(savedSettings)); } catch (e) { }
-
-        if (await AsyncStorage.getItem('cached_attendance')) setAttendance(JSON.parse(await AsyncStorage.getItem('cached_attendance') || '[]'));
         if (savedLastSync) setLastSync(savedLastSync);
-        if (await AsyncStorage.getItem('last_sync_iso')) setLastSyncIso(await AsyncStorage.getItem('last_sync_iso'));
+        if (savedLastSyncIso) setLastSyncIso(savedLastSyncIso);
 
       } catch (e) {
         console.error('Initial load error', e);
@@ -348,38 +372,50 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
         return merged;
       };
 
+      const isWeb = Platform.OS === 'web';
+
       setStudents(prev => {
         const next = applySync(prev, (sRes.status === 'fulfilled' ? sRes.value.data : null), 'students');
-        AsyncStorage.setItem('cached_students', JSON.stringify(next));
+        if (isWeb) AsyncStorage.setItem('cached_students', JSON.stringify(next));
+        else insertStudents(next);
         return next;
       });
       setAssessments(prev => {
         const next = applySync(prev, (aRes.status === 'fulfilled' ? aRes.value.data : null), 'assessments');
-        AsyncStorage.setItem('cached_assessments', JSON.stringify(next));
+        if (isWeb) AsyncStorage.setItem('cached_assessments', JSON.stringify(next));
+        else insertAssessments(next);
         return next;
       });
       setMarks(prev => {
         const next = applySync(prev, (mRes.status === 'fulfilled' ? mRes.value.data : null), 'marks');
-        AsyncStorage.setItem('cached_marks', JSON.stringify(next));
+        if (isWeb) AsyncStorage.setItem('cached_marks', JSON.stringify(next));
+        else insertMarks(next);
         return next;
       });
       setAttendance(prev => {
         const next = applySync(prev, (attRes.status === 'fulfilled' ? attRes.value.data : null), 'attendance');
-        AsyncStorage.setItem('cached_attendance', JSON.stringify(next));
+        if (isWeb) AsyncStorage.setItem('cached_attendance', JSON.stringify(next));
+        else insertAttendance(next);
         return next;
       });
       setSubjects(prev => {
         const next = applySync(prev, (subRes.status === 'fulfilled' ? subRes.value.data : null), 'subjects');
-        AsyncStorage.setItem('cached_subjects', JSON.stringify(next));
+        if (isWeb) AsyncStorage.setItem('cached_subjects', JSON.stringify(next));
+        else insertSubjects(next);
         return next;
       });
 
       if (setRes.status === 'fulfilled' && setRes.value.data) {
         const settingsData = setRes.value.data;
+        if (!isWeb) {
+          const mappedSettings = settingsData.map((r: any) => ({ ...r, id: r.key }));
+          insertSettings(mappedSettings);
+        }
+        
         setSettings(prev => {
           const next = { ...prev };
           settingsData.forEach((r: any) => { next[r.key] = r.value; });
-          AsyncStorage.setItem('cached_settings', JSON.stringify(next));
+          if (isWeb) AsyncStorage.setItem('cached_settings', JSON.stringify(next));
           return next;
         });
       }
@@ -430,8 +466,10 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
     setTeacher(null);
     setStudents([]); setAssessments([]); setMarks([]); setAttendance([]); setSubjects([]); setSettings({});
     setLastSync(null); setLastSyncIso(null);
+    clearDB(); // Wipe SQLite on native
     await AsyncStorage.multiRemove([
-      'senbet_teacher_auth', 'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'last_sync_time', 'last_sync_iso', 'cached_subjects', 'cached_settings'
+      'senbet_teacher_auth', 'last_sync_time', 'last_sync_iso',
+      'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'cached_subjects', 'cached_settings'
     ]);
   };
 
