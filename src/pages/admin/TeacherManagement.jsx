@@ -7,7 +7,7 @@ import { syncData } from '../../utils/sync';
 import { useTranslation } from 'react-i18next';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade, normalizeSubject } from '../../utils/gradeUtils';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 export default function TeacherManagement() {
     const { t } = useTranslation();
@@ -200,7 +200,7 @@ export default function TeacherManagement() {
                             text: actualCode,
                             icon: [<CopyOutlined key="copy-icon" className="text-slate-400 hover:text-blue-500 transition-colors" />, <CheckCircleOutlined key="check-icon" className="text-green-500" />],
                             tooltips: [t('common.copy', 'Copy Code'), t('common.copied', 'Copied!')]
-                        }} style={{ fontFamily: 'monospace', fontWeight: '800', letterSpacing: '0.5px' }} className="bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded border border-amber-100 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400">
+                        }} style={{ fontFamily: 'monospace', fontWeight: '800', letterSpacing: '0.5px' }} className="bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-100 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300">
                             {actualCode}
                         </Text>
                     </div>
