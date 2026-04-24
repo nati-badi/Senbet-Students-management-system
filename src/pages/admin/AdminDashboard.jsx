@@ -166,6 +166,29 @@ export default function AdminDashboard() {
     return (
         <div className="flex flex-col w-full h-full">
             <style>{`
+                .admin-sidebar .ant-menu-item-selected {
+                    background-color: #f0fdf4 !important;
+                    color: #166534 !important;
+                    border-right: 3px solid #166534;
+                    font-weight: 700;
+                }
+                .dark .admin-sidebar .ant-menu-item-selected {
+                    background-color: rgba(22, 101, 52, 0.2) !important;
+                    color: #4ade80 !important;
+                    border-right: 3px solid #4ade80;
+                }
+                .admin-sidebar .ant-menu-item-selected .ant-menu-item-icon,
+                .admin-sidebar .ant-menu-item-selected span {
+                    color: inherit !important;
+                }
+                .admin-sidebar .ant-menu-item:hover {
+                    background-color: #f8fafc !important;
+                    color: #166534 !important;
+                }
+                .dark .admin-sidebar .ant-menu-item:hover {
+                    background-color: #1e293b !important;
+                    color: #4ade80 !important;
+                }
                 .menu-item-coming-soon {
                     filter: blur(1px);
                     opacity: 0.6;
@@ -186,7 +209,7 @@ export default function AdminDashboard() {
                     selectedKeys={[location.pathname]}
                     items={menuItems}
                     onClick={({ key }) => navigate(key)}
-                    className="border-none w-full overflow-x-auto flex-nowrap hide-scrollbar"
+                    className="admin-sidebar border-none w-full overflow-x-auto flex-nowrap hide-scrollbar"
                 />
             </div>
 
@@ -204,7 +227,7 @@ export default function AdminDashboard() {
                     selectedKeys={[location.pathname]}
                     items={menuItems}
                     onClick={({ key }) => navigate(key)}
-                    className="border-none pt-2"
+                    className="admin-sidebar border-none pt-2"
                 />
             </Sider>
 

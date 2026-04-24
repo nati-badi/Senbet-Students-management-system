@@ -206,42 +206,48 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
 
             <Row gutter={[24, 24]}>
                 <Col xs={24} md={8}>
-                    <Card className="rounded-3xl border-none bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-xl shadow-blue-500/20 overflow-hidden relative">
-                        <div className="absolute right-0 top-0 opacity-10 transform translate-x-4 -translate-y-4">
-                            <TrophyOutlined style={{ fontSize: '120px' }} />
-                        </div>
-                        <div className="relative z-10">
-                        <span className="text-blue-100 font-bold uppercase tracking-wider text-xs">{t('admin.categoryAverage')}</span>
-                        <div className="text-5xl font-black mt-2 mb-1">{schoolAverage.toFixed(1)}%</div>
-                        <span className="text-blue-100 text-sm">{t('admin.target')} {t(selectedSemester === 'Semester I' ? 'admin.semester1' : 'admin.semester2')}</span>
-                        </div>
-                    </Card>
-                </Col>
-                <Col xs={24} md={8}>
-                    <Card className="rounded-3xl border-none bg-gradient-to-br from-emerald-400 to-green-600 text-white shadow-xl shadow-green-500/20 overflow-hidden relative">
-                        <div className="absolute right-0 top-0 opacity-10 transform translate-x-4 -translate-y-4">
-                            <TeamOutlined style={{ fontSize: '120px' }} />
-                        </div>
-                        <div className="relative z-10">
-                            <span className="text-green-100 font-bold uppercase tracking-wider text-xs">{t('admin.totalRankedStudents')}</span>
-                            <div className="text-5xl font-black mt-2 mb-1">{studentRankings.length}</div>
-                            <span className="text-green-100 text-sm">{t('admin.withRecordedMarks')}</span>
-                        </div>
-                    </Card>
-                </Col>
-                <Col xs={24} md={8}>
-                    <Card className="rounded-3xl border-none bg-gradient-to-br from-purple-500 to-pink-600 text-white shadow-xl shadow-purple-500/20 overflow-hidden relative">
-                         <div className="absolute right-0 top-0 opacity-10 transform translate-x-4 -translate-y-4">
-                            <StarOutlined style={{ fontSize: '120px' }} />
-                        </div>
-                        <div className="relative z-10">
-                            <span className="text-purple-100 font-bold uppercase tracking-wider text-xs">{t('admin.topPerformer')}</span>
-                            <div className="text-3xl font-black mt-2 mb-1 truncate">
-                                {top10Students.length > 0 ? top10Students[0].name : t('common.na')}
+                    <Card className="rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden h-full">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <span className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs">{t('admin.categoryAverage')}</span>
+                                <div className="text-4xl font-black mt-2 mb-1 text-slate-800 dark:text-white">{schoolAverage.toFixed(1)}%</div>
+                                <span className="text-slate-400 dark:text-slate-500 text-sm">{t('admin.target')} {t(selectedSemester === 'Semester I' ? 'admin.semester1' : 'admin.semester2')}</span>
                             </div>
-                            <span className="text-purple-100 text-sm">
-                                {top10Students.length > 0 ? `${top10Students[0].percentage.toFixed(1)}% ${t('admin.average')}` : t('common.noData')}
-                            </span>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-2xl">
+                                <TrophyOutlined className="text-3xl text-blue-500" />
+                            </div>
+                        </div>
+                    </Card>
+                </Col>
+                <Col xs={24} md={8}>
+                    <Card className="rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden h-full">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <span className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs">{t('admin.totalRankedStudents')}</span>
+                                <div className="text-4xl font-black mt-2 mb-1 text-slate-800 dark:text-white">{studentRankings.length}</div>
+                                <span className="text-slate-400 dark:text-slate-500 text-sm">{t('admin.withRecordedMarks')}</span>
+                            </div>
+                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-2xl">
+                                <TeamOutlined className="text-3xl text-green-500" />
+                            </div>
+                        </div>
+                    </Card>
+                </Col>
+                <Col xs={24} md={8}>
+                    <Card className="rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden h-full">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <span className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs">{t('admin.topPerformer')}</span>
+                                <div className="text-2xl font-black mt-2 mb-1 text-slate-800 dark:text-white truncate max-w-[200px]">
+                                    {top10Students.length > 0 ? top10Students[0].name : t('common.na')}
+                                </div>
+                                <span className="text-slate-400 dark:text-slate-500 text-sm">
+                                    {top10Students.length > 0 ? `${top10Students[0].percentage.toFixed(1)}% ${t('admin.average')}` : t('common.noData')}
+                                </span>
+                            </div>
+                            <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-2xl">
+                                <StarOutlined className="text-3xl text-purple-500" />
+                            </div>
                         </div>
                     </Card>
                 </Col>

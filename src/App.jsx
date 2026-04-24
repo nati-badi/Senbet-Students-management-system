@@ -172,6 +172,13 @@ function AppContent({ isDarkMode, toggleTheme }) {
     return () => clearInterval(interval);
   }, [isOnline, handleSync]);
 
+  const getLogoLink = () => {
+    if (activeRole === 'admin') return '/admin';
+    if (activeRole === 'teacher') return '/teacher';
+    if (activeRole === 'parent') return '/parent';
+    return '/';
+  };
+
   if (location.pathname.startsWith('/verify/')) {
     return (
       <Routes>
@@ -187,7 +194,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
         style={{ height: '64px' }}
       >
         <Space align="center" size="small">
-          <Link to="/" className="flex items-center gap-2 notranslate" translate="no">
+          <Link to={getLogoLink()} className="flex items-center gap-2 notranslate" translate="no">
             <img src="/logo.png" alt="Logo" className="w-9 h-9 object-cover rounded-full shadow-sm flex-shrink-0" />
             <span 
               className="hidden lg:block font-bold text-slate-800 dark:text-slate-100"
@@ -369,9 +376,18 @@ export default function SenbetApp() {
             headerBg: isDarkMode ? '#0f172a' : '#ffffff',
             siderBg: isDarkMode ? '#0f172a' : '#ffffff',
           },
+          Select: {
+            optionSelectedBg: isDarkMode ? 'rgba(34, 197, 94, 0.2)' : '#f0fdf4',
+            optionSelectedColor: isDarkMode ? '#4ade80' : '#166534',
+            optionActiveBg: isDarkMode ? 'rgba(34, 197, 94, 0.1)' : '#f8fafc',
+          },
           Menu: {
             itemBg: 'transparent',
             subMenuItemBg: 'transparent',
+            itemSelectedBg: isDarkMode ? 'rgba(34, 197, 94, 0.15)' : 'rgba(22, 101, 52, 0.1)',
+            itemSelectedColor: isDarkMode ? '#4ade80' : '#166534',
+            itemHoverBg: isDarkMode ? 'rgba(34, 197, 94, 0.05)' : 'rgba(22, 101, 52, 0.05)',
+            itemHoverColor: isDarkMode ? '#4ade80' : '#166534',
           }
         }
       }}
