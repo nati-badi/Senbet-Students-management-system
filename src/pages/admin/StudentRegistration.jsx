@@ -489,7 +489,7 @@ export default function StudentRegistration() {
             }
         },
         { 
-            title: t('admin.contact'), 
+            title: t('admin.parentContact', "Parent's Contact"), 
             dataIndex: 'parentContact',
             render: (v, r) => v || r.parentcontact || '—'
         },

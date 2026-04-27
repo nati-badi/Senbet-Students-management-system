@@ -332,17 +332,37 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                 )}
             </Card>
 
-            <Descriptions bordered size="small" column={{ xxl: 2, xl: 2, lg: 2, md: 2, sm: 1, xs: 1 }}>
-                <Descriptions.Item label={t('admin.gender')}>{student?.gender === 'Male' ? t('admin.male') : t('admin.female')}</Descriptions.Item>
-                <Descriptions.Item label={t('admin.baptismalName')}>{student?.baptismalName || student?.baptismalname || '—'}</Descriptions.Item>
-                <Descriptions.Item label={t('admin.parentContact')}>
-                    <Space><PhoneOutlined /> {student?.parentContact || student?.parentcontact || '—'}</Space>
-                </Descriptions.Item>
-                <Descriptions.Item label={t('teacher.totalAssessments')}>{gradeAssessments.length}</Descriptions.Item>
-                <Descriptions.Item label={t('teacher.missingMarks')}>
-                    {missingAssessments.length > 0 ? <Text type="danger" strong>{missingAssessments.length}</Text> : <Text type="success">0 ({t('teacher.fullyGraded')})</Text>}
-                </Descriptions.Item>
-            </Descriptions>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-center">
+                    <Text type="secondary" className="text-[11px] uppercase tracking-wider mb-1">{t('admin.gender')}</Text>
+                    <Text className="text-sm font-medium">{student?.gender === 'Male' ? t('admin.male') : t('admin.female')}</Text>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-center">
+                    <Text type="secondary" className="text-[11px] uppercase tracking-wider mb-1">{t('admin.baptismalName')}</Text>
+                    <Text className="text-sm font-medium">{student?.baptismalName || student?.baptismalname || '—'}</Text>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-center">
+                    <Text type="secondary" className="text-[11px] uppercase tracking-wider mb-1">{t('admin.parentContact')}</Text>
+                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                        <PhoneOutlined className="text-blue-500" /> {student?.parentContact || student?.parentcontact || '—'}
+                    </div>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-center">
+                    <Text type="secondary" className="text-[11px] uppercase tracking-wider mb-1">{t('teacher.totalAssessments')}</Text>
+                    <Text className="text-xl font-bold text-slate-700 dark:text-slate-300">{gradeAssessments.length}</Text>
+                </div>
+                
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-center md:col-span-4">
+                    <Text type="secondary" className="text-[11px] uppercase tracking-wider mb-2">{t('teacher.missingMarks')}</Text>
+                    <div>
+                        {missingAssessments.length > 0 ? (
+                            <Tag color="red" className="text-sm px-3 py-1 rounded-full"><WarningOutlined className="mr-1"/> {missingAssessments.length} {t('teacher.pending')}</Tag>
+                        ) : (
+                            <Tag color="green" className="text-sm px-3 py-1 rounded-full"><CheckCircleOutlined className="mr-1"/> {t('teacher.fullyGraded')}</Tag>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 

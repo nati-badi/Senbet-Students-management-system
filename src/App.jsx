@@ -173,9 +173,8 @@ function AppContent({ isDarkMode, toggleTheme }) {
   }, [isOnline, handleSync]);
 
   const getLogoLink = () => {
-    if (activeRole === 'admin') return '/admin';
-    if (activeRole === 'teacher') return '/teacher';
-    if (activeRole === 'parent') return '/parent';
+    if (isAdminAuth) return '/admin';
+    if (teacherSession) return '/teacher/analytics';
     return '/';
   };
 

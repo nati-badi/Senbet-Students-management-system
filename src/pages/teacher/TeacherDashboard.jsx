@@ -189,18 +189,12 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
             ),
             disabled: true
         },
-        {
-            key: '/teacher/profile',
-            icon: <UserOutlined />,
-            label: t('teacher.profile', 'Profile & Settings')
-        },
     ];
 
     const mobileNavItems = [
         { key: '/teacher/mark-entry', icon: <EditOutlined />, label: t('teacher.markEntry') },
         { key: '/teacher/analytics', icon: <BarChartOutlined />, label: t('admin.analytics') },
         { key: '/teacher/urgent', icon: <WarningOutlined />, label: t('admin.urgent') },
-        { key: '/teacher/profile', icon: <UserOutlined />, label: t('teacher.profile') },
     ];
 
     return (
@@ -243,77 +237,6 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
             </Card>
 
             <Routes>
-                <Route path="/profile" element={
-                    <div className="space-y-6">
-                        <Card 
-                            title={<Space><GlobalOutlined className="text-blue-600" /> <span className="font-bold">{t('common.settings', 'Portal Settings')}</span></Space>}
-                            className="shadow-xl border-none rounded-[2rem]"
-                        >
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl">
-                                    <Space>
-                                        <span className="text-xl">{isDarkMode ? <MoonOutlined className="text-blue-400" /> : <SunOutlined className="text-amber-500" />}</span>
-                                        <span className="font-bold text-sm">{t('common.darkMode', 'Dark Mode')}</span>
-                                    </Space>
-                                    <Switch checked={isDarkMode} onChange={toggleTheme} />
-                                </div>
-
-                                <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl">
-                                    <Space>
-                                         <GlobalOutlined className="text-forest-600 text-xl" />
-                                         <span className="font-bold text-sm">{t('common.language', 'Language')}</span>
-                                    </Space>
-                                    <Segmented 
-                                        value={i18n.language.startsWith('am') ? 'am' : 'en'} 
-                                        onChange={(v) => i18n.changeLanguage(v)}
-                                        options={[
-                                            { label: 'አማ', value: 'am' },
-                                            { label: 'EN', value: 'en' }
-                                        ]}
-                                        className="bg-slate-200 dark:bg-slate-700 h-9"
-                                    />
-                                </div>
-
-                                <Button 
-                                    type="primary"
-                                    size="large"
-                                    block 
-                                    icon={<SyncOutlined />} 
-                                    onClick={() => handleSync()}
-                                    className="h-14 font-black rounded-2xl mt-4 shadow-lg shadow-forest-500/20 bg-forest-600 border-none"
-                                >
-                                    {t('common.syncNow', 'Manual Sync')}
-                                </Button>
-
-                                <Button 
-                                    danger 
-                                    block 
-                                    size="large" 
-                                    icon={<LogoutOutlined />} 
-                                    onClick={() => {
-                                        setTeacherSession(null);
-                                        sessionStorage.removeItem('senbet_teacher_auth');
-                                        navigate('/');
-                                    }}
-                                    className="h-14 font-black rounded-2xl mt-2 shadow-lg shadow-red-500/10 border-none"
-                                >
-                                    {t('common.logout')}
-                                </Button>
-                            </div>
-                        </Card>
-
-                        <Card 
-                            className="shadow-xl border-none rounded-[2rem] overflow-hidden"
-                            title={<Space><UserOutlined className="text-forest-600" /> <span className="font-bold">{t('teacher.profile')}</span></Space>}
-                        >
-                             <Descriptions column={1} className="px-2">
-                                <Descriptions.Item label={t('admin.name')}>{activeTeacher?.name}</Descriptions.Item>
-                                <Descriptions.Item label={t('admin.gender')}>{activeTeacher?.gender}</Descriptions.Item>
-                                <Descriptions.Item label={t('parent.accessCode')}>{activeTeacher?.accessCode || activeTeacher?.accesscode}</Descriptions.Item>
-                            </Descriptions>
-                        </Card>
-                    </div>
-                } />
             </Routes>
 
             {/* Mobile Bottom Navigation (Visible on lg-) */}
@@ -557,17 +480,23 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     // Only allow teachers to grade assessments that match their assigned subjects/grades + current semester.
     // Subject selection (selectedSubject) is applied after this base filter.
     const assessmentsForGrade = allAssessments.filter(a => {
-        const subject = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(a.subjectName));
+        const rawSubj = a.subjectName || a.subjectname;
+        const subject = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(rawSubj));
         const assessmentSemester = subject?.semester || 'Semester I';
         const currentYear = settingsRows.find(s => s.key === 'currentAcademicYear')?.value;
         const targetYearNum = currentYear ? getEthiopianYear(currentYear) : null;
         const assessmentYearNum = a.academicYear ? getEthiopianYear(a.academicYear) : null;
 
+        const isYearMatch = !targetYearNum || 
+                            assessmentYearNum === targetYearNum || 
+                            !assessmentYearNum || 
+                            (assessmentYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም');
+
         return normalizeGrade(a.grade) === normalizeGrade(selectedGrade) &&
             assessmentSemester === currentSemesterSetting &&
-            (!targetYearNum || assessmentYearNum === targetYearNum) &&
+            isYearMatch &&
             (allowedGrades.length === 0 || allowedGrades.some(g => normalizeGrade(g) === normalizeGrade(a.grade))) &&
-            (allowedSubjects.length === 0 || normalizedAllowedSubjects.includes(normalizeSubject(a.subjectName)));
+            (allowedSubjects.length === 0 || normalizedAllowedSubjects.includes(normalizeSubject(rawSubj)));
     });
 
     // Build subject dropdown options directly from the teacher-assigned subject list

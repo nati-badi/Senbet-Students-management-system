@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, Typography, Switch, Select, Input, Button, Table, Tag, message, Alert, Modal, Empty, Row, Col, Space, Tooltip } from 'antd';
+import { Card, Typography, Switch, Select, Input, Button, Table, Tag, Alert, Modal, Empty, Row, Col, Space, Tooltip, App } from 'antd';
 import { CalendarOutlined, BookOutlined, RiseOutlined, CheckCircleOutlined, SaveOutlined, CalculatorOutlined, SearchOutlined, WarningOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -12,6 +12,7 @@ const { Title, Text, Paragraph } = Typography;
 
 export default function AcademicSetup() {
     const { t } = useTranslation();
+    const { message } = App.useApp();
     const [loading, setLoading] = useState(false);
     const [yearInput, setYearInput] = useState(computeEthiopianYear());
     const [semesterInput, setSemesterInput] = useState('Semester I');
@@ -233,13 +234,15 @@ export default function AcademicSetup() {
             await db.teachers.clear();
             if (db.deleted_records) await db.deleted_records.clear();
 
+            hide();
             message.success(t('admin.systemWiped', 'System wiped completely.'));
             setWipeInput('');
-            window.location.reload();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
         } catch (error) {
-            message.error(`${t('admin.wipeFailedTitle', 'Wipe failed:')} ${error.message}`);
-        } finally {
             hide();
+            message.error(`${t('admin.wipeFailedTitle', 'Wipe failed:')} ${error.message}`);
         }
     };
 
