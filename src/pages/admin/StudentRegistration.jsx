@@ -529,7 +529,7 @@ export default function StudentRegistration() {
                 <Form form={form} onFinish={handleRegister} layout="vertical" initialValues={{ gender: 'Male' }} onValuesChange={handleValuesChange}>
                     <Row gutter={16}>
                         <Col xs={24} md={12}><Form.Item label={t('admin.fullName')} name="name" rules={[{ required: true }, { validator: validateAmharic }]}><Input /></Form.Item></Col>
-                        <Col xs={24} md={12}><Form.Item label={t('admin.baptismalNameField')} name="baptismalName" rules={[{ required: true }, { validator: validateAmharic }]}><Input /></Form.Item></Col>
+                        <Col xs={24} md={12}><Form.Item label={t('admin.baptismalNameField')} name="baptismalName" rules={[{ validator: validateAmharic }]}><Input /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.gender')} name="gender"><Select options={[{ value: 'Male', label: t('admin.male') }, { value: 'Female', label: t('admin.female') }]} /></Form.Item></Col>
                         <Col xs={24} md={12}>
                             <Form.Item label={t('admin.dateOfEntry')} name="dateOfEntry" initialValue={dayjs()} extra={regDateOfEntry ? <EthiopianDatePreview value={regDateOfEntry} /> : null}>
@@ -538,7 +538,7 @@ export default function StudentRegistration() {
                         </Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.gradeClass')} name="grade" rules={[{ required: true }]}><Select options={GRADE_OPTIONS} showSearch /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.portalAccessCode')} name="portalCode" tooltip={t('admin.portalCodeTooltip')}><Input placeholder={t('admin.autoGeneratePlaceholder')} maxLength={6} /></Form.Item></Col>
-                        <Col xs={24} md={12}><Form.Item label={t('admin.parentContact')} name="parentContact" rules={[{ required: true }, { validator: validateEthiopianPhone }]}><Input maxLength={10} /></Form.Item></Col>
+                        <Col xs={24} md={12}><Form.Item label={t('admin.parentContact')} name="parentContact" rules={[{ validator: validateEthiopianPhone }]}><Input maxLength={10} /></Form.Item></Col>
                     </Row>
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
                         <Button icon={<DownloadOutlined />} onClick={downloadTemplate}>
@@ -622,10 +622,10 @@ export default function StudentRegistration() {
                 <Form form={editForm} layout="vertical">
                     <Row gutter={16}>
                         <Col xs={24} md={12}><Form.Item label={t('admin.fullName')} name="name" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                        <Col xs={24} md={12}><Form.Item label={t('admin.baptismalNameField')} name="baptismalName" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                        <Col xs={24} md={12}><Form.Item label={t('admin.baptismalNameField')} name="baptismalName"><Input /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.gradeClass')} name="grade" rules={[{ required: true }]}><Select options={GRADE_OPTIONS} /></Form.Item></Col>
                         <Col xs={24} md={12}><Form.Item label={t('admin.portalCode', 'Portal Access Code')} name="portalCode" rules={[{ required: true }]}><Input maxLength={6} /></Form.Item></Col>
-                        <Col xs={24} md={12}><Form.Item label={t('admin.parentContact')} name="parentContact" rules={[{ required: true }]}><Input /></Form.Item></Col>
+                        <Col xs={24} md={12}><Form.Item label={t('admin.parentContact')} name="parentContact"><Input /></Form.Item></Col>
                     </Row>
                 </Form>
             </Modal>

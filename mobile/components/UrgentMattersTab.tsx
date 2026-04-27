@@ -43,30 +43,12 @@ export const UrgentMattersTab = React.memo(({ navigation, teacher, students: all
     return { assessment: a, count: ungraded.length, students: ungraded };
   }).filter(item => item.count > 0), [assessments, students, marksData]);
 
-  const studentsWithNoMarks = useMemo(() => students.filter(st => {
-    const assessmentsForGrade = assessments.filter(a => normG(a.grade) === normG(st.grade));
-    if (assessmentsForGrade.length === 0) return false;
-    return !marksData.some(m => (m.studentid || m.studentId) === st.id && assessmentsForGrade.some(a => a.id === (m.assessmentid || m.assessmentId)));
-  }), [students, assessments, marksData]);
-
   const PAGE_SIZE = 5;
-  const displayedStudents = showAllStudents ? studentsWithNoMarks : studentsWithNoMarks.slice(0, PAGE_SIZE);
   const displayedAssessments = showAllAssessments ? missingMarksByAssessment : missingMarksByAssessment.slice(0, PAGE_SIZE);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />}>
       <View style={{ marginBottom: 24 }}><Text style={s.sectionTitle}>⚠️ {t('teacher.urgent')}</Text><Text style={{ color: C.muted, fontSize: 13 }}>{t('teacher.urgentSubtitle')}</Text></View>
-
-      {studentsWithNoMarks.length > 0 && (
-        <View style={[s.issueCard, { borderRadius: 20, padding: 20 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}><AlertTriangle size={20} color={C.red} stroke={C.red} /><Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>{t('teacher.noMarksTitle')}</Text><View style={{ flex: 1 }} /><View style={{ backgroundColor: C.red + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}><Text style={{ color: C.red, fontSize: 12, fontWeight: '800' }}>{studentsWithNoMarks.length}</Text></View></View>
-          <Text style={s.issueSub}>{t('teacher.noMarksDesc')}</Text>
-          {displayedStudents.map(st => (
-            <View key={st.id} style={[s.issueRow, { borderTopColor: C.border }]}><Users size={14} color={C.muted} stroke={C.muted} /><Text style={[s.issueText, { marginLeft: 8 }]}>{st.name}</Text><View style={{ flex: 1 }} /><View style={s.badge}><Text style={s.badgeText}>{fmtGrade(st.grade)}</Text></View></View>
-          ))}
-          {studentsWithNoMarks.length > PAGE_SIZE && (<TouchableOpacity onPress={() => setShowAllStudents(!showAllStudents)} style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.red + '12' }}><Text style={{ color: C.red, fontWeight: '700', fontSize: 13 }}>{showAllStudents ? t('urgent.showLess') : t('urgent.showAllStudents', { count: studentsWithNoMarks.length })}</Text></TouchableOpacity>)}
-        </View>
-      )}
 
       {missingMarksByAssessment.length > 0 && (
         <View style={[s.issueCard, { borderRadius: 20, padding: 20, marginTop: 16 }]}>
@@ -79,7 +61,7 @@ export const UrgentMattersTab = React.memo(({ navigation, teacher, students: all
         </View>
       )}
 
-      {studentsWithNoMarks.length === 0 && missingMarksByAssessment.length === 0 && (
+      {missingMarksByAssessment.length === 0 && (
         <View style={{ alignItems: 'center', marginTop: 100 }}><View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: C.green + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}><TrendingUp size={40} color={C.green} stroke={C.green} /></View><Text style={[s.empty, { color: C.text, fontWeight: '700' }]}>{t('urgent.everyoneUpToDate')}</Text><Text style={{ color: C.muted, marginTop: 4 }}>{t('urgent.noUrgentMatters')}</Text></View>
       )}
     </ScrollView>

@@ -6,6 +6,7 @@ import { db } from '../../db/database';
 import { useTranslation } from 'react-i18next';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade, normalizeSubject } from '../../utils/gradeUtils';
 import { calculateRankings, calculateGroupAverage, isConductAssessment } from '../../utils/analyticsEngine';
+import { getEthiopianYear } from '../../utils/dateUtils';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -55,8 +56,15 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
         if (!students.length || !marks.length || !assessments.length) return [];
 
         const semesterAssessments = assessments.filter(a => {
-            // New: Filter by Academic Year
-            const matchesYear = !currentYear || a.academicYear === currentYear;
+            // Filter by Academic Year using standardized logic
+            const targetYearNum = currentYear ? getEthiopianYear(currentYear) : null;
+            const assessmentYearNum = a.academicYear ? getEthiopianYear(a.academicYear) : null;
+            
+            const matchesYear = !targetYearNum || 
+                                assessmentYearNum === targetYearNum || 
+                                !assessmentYearNum || 
+                                (assessmentYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም');
+                                
             if (!matchesYear) return false;
 
             const subject = subjects.find(s => s.name === a.subjectName || s.name === a.subjectname);
