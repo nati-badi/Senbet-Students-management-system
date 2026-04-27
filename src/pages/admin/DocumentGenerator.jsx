@@ -47,6 +47,7 @@ export default function DocumentGenerator({ type }) {
     const { t } = useTranslation();
     const { message } = App.useApp();
     const [selectedGrade, setSelectedGrade] = useState(null);
+    const [selectedStudents, setSelectedStudents] = useState([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [validationReport, setValidationReport] = useState(null);
     const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
@@ -73,7 +74,7 @@ export default function DocumentGenerator({ type }) {
 
     const normalizeGradeLocal = (g) => normalizeGrade(g);
     const uniqueGrades = [...new Set(students.map(s => s.grade))].filter(Boolean);
-    const gradeStudents = students.filter(s => s.grade === selectedGrade);
+    const gradeStudents = selectedGrade === 'All' ? students : students.filter(s => s.grade === selectedGrade);
 
     // Centralized Ranking for all students in the selected grade
     const rankMap = useMemo(() => {
@@ -160,13 +161,18 @@ export default function DocumentGenerator({ type }) {
     };
 
     const handleGenerate = async (targetStudents = null) => {
-        const studentsToProcess = Array.isArray(targetStudents) ? targetStudents : gradeStudents;
+        let studentsToProcess = Array.isArray(targetStudents) ? targetStudents : gradeStudents;
+        
+        if (selectedStudents.length > 0 && selectedGrade !== 'All') {
+            studentsToProcess = studentsToProcess.filter(s => selectedStudents.includes(s.id));
+        }
+
         if (!selectedGrade || studentsToProcess.length === 0) return;
         
         const isIdCard = type === 'id-card';
 
         // 1. Validation Logic
-        if (!Array.isArray(targetStudents) && !isIdCard) {
+        if (!Array.isArray(targetStudents) && !isIdCard && selectedGrade !== 'All') {
             const report = validateGradeData();
             if (report.incomplete.length > 0) {
                 setValidationReport(report);
@@ -175,151 +181,139 @@ export default function DocumentGenerator({ type }) {
             }
         }
 
-        const fileName = `Senbet_${type === 'id-card' ? 'ID_Cards' : 'Certificates'}_${selectedGrade}.pdf`;
-        let savedFilePath = null;
-        let shellOpen = null;
+        let savedDirPath = null;
+        let singleSavedFilePath = null;
 
-        // 2. Ask WHERE to save FIRST (before any rendering)
+        // 2. Ask WHERE to save FIRST
         if (window.__TAURI_INTERNALS__) {
             try {
-                const { save } = await import('@tauri-apps/plugin-dialog');
-                const filePath = await save({
-                    defaultPath: fileName,
-                    filters: [{ name: 'PDF Documents', extensions: ['pdf'] }],
-                    title: t('admin.saveGenDocs', 'Save Generated Documents'),
-                });
-
-                if (!filePath) {
-                    // User cancelled — do nothing
-                    return;
+                if (selectedGrade === 'All') {
+                    const { open } = await import('@tauri-apps/plugin-dialog');
+                    const dirPath = await open({
+                        directory: true,
+                        multiple: false,
+                        title: t('admin.selectFolderToSave', 'Select Folder to Save All Documents'),
+                    });
+                    if (!dirPath) return; // Cancelled
+                    savedDirPath = dirPath;
+                } else {
+                    const { save } = await import('@tauri-apps/plugin-dialog');
+                    const fileName = `Senbet_${isIdCard ? 'ID_Cards' : 'Certificates'}_${selectedGrade}.pdf`;
+                    const filePath = await save({
+                        defaultPath: fileName,
+                        filters: [{ name: 'PDF Documents', extensions: ['pdf'] }],
+                        title: t('admin.saveGenDocs', 'Save Generated Documents'),
+                    });
+                    if (!filePath) return;
+                    singleSavedFilePath = filePath;
                 }
-                savedFilePath = filePath;
-
-                // Pre-load shell open for later
-                const shellModule = await import('@tauri-apps/plugin-shell');
-                shellOpen = shellModule.open;
-            } catch (dialogErr) {
-                console.warn("Tauri dialog failed, will fall back to browser download:", dialogErr);
+            } catch (err) {
+                console.warn("Tauri dialog failed:", err);
             }
         }
 
-        // 3. Start the rendering progress
         setIsGenerating(true);
         setStatusMsg("Loading localized fonts...");
         setProgress(5);
 
         try {
-            // CRITICAL: Ensure all fonts (Noto Sans Ethiopic) are loaded before capturing
-            // This prevents misalignment of text bounding boxes in the canvas
-            if (document.fonts) {
-                await document.fonts.ready;
-            }
+            if (document.fonts) await document.fonts.ready;
 
-            const doc = new jsPDF({
-                orientation: isIdCard ? 'l' : 'p',
-                unit: 'mm',
-                format: isIdCard ? [86, 54] : 'a4'
-            });
-
-            // High-Fidelity Rendering Loop
-            for (let i = 0; i < studentsToProcess.length; i++) {
-                const student = studentsToProcess[i];
-                setStatusMsg(`Rendering ${student.name} (${i + 1}/${studentsToProcess.length})...`);
-                setProgress(Math.floor(10 + ((i / studentsToProcess.length) * 80)));
-                
-                // Allow UI to breathe
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                const element = document.getElementById(`temp-${type}-${student.id}`);
-                if (!element) {
-                    console.warn(`Template not found for student ${student.id}`);
-                    continue;
-                }
-
-                const canvas = await html2canvas(element, {
-                    scale: 1.5, 
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: '#ffffff', // Ensures JPEG background works correctly
+            const processGroup = async (groupStudents, groupName, savePath) => {
+                const doc = new jsPDF({
+                    orientation: isIdCard ? 'l' : 'p',
+                    unit: 'mm',
+                    format: isIdCard ? [86, 54] : 'a4'
                 });
 
-                const imgData = canvas.toDataURL('image/jpeg', 0.85); // Use JPEG compression to fix Out of Memory limits
-                const pdfWidth = doc.internal.pageSize.getWidth();
-                const imgProps = doc.getImageProperties(imgData);
-                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                for (let i = 0; i < groupStudents.length; i++) {
+                    const student = groupStudents[i];
+                    setStatusMsg(`[${groupName}] Rendering ${student.name} (${i + 1}/${groupStudents.length})...`);
+                    setProgress(Math.floor(10 + ((i / groupStudents.length) * 80)));
+                    
+                    await new Promise(resolve => setTimeout(resolve, 50));
 
-                if (i > 0) doc.addPage();
-                doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-                
-                // Explicitly clear canvas to free memory
-                canvas.width = 0; 
-                canvas.height = 0;
-            }
+                    const element = document.getElementById(`temp-${type}-${student.id}`);
+                    if (!element) continue;
 
-            // 4. Save the file
-            setStatusMsg("Saving file...");
-            setProgress(95);
+                    const canvas = await html2canvas(element, {
+                        scale: 1.5, 
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#ffffff',
+                    });
 
-            if (savedFilePath && window.__TAURI_INTERNALS__) {
-                // --- Native Tauri Write ---
-                try {
-                    const { writeFile } = await import('@tauri-apps/plugin-fs');
-                    const pdfBytes = doc.output('arraybuffer');
-                    await writeFile(savedFilePath, new Uint8Array(pdfBytes));
-                } catch (writeErr) {
-                    console.warn("Tauri write failed, falling back to browser download:", writeErr);
-                    doc.save(fileName);
-                    savedFilePath = null;
+                    const imgData = canvas.toDataURL('image/jpeg', 0.85);
+                    const pdfWidth = doc.internal.pageSize.getWidth();
+                    const imgProps = doc.getImageProperties(imgData);
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                    if (i > 0) doc.addPage();
+                    doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                    
+                    canvas.width = 0; 
+                    canvas.height = 0;
                 }
+
+                setStatusMsg(`Saving ${groupName}...`);
+                
+                const fallbackFileName = `Senbet_${isIdCard ? 'ID_Cards' : 'Certificates'}_${groupName}.pdf`;
+
+                if (savePath && window.__TAURI_INTERNALS__) {
+                    try {
+                        const { writeFile } = await import('@tauri-apps/plugin-fs');
+                        const pdfBytes = doc.output('arraybuffer');
+                        await writeFile(savePath, new Uint8Array(pdfBytes));
+                    } catch (writeErr) {
+                        console.warn("Tauri write failed:", writeErr);
+                        doc.save(fallbackFileName);
+                    }
+                } else {
+                    doc.save(fallbackFileName);
+                }
+            };
+
+            if (selectedGrade === 'All') {
+                const sep = savedDirPath?.includes('\\') ? '\\' : '/';
+                for (let i = 0; i < uniqueGrades.length; i++) {
+                    const grade = uniqueGrades[i];
+                    const groupStudents = studentsToProcess.filter(s => s.grade === grade);
+                    if (groupStudents.length === 0) continue;
+                    
+                    const fileName = `Senbet_${isIdCard ? 'ID_Cards' : 'Certificates'}_${grade}.pdf`;
+                    const fullPath = savedDirPath ? `${savedDirPath}${sep}${fileName}` : null;
+                    
+                    await processGroup(groupStudents, grade, fullPath);
+                }
+                
+                if (savedDirPath) lastGeneratedPath.current = savedDirPath;
+                setSuccessModal({ open: true, count: studentsToProcess.length, fileName: savedDirPath || "Multiple Files" });
+                
             } else {
-                // --- Browser Fallback ---
-                doc.save(fileName);
+                await processGroup(studentsToProcess, selectedGrade, singleSavedFilePath);
+                if (singleSavedFilePath) lastGeneratedPath.current = singleSavedFilePath;
+                setSuccessModal({ open: true, count: studentsToProcess.length, fileName: singleSavedFilePath || `Senbet_${isIdCard ? 'ID_Cards' : 'Certificates'}_${selectedGrade}.pdf` });
             }
 
             setProgress(100);
             setStatusMsg("Download ready.");
             setIsValidationModalOpen(false);
-            setSuccessModal({ open: true, count: studentsToProcess.length, fileName: savedFilePath || fileName });
-            
-            // Store path for notification click handler
-            if (savedFilePath) {
-                lastGeneratedPath.current = savedFilePath;
-            }
 
-            // 5. Notification + Auto-open (only for native saves)
-            if (savedFilePath && window.__TAURI_INTERNALS__) {
+            // Notification logic
+            if (window.__TAURI_INTERNALS__ && (savedDirPath || singleSavedFilePath)) {
                 try {
                     const { isPermissionGranted, requestPermission, sendNotification } = await import('@tauri-apps/plugin-notification');
-                    console.log("[Notification] Plugin loaded successfully");
-                    
                     let permissionGranted = await isPermissionGranted();
-                    console.log("[Notification] Permission status:", permissionGranted);
+                    if (!permissionGranted) permissionGranted = (await requestPermission()) === 'granted';
                     
-                    if (!permissionGranted) {
-                        const permission = await requestPermission();
-                        console.log("[Notification] Permission request result:", permission);
-                        permissionGranted = permission === 'granted';
-                    }
                     if (permissionGranted) {
-                        const docName = type === 'id-card' ? 'Student ID Cards' : 'Certificates';
-                        const gradeText = selectedGrade && selectedGrade !== 'All' ? selectedGrade : 'all selected students';
-                        
-                        console.log("[Notification] Sending notification now...");
                         sendNotification({ 
                             id: Math.floor(Math.random() * 2147483647),
                             title: 'Senbet Students Management System', 
-                            body: `Download Complete! Successfully generated ${studentsToProcess.length} ${docName} for ${gradeText}. Saved to: ${savedFilePath}`,
-                            extra: { filePath: savedFilePath }
+                            body: `Download Complete! Successfully generated documents. Saved to: ${savedDirPath || singleSavedFilePath}`
                         });
-                        console.log("[Notification] Notification sent!");
-                    } else {
-                        console.warn("[Notification] Permission denied");
                     }
-                } catch (notifyErr) {
-                    console.error("[Notification] Error:", notifyErr);
-                }
-
-                // Auto-open removed per user request - manual 'Open File' button is available in success modal.
+                } catch (e) {}
             }
         } catch (err) {
             console.error("PDF Gen Error:", err);
@@ -339,16 +333,39 @@ export default function DocumentGenerator({ type }) {
                 <Card className="mt-6 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
                     <Space orientation="vertical" className="w-full" size="middle">
                         <div>
-                            <Text strong style={{ display: 'block', marginBottom: '8px' }}>{t('admin.selectGradeCerts')}</Text>
+                            <Text strong style={{ display: 'block', marginBottom: '8px' }}>{t('admin.selectGradeCerts', 'Select Grade')}</Text>
                             <Select
                                 placeholder={t('teacher.selectGrade')}
                                 value={selectedGrade}
-                                onChange={setSelectedGrade}
+                                onChange={(val) => {
+                                    setSelectedGrade(val);
+                                    setSelectedStudents([]);
+                                }}
                                 style={{ width: '100%' }}
                                 size="large"
-                                options={uniqueGrades.map(g => ({ value: g, label: g }))}
+                                options={[
+                                    { value: 'All', label: t('admin.allGrades', 'All Grades (Separate PDFs)') },
+                                    ...uniqueGrades.map(g => ({ value: g, label: g }))
+                                ]}
                             />
                         </div>
+                        {selectedGrade && selectedGrade !== 'All' && (
+                            <div>
+                                <Text strong style={{ display: 'block', marginBottom: '8px' }}>{t('admin.selectSpecificStudents', 'Select Specific Students (Optional)')}</Text>
+                                <Select
+                                    mode="multiple"
+                                    placeholder={t('admin.allStudentsInGrade', 'All Students in Grade')}
+                                    value={selectedStudents}
+                                    onChange={setSelectedStudents}
+                                    style={{ width: '100%' }}
+                                    size="large"
+                                    options={gradeStudents.map(s => ({ value: s.id, label: s.name }))}
+                                    filterOption={(input, option) =>
+                                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                    }
+                                />
+                            </div>
+                        )}
                         <div className="flex gap-2">
                             <Button
                                 icon={<EyeOutlined />}
