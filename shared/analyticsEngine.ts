@@ -48,20 +48,20 @@ export const calculateStudentStats = (
   relevantAssessments.forEach(a => {
     const aId = a.id || a.assessmentId;
     
-    // Find mark with robust ID matching
+    // Find mark for this specific student
     const mark = allMarks.find(m => {
-      const mStudentId = m.studentId || m.studentid;
-      const mAssessmentId = m.assessmentId || m.assessmentid;
-      return mStudentId === student.id && mAssessmentId === aId;
+        const mStudentId = m.studentId || m.studentid;
+        const mAssessmentId = m.assessmentId || m.assessmentid;
+        return mStudentId === student.id && mAssessmentId === aId;
     });
 
+    // Progressive Average: Only count this assessment in the total if this specific student has a mark recorded.
+    // This ensures averages represent "Performance on completed work".
     if (mark) {
-      totalScore += (Number(mark.score) || 0);
+        const mScore = Number(a.maxScore || a.maxscore || a.max_score || 0);
+        totalMax += mScore;
+        totalScore += (Number(mark.score) || 0);
     }
-
-    // Accumulate total max potential score
-    const mScore = Number(a.maxScore || a.maxscore || a.max_score || 0);
-    totalMax += mScore;
   });
 
   const percentage = totalMax > 0 ? (totalScore / totalMax) * 100 : 0;

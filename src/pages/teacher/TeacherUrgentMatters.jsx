@@ -55,21 +55,6 @@ export default function TeacherUrgentMatters({ teacher }) {
             (allowedSubjects.length === 0 || allowedSubjects.includes(a.subjectName));
     }), [allAssessments, allSubjects, allowedGrades, allowedSubjects, currentSemester]);
 
-    // Students with NO marks in any of teacher's assessments
-    const noMarksStudents = useMemo(() => {
-        if (!myAssessments.length) return [];
-        return myStudents.filter(student => {
-            const myAssessmentsForGrade = myAssessments.filter(a =>
-                normalizeGrade(a.grade) === normalizeGrade(student.grade)
-            );
-            if (!myAssessmentsForGrade.length) return false;
-            return !marks.some(m =>
-                m.studentId === student.id &&
-                myAssessmentsForGrade.some(a => a.id === m.assessmentId)
-            );
-        });
-    }, [myStudents, myAssessments, marks]);
-
     // Per-assessment missing marks (students who haven't been graded in a specific assessment)
     const missingMarksByAssessment = useMemo(() => {
         const result = [];
@@ -87,7 +72,7 @@ export default function TeacherUrgentMatters({ teacher }) {
         return result;
     }, [myAssessments, myStudents, marks]);
 
-    const totalIssues = noMarksStudents.length + missingMarksByAssessment.reduce((s, a) => s + a.count, 0);
+    const totalIssues = missingMarksByAssessment.length;
 
     const avatarStyle = (bg, fg, border) => ({
         backgroundColor: bg,
@@ -135,82 +120,19 @@ export default function TeacherUrgentMatters({ teacher }) {
                 />
             )}
 
-            <Row gutter={[16, 16]}>
-                <Col xs={24} sm={12}>
-                    <Card className="rounded-2xl border-none shadow-sm bg-yellow-50 dark:bg-yellow-900/20 text-center">
-                        <Statistic
-                            title={<span className="text-yellow-700 font-bold">{t('teacher.studentsWithNoMarks')}</span>}
-                            value={noMarksStudents.length}
-                            valueStyle={{ color: '#ca8a04', fontWeight: 'bold', fontSize: '2.5rem' }}
-                            prefix={<ClockCircleOutlined />}
-                        />
-                    </Card>
-                </Col>
-                <Col xs={24} sm={12}>
-                    <Card className="rounded-2xl border-none shadow-sm bg-orange-50 dark:bg-orange-900/20 text-center">
-                        <Statistic
-                            title={<span className="text-orange-600 font-bold">{t('teacher.assessmentsWithGaps')}</span>}
-                            value={missingMarksByAssessment.length}
-                            valueStyle={{ color: '#ea580c', fontWeight: 'bold', fontSize: '2.5rem' }}
-                            prefix={<FormOutlined />}
-                        />
-                    </Card>
-                </Col>
-            </Row>
-
-            {noMarksStudents.length > 0 && (
-                <Card
-                    title={
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-yellow-100 rounded-xl flex items-center justify-center">
-                                <ClockCircleOutlined className="text-yellow-600" />
-                            </div>
-                            <span className="font-bold">{t('teacher.noMarksRecordedTitle')}</span>
-                            <Badge count={noMarksStudents.length} color="gold" />
-                        </div>
-                    }
-                    className="rounded-2xl border-l-4 border-l-yellow-500 shadow-sm"
-                >
-                    <Paragraph type="secondary" className="mb-4">
-                        {t('teacher.noMarksRecordedDesc')}
-                    </Paragraph>
-                    <List
-                        dataSource={noMarksStudents}
-                        rowKey="id"
-                        renderItem={student => (
-                            <List.Item
-                                className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg"
-                                actions={[
-                                    <Button
-                                        key="go"
-                                        type="primary"
-                                        size="small"
-                                        icon={<EditOutlined />}
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            navigate('/teacher/mark-entry');
-                                        }}
-                                    >
-                                        {t('teacher.goToMarkEntry')}
-                                    </Button>
-                                ]}
-                            >
-                                <List.Item.Meta
-                                    avatar={
-                                        <Avatar
-                                            size={44}
-                                            icon={<ClockCircleOutlined />}
-                                            style={avatarStyle('#fefce8', '#a16207', '#fde68a')}
-                                        />
-                                    }
-                                    title={<span className="font-bold">{student.name}</span>}
-                                    description={<Tag color="green">{formatGrade(student.grade)}</Tag>}
-                                />
-                            </List.Item>
-                        )}
-                        pagination={{ pageSize: 8 }}
-                    />
-                </Card>
+            {totalIssues > 0 && (
+                <Row justify="center" gutter={[16, 16]}>
+                    <Col xs={24} md={12}>
+                        <Card className="rounded-2xl border-none shadow-sm bg-orange-50 dark:bg-orange-900/20 text-center">
+                            <Statistic
+                                title={<span className="text-orange-600 font-bold">{t('teacher.assessmentsWithGaps')}</span>}
+                                value={missingMarksByAssessment.length}
+                                valueStyle={{ color: '#ea580c', fontWeight: 'bold', fontSize: '2.5rem' }}
+                                prefix={<FormOutlined />}
+                            />
+                        </Card>
+                    </Col>
+                </Row>
             )}
 
             {missingMarksByAssessment.length > 0 && (

@@ -1,17 +1,18 @@
 import { useState } from 'react';
-import { Typography, Card, Button, Space, message, Select, DatePicker, Row, Col, Modal } from 'antd';
+import { Typography, Card, Button, Space, Select, DatePicker, Row, Col, Modal, App as AntApp } from 'antd';
 import { DownloadOutlined, FileExcelOutlined, DatabaseOutlined, EyeOutlined } from '@ant-design/icons';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
 import { useTranslation } from 'react-i18next';
 import * as XLSX from 'xlsx';
-import { formatEthiopianDate } from '../../utils/dateUtils';
+import { formatEthiopianDate, formatEthiopianTime, getEthiopianYear } from '../../utils/dateUtils';
 import { formatGrade } from '../../utils/gradeUtils';
 
 const { Title, Text, Paragraph } = Typography;
 
 export default function ReportsAndBackups() {
     const { t } = useTranslation();
+    const { message } = AntApp.useApp();
     const students = useLiveQuery(() => db.students.toArray()) || [];
     const marks = useLiveQuery(() => db.marks.toArray()) || [];
     const assessments = useLiveQuery(() => db.assessments.toArray()) || [];
@@ -138,7 +139,14 @@ export default function ReportsAndBackups() {
 
             // Correct filtering: Use the semester property on the assessment itself AND the academicYear
             const semesterAssessments = assessments.filter(a => {
-                const matchesYear = !currentYear || a.academicYear === currentYear;
+                const targetYearNum = currentYear ? getEthiopianYear(currentYear) : null;
+                const assessmentYearNum = a.academicYear ? getEthiopianYear(a.academicYear) : null;
+                
+                const matchesYear = !targetYearNum || 
+                                    assessmentYearNum === targetYearNum || 
+                                    !assessmentYearNum || 
+                                    (assessmentYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም');
+                                    
                 if (!matchesYear) return false;
 
                 if (semester === 'Semester I') {

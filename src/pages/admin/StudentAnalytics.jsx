@@ -218,7 +218,11 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                         <div className="flex items-start justify-between">
                             <div>
                                 <span className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-xs">{t('admin.categoryAverage')}</span>
-                                <div className="text-4xl font-black mt-2 mb-1 text-slate-800 dark:text-white">{schoolAverage.toFixed(1)}%</div>
+                                <div className={`text-4xl font-black mt-2 mb-1 ${
+                                    schoolAverage >= 75 ? 'text-emerald-500' : 
+                                    schoolAverage >= 50 ? 'text-amber-500' : 
+                                    'text-red-500'
+                                }`}>{schoolAverage.toFixed(1)}%</div>
                                 <span className="text-slate-400 dark:text-slate-500 text-sm">{t('admin.target')} {t(selectedSemester === 'Semester I' ? 'admin.semester1' : 'admin.semester2')}</span>
                             </div>
                             <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-2xl">

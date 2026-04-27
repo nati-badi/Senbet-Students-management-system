@@ -221,7 +221,7 @@ export default function AcademicSetup() {
         const hide = message.loading(t('admin.wipingSystem', 'Wiping system data...'), 0);
         try {
             const { supabase } = await import('../../utils/supabaseClient');
-            const tables = ['marks', 'attendance', 'assessments', 'students', 'teachers', 'subjects', 'deleted_records'];
+            const tables = ['marks', 'attendance', 'assessments', 'students', 'teachers', 'subjects', 'deleted_records', 'announcements'];
             for (const table of tables) {
                 await supabase.from(table).delete().not('id', 'is', null);
             }
@@ -233,6 +233,8 @@ export default function AcademicSetup() {
             await db.assessments.clear();
             await db.teachers.clear();
             if (db.deleted_records) await db.deleted_records.clear();
+            if (db.announcements) await db.announcements.clear();
+            if (db.settings) await db.settings.clear();
 
             hide();
             message.success(t('admin.systemWiped', 'System wiped completely.'));
@@ -413,7 +415,7 @@ export default function AcademicSetup() {
                             <WarningOutlined /> {t('admin.factoryReset', 'Factory Reset (Nuclear Option)')}
                         </h4>
                         <p className="text-slate-500 mt-2 text-sm leading-relaxed">
-                            {t('admin.factoryResetDesc', 'This will permanently delete ALL students, teachers, grades, subjects, and assessments from both this device and the server. Only use this for a completely fresh installation.')}
+                            {t('admin.factoryResetDesc', 'This will permanently delete ALL students, teachers, grades, subjects, assessments, announcements, and settings from both this device and the server. Only use this for a completely fresh installation.')}
                         </p>
                     </div>
                     
