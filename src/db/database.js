@@ -198,7 +198,19 @@ db.version(24).stores({
   });
 });
 
-db.version(25).stores({
+db.version(26).stores({
+  students: "++id, name, grade, archived, synced, updated_at, portalCode",
+  attendance: "++id, studentId, date, synced, updated_at, [studentId+date]",
+  marks: "++id, studentId, assessmentId, synced, updated_at, [studentId+assessmentId]",
+  subjects: "++id, name, synced, updated_at",
+  assessments: "++id, name, subjectName, grade, synced, updated_at",
+  teachers: "++id, name, synced, updated_at",
+  settings: "key, value, updated_at",
+  deleted_records: "++id, tableName, recordId",
+  announcements: "++id, title_en, synced, updated_at"
+});
+
+db.version(27).stores({
   students: "++id, name, baptismalName, gender, academicYear, grade, archived, parentContact, portalCode, synced, updated_at",
   attendance: "++id, studentId, date, status, semester, academicYear, synced, updated_at, [studentId+date]",
   marks: "++id, studentId, assessmentDate, subject, score, assessmentId, semester, academicYear, synced, updated_at, [studentId+assessmentId]",

@@ -451,8 +451,8 @@ function AdminLogin({ onLogin }) {
     return (
         <div className="flex-1 flex items-center justify-center w-full py-20 relative overflow-hidden font-['Inter']">
             {/* Background Aesthetic Elements */}
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full -mr-64 -mt-64" />
-            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-rose-500/5 blur-[100px] rounded-full -ml-48 -mb-48" />
+            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/5 blur-[80px] rounded-full -mr-48 -mt-48" />
+            <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-rose-500/5 blur-[60px] rounded-full -ml-32 -mb-32" />
 
             <div className="relative w-full max-w-md px-6">
                 <div className="p-10 rounded-[3rem] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/20 dark:border-slate-800/40 shadow-2xl shadow-indigo-500/10">

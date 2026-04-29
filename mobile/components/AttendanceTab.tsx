@@ -21,7 +21,7 @@ export const AttendanceTab = React.memo(({ route, navigation, teacher, students:
   const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
   
   const students = useMemo(() => 
-    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    allStudents.filter(st => st.archived !== 1 && (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
 

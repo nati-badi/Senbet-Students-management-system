@@ -5,6 +5,7 @@ import { TrendingUp, Edit, Trash2, ChevronRight, Clock } from 'lucide-react-nati
 import { BlurView } from 'expo-blur';
 import { supabase } from '../supabase';
 import { Student, Assessment, Teacher, normG, normS, isConduct, generateUUID, fmtGrade, paginate } from '../utils';
+import { getEthiopianYear } from '../dateUtils';
 import { PremiumDropdown } from './PremiumDropdown';
 import { useToast } from './ToastContext';
 
@@ -24,7 +25,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
   const normalizedMySubjects = useMemo(() => mySubjects.map(normS).filter(Boolean), [mySubjects]);
   
   const myStudents = useMemo(() => 
-    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    allStudents.filter(st => st.archived !== 1 && (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
 
@@ -36,10 +37,16 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
       const assessmentSemester = subject?.semester || 'Semester I';
       const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
+
+      // Academic year filtering (matches web app logic)
+      const currentYear = settings.currentAcademicYear;
+      const targetYearNum = currentYear ? getEthiopianYear(currentYear) : null;
+      const assessmentYearNum = a.academicyear ? getEthiopianYear(a.academicyear) : null;
+      const isYearMatch = !targetYearNum || !assessmentYearNum || assessmentYearNum === targetYearNum;
       
-      return isGradeMatch && isSubjectMatch && !isConduct(a) && isSemesterMatch;
+      return isGradeMatch && isSubjectMatch && !isConduct(a) && isSemesterMatch && isYearMatch;
     }),
-    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, normalizedMySubjects, subjects, settings.currentSemester]
+    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, normalizedMySubjects, subjects, settings.currentSemester, settings.currentAcademicYear]
   );
 
   const [selectedGrade, setSelectedGrade] = useState('');
@@ -88,7 +95,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
   
   const filteredStudents = useMemo(() => {
     const gradeStudents = myStudents.filter((st) => normG(st.grade) === normG(selectedGrade));
-    return gradeStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
+    return gradeStudents.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()));
   }, [myStudents, selectedGrade, search]);
 
   const focusNext = (currentIndex: number) => {

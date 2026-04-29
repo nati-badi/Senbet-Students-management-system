@@ -3,6 +3,7 @@ import { View, Text, ScrollView, RefreshControl, TouchableOpacity } from 'react-
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Users, BarChart3, TrendingUp } from 'lucide-react-native';
 import { Student, Assessment, Teacher, normG, normS, isConduct, fmtGrade } from '../utils';
+import { getEthiopianYear } from '../dateUtils';
 
 export const UrgentMattersTab = React.memo(({ navigation, teacher, students: allStudents, assessments: allAssessments, marksData, subjects, settings, C, s, onRefresh }: {
   navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, onRefresh?: () => Promise<void> | void
@@ -16,7 +17,7 @@ export const UrgentMattersTab = React.memo(({ navigation, teacher, students: all
   const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
 
   const students = useMemo(() => 
-    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    allStudents.filter(st => st.archived !== 1 && (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
   
@@ -27,9 +28,16 @@ export const UrgentMattersTab = React.memo(({ navigation, teacher, students: all
       const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
       const assessmentSemester = subject?.semester || 'Semester I';
       const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
-      return isGradeMatch && isSubjectMatch && !isConduct(a) && isSemesterMatch;
+
+      // Academic year filtering (matches web app logic)
+      const currentYear = settings.currentAcademicYear;
+      const targetYearNum = currentYear ? getEthiopianYear(currentYear) : null;
+      const assessmentYearNum = (a as any).academicyear ? getEthiopianYear((a as any).academicyear) : null;
+      const isYearMatch = !targetYearNum || !assessmentYearNum || assessmentYearNum === targetYearNum;
+
+      return isGradeMatch && isSubjectMatch && !isConduct(a) && isSemesterMatch && isYearMatch;
     }),
-    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, mySubjects, subjects, settings.currentSemester]
+    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, mySubjects, subjects, settings.currentSemester, settings.currentAcademicYear]
   );
   
   const [refreshing, setRefreshing] = useState(false);

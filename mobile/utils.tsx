@@ -15,6 +15,7 @@ export interface Student {
   academicyear?: string;
   portalCode?: string;
   portalcode?: string;
+  archived?: number;
 }
 
 export interface Assessment {
@@ -24,6 +25,7 @@ export interface Assessment {
   grade: string;
   maxscore: number;
   date: string;
+  academicyear?: string;
 }
 
 export interface Teacher {

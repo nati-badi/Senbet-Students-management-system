@@ -36,7 +36,7 @@ export const initDB = () => {
         data TEXT,
         isDeleted INTEGER DEFAULT 0
       );
-      CREATE INDEX IF NOT EXISTS idx_students_grade ON students(grade);
+      CREATE INDEX IF NOT EXISTS idx_students_grade_active ON students(grade, isDeleted);
       CREATE INDEX IF NOT EXISTS idx_students_portalCode ON students(portalCode);
 
       CREATE TABLE IF NOT EXISTS assessments (
@@ -56,8 +56,7 @@ export const initDB = () => {
         data TEXT,
         isDeleted INTEGER DEFAULT 0
       );
-      CREATE INDEX IF NOT EXISTS idx_marks_studentId ON marks(studentId);
-      CREATE INDEX IF NOT EXISTS idx_marks_assessmentId ON marks(assessmentId);
+      CREATE INDEX IF NOT EXISTS idx_marks_lookup ON marks(studentId, assessmentId, isDeleted);
 
       CREATE TABLE IF NOT EXISTS attendance (
         id TEXT PRIMARY KEY,
@@ -66,7 +65,7 @@ export const initDB = () => {
         data TEXT,
         isDeleted INTEGER DEFAULT 0
       );
-      CREATE INDEX IF NOT EXISTS idx_attendance_studentId ON attendance(studentId);
+      CREATE INDEX IF NOT EXISTS idx_attendance_lookup ON attendance(studentId, date, isDeleted);
 
       CREATE TABLE IF NOT EXISTS subjects (
         id TEXT PRIMARY KEY,

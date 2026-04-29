@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Users, CalendarCheck, AlertTriangle, RefreshCw, TrendingUp, ChevronRight, Clock, BarChart3 } from 'lucide-react-native';
-import { formatEthiopianDate, formatEthiopianTime } from '../dateUtils';
+import { formatEthiopianDate, formatEthiopianTime, getEthiopianYear } from '../dateUtils';
 import { Teacher, Student, Assessment, normG, normS } from '../utils';
 import { useToast } from './ToastContext';
 import { EthiopicClockWidget } from './EthiopicClockWidget';
@@ -23,7 +23,7 @@ export const DashboardTab = React.memo(({ teacher, students: allStudents, assess
   const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
   
   const students = useMemo(() => 
-    allStudents.filter(st => !hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade)),
+    allStudents.filter(st => st.archived !== 1 && (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
   
@@ -35,20 +35,35 @@ export const DashboardTab = React.memo(({ teacher, students: allStudents, assess
       const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
       const assessmentSemester = subject?.semester || 'Semester I';
       const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
+
+      // Academic year filtering (matches web app logic)
+      const currentYear = settings.currentAcademicYear;
+      const targetYearNum = currentYear ? getEthiopianYear(currentYear) : null;
+      const assessmentYearNum = (a as any).academicyear ? getEthiopianYear((a as any).academicyear) : null;
+      const isYearMatch = !targetYearNum || !assessmentYearNum || assessmentYearNum === targetYearNum;
       
-      return isGradeMatch && isSubjectMatch && isSemesterMatch;
+      return isGradeMatch && isSubjectMatch && isSemesterMatch && isYearMatch;
     }),
-    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, mySubjects, subjects, settings.currentSemester]
+    [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, mySubjects, subjects, settings.currentSemester, settings.currentAcademicYear]
   );
 
   const handleRefresh = async () => { setRefreshing(true); await onSync(); setRefreshing(false); };
 
-  const missingCount = useMemo(() => students.reduce((acc, st) => {
-    const stGrade = normG(st.grade);
-    const stAsses = assessments.filter(a => normG(a.grade) === stGrade);
-    const missing = stAsses.filter(a => !marks.some(m => m.studentid === st.id && m.assessmentid === a.id));
-    return acc + missing.length;
-  }, 0), [students, assessments, marks]);
+  const missingCount = useMemo(() => {
+    if (students.length === 0 || assessments.length === 0) return 0;
+    
+    // Optimization: Create a Set of "studentId:assessmentId" for O(1) lookups
+    const recordedMarksSet = new Set(
+      marks.map(m => `${m.studentid}:${m.assessmentid}`)
+    );
+
+    return students.reduce((acc, st) => {
+      const stGrade = normG(st.grade);
+      const stAsses = assessments.filter(a => normG(a.grade) === stGrade);
+      const missing = stAsses.filter(a => !recordedMarksSet.has(`${st.id}:${a.id}`));
+      return acc + missing.length;
+    }, 0);
+  }, [students, assessments, marks]);
   
   const stats = useMemo(() => [
     { label: t('dashboard.totalStudents'), value: students.length, icon: <Users size={24} color={C.accent} stroke={C.accent} />, bg: C.accentMuted, target: 'Students' },

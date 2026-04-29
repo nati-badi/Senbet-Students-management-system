@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     EditOutlined,
@@ -93,9 +93,9 @@ const EthiopicClockWidget = () => {
             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 to-rose-500/20 rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-75 transition duration-1000"></div>
             
             <div className="relative w-full bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-slate-800/40 rounded-[2.5rem] shadow-2xl shadow-indigo-500/5 overflow-hidden">
-                {/* Animated Gradient Shapes */}
-                <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 blur-[100px] -mr-40 -mt-40 rounded-full animate-pulse" />
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-rose-500/5 blur-[80px] -ml-32 -mb-32 rounded-full" />
+                {/* Optimized Static Glows */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[60px] -mr-32 -mt-32 rounded-full" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-rose-500/5 blur-[40px] -ml-24 -mb-24 rounded-full" />
                 
                 <div className="relative flex flex-col md:flex-row items-center justify-between py-10 px-12 gap-8 md:gap-4">
                     <div className="flex flex-col items-center md:items-start">
@@ -212,7 +212,7 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
         <div className="flex flex-col w-full gap-4 pt-4">
             <EthiopicClockWidget />
             <div className="relative p-8 rounded-[2.5rem] bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm overflow-hidden mb-6">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-400/5 blur-[100px] -mr-32 -mt-32 rounded-full" />
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-400/5 blur-[40px] -mr-32 -mt-32 rounded-full" />
                 <div className="relative flex flex-col md:flex-row md:items-center gap-8">
                     <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/30 rounded-2xl flex items-center justify-center border border-indigo-100/50 dark:border-indigo-800/30 shrink-0">
                         <UserOutlined className="text-2xl text-indigo-500/80" />
@@ -385,8 +385,8 @@ function TeacherLogin({ onLogin }) {
     return (
         <div className="flex-1 flex items-center justify-center w-full py-20 relative overflow-hidden font-['Inter']">
             {/* Background Aesthetic Elements */}
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full -mr-64 -mt-64" />
-            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-rose-500/5 blur-[100px] rounded-full -ml-48 -mb-48" />
+            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/5 blur-[80px] rounded-full -mr-48 -mt-48" />
+            <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-rose-500/5 blur-[60px] rounded-full -ml-32 -mb-32" />
 
             <div className="relative w-full max-w-lg px-6">
                 <div className="p-10 rounded-[3rem] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/20 dark:border-slate-800/40 shadow-2xl shadow-indigo-500/10">
@@ -495,33 +495,36 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         return () => window.removeEventListener('syncComplete', handleSync);
     }, []);
 
-    const allStudentsData = useLiveQuery(() => db.students.toArray(), [syncKey]);
-    const assessmentsData = useLiveQuery(() => db.assessments.toArray(), [syncKey]);
+    const allowedGrades = Array.isArray(teacher?.assignedGrades) ? teacher.assignedGrades : [];
+    const normalizedAllowedGrades = useMemo(() => allowedGrades.map(g => normalizeGrade(g)), [allowedGrades]);
+    const hasTeacherAssignedGrades = Array.isArray(teacher?.assignedGrades);
+
+    const teacherStudents = useLiveQuery(async () => {
+        if (!hasTeacherAssignedGrades) return db.students.toArray();
+        if (normalizedAllowedGrades.length === 0) return [];
+        return db.students.where('grade').anyOf(normalizedAllowedGrades).toArray();
+    }, [syncKey, normalizedAllowedGrades, hasTeacherAssignedGrades]) || [];
+
+    const assessmentsData = useLiveQuery(async () => {
+        if (!hasTeacherAssignedGrades) return db.assessments.toArray();
+        if (normalizedAllowedGrades.length === 0) return [];
+        return db.assessments.where('grade').anyOf(normalizedAllowedGrades).toArray();
+    }, [syncKey, normalizedAllowedGrades, hasTeacherAssignedGrades]);
+
     const subjectsData = useLiveQuery(() => db.subjects.toArray(), [syncKey]);
     const settingsRows = useLiveQuery(() => db.settings?.toArray(), [syncKey]) || [];
 
-    const allStudents = allStudentsData || [];
     const allAssessments = assessmentsData || [];
     const allSubjects = subjectsData || [];
-    const isLoading = allStudentsData === undefined || assessmentsData === undefined || subjectsData === undefined;
+    const isLoading = teacherStudents === undefined || assessmentsData === undefined || subjectsData === undefined;
 
     const currentSemesterSetting = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
-
-    const allowedGrades = Array.isArray(teacher?.assignedGrades) ? teacher.assignedGrades : [];
     const allowedSubjects = Array.isArray(teacher?.assignedSubjects) ? teacher.assignedSubjects : [];
     const normalizeSubject = (raw) => {
         if (!raw) return '';
         return String(raw).toLowerCase().trim();
     };
-
-    const hasTeacherAssignedGrades = Array.isArray(teacher?.assignedGrades);
-    const normalizedAllowedGrades = allowedGrades.map(g => normalizeGrade(g));
-    const normalizedAllowedSubjects = allowedSubjects.map(s => normalizeSubject(s)).filter(Boolean);
-    const teacherStudents = hasTeacherAssignedGrades
-        ? (normalizedAllowedGrades.length > 0
-            ? allStudents.filter(s => normalizedAllowedGrades.includes(normalizeGrade(s.grade)))
-            : [])
-        : allStudents;
+    const normalizedAllowedSubjects = useMemo(() => allowedSubjects.map(s => normalizeSubject(s)).filter(Boolean), [allowedSubjects]);
 
     // Guard: if sessionStorage has a grade that this teacher isn't assigned to, clear it.
     useEffect(() => {
@@ -593,7 +596,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     }, [selectedSubject, normalizedAllowedSubjects, isLoading]);
 
     // Build grade list: fixed GRADE_OPTIONS + any extra grades already in DB
-    const dbGrades = [...new Set(allStudents.map(s => s.grade))].filter(Boolean);
+    const dbGrades = [...new Set(teacherStudents.map(s => s.grade))].filter(Boolean);
     const extraGradeOptions = dbGrades
         .filter(g => !GRADE_OPTIONS.some(o => o.value === String(g)))
         .map(g => ({ value: String(g), label: formatGrade(g) }));
@@ -757,7 +760,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 const value = marksToUse[studentId];
                 const score = parseFloat(value);
 
-                const student = allStudents.find(s => s.id === studentId);
+                const student = teacherStudents.find(s => s.id === studentId);
                 const studentYear = student?.academicYear;
 
                 const allExisting = await db.marks
@@ -1165,7 +1168,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                             const subject = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(a.subjectName));
                                             const sem = subject?.semester || 'Semester I';
                                             const semText = t(`admin.${sem === 'Semester I' ? 'semester1' : 'semester2'}`, sem);
-                                            const groupLabel = `${a.subjectName} • ${semText}`;
+                                            const groupLabel = semText;
                                             
                                             if (!acc[groupLabel]) acc[groupLabel] = [];
                                             acc[groupLabel].push({
@@ -1221,15 +1224,16 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     </Tag>
                 </Title>
                 <div className="hidden sm:block flex-grow border-t border-slate-200 dark:border-slate-700 mx-2"></div>
-                <Input
-                    placeholder={t('common.searchPlaceholder')}
-                    prefix={<SearchOutlined className="text-slate-400" />}
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    style={{ maxWidth: '300px' }}
-                    allowClear
-                    disabled={!selectedGrade}
-                />
+                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-start sm:justify-end">
+                    <Input
+                        placeholder={t('common.searchPlaceholder')}
+                        prefix={<SearchOutlined className="text-slate-400" />}
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="w-full sm:w-[200px] md:w-[250px]"
+                        allowClear
+                        disabled={!selectedGrade}
+                    />
                 {selectedAssessment && (
                     <Space>
                         <Button
@@ -1265,6 +1269,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         </Button>
                     </Space>
                 )}
+                </div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden w-full">

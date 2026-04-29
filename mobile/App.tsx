@@ -287,6 +287,27 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
       } catch (e) {
         console.error('Initial load error', e);
       } finally {
+        // Schema migration: force full re-sync when data model changes
+        // Bump this version whenever Supabase queries change (e.g. new columns like archived, academicyear)
+        const CURRENT_SCHEMA_VERSION = '3';
+        const storedVersion = await AsyncStorage.getItem('senbet_schema_version');
+        if (storedVersion !== CURRENT_SCHEMA_VERSION) {
+          console.log('📦 Schema version changed, clearing stale cache and forcing full re-sync...');
+          // Clear stale SQLite data so it doesn't contaminate the merge
+          clearDB();
+          // Clear in-memory state loaded from stale SQLite
+          setStudents([]);
+          setAssessments([]);
+          setMarks([]);
+          setAttendance([]);
+          setSubjects([]);
+          setSettings({});
+          // Clear sync anchor to force full fetch
+          await AsyncStorage.removeItem('last_sync_iso');
+          await AsyncStorage.setItem('senbet_schema_version', CURRENT_SCHEMA_VERSION);
+          setLastSyncIso(null);
+        }
+
         setAuthLoading(false);
       }
     })();
@@ -328,8 +349,8 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
       }
 
       const syncAnchor = (lastSyncIso && students.length === 0) ? null : lastSyncIso;
-      const stQ = supabase.from('students').select('id, name, grade, baptismalname, parentcontact, academicyear, portalcode, updated_at');
-      const asQ = supabase.from('assessments').select('id, name, subjectname, grade, maxscore, date, updated_at');
+      const stQ = supabase.from('students').select('id, name, grade, baptismalname, parentcontact, academicyear, portalcode, archived, updated_at');
+      const asQ = supabase.from('assessments').select('id, name, subjectname, grade, maxscore, date, academicyear, updated_at');
       const maQ = supabase.from('marks').select('id, score, subject, semester, studentid, assessmentid, assessmentdate, last_modified_by, updated_at');
       const atQ = supabase.from('attendance').select('id, date, status, semester, studentid, last_modified_by, updated_at');
       const suQ = supabase.from('subjects').select('id, name, semester, updated_at');

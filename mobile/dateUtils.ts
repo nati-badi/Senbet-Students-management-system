@@ -66,3 +66,29 @@ export const computeEthiopianYear = (): string => {
     // Always use Amharic suffix
     return `${ethiopianYear} ዓ.ም`;
 };
+
+/**
+ * Extracts the Ethiopian Year from a date string or Date object.
+ * @param dateInput - The date to extract the year from.
+ * @returns The Ethiopian year with ዓ.ም suffix.
+ */
+export const getEthiopianYear = (dateInput: string | Date | any): string => {
+    if (!dateInput) return '—';
+
+    const dateObj = dateInput instanceof Date ? dateInput : new Date(dateInput);
+
+    if (dateObj && !isNaN(dateObj.getTime())) {
+        const month = dateObj.getMonth();
+        const year = dateObj.getFullYear();
+        const etYear = month >= 8 ? year - 7 : year - 8;
+        return `${etYear} ዓ.ም`;
+    }
+
+    // Fallback: extract a 4-digit number from raw text (e.g. "2018 ዓ.ም")
+    if (typeof dateInput === 'string') {
+        const match = dateInput.match(/(\d{4})/);
+        if (match) return `${match[1]} ዓ.ም`;
+    }
+
+    return '—';
+};

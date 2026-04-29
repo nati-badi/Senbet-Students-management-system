@@ -57,9 +57,9 @@ const EthiopicClockWidget = () => {
             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 to-rose-500/20 rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-75 transition duration-1000"></div>
             
             <div className="relative w-full bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-slate-800/40 rounded-[2.5rem] shadow-2xl shadow-indigo-500/5 overflow-hidden">
-                {/* Animated Gradient Shapes */}
-                <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 blur-[100px] -mr-40 -mt-40 rounded-full animate-pulse" />
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-rose-500/5 blur-[80px] -ml-32 -mb-32 rounded-full" />
+                {/* Optimized Static Glows (Previously heavy animated blurs) */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[60px] -mr-32 -mt-32 rounded-full" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-rose-500/5 blur-[40px] -ml-24 -mb-24 rounded-full" />
                 
                 <div className="relative flex flex-col md:flex-row items-center justify-between py-10 px-12 gap-8 md:gap-4">
                     <div className="flex flex-col items-center md:items-start">
