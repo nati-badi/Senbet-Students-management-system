@@ -80,33 +80,43 @@ const EthiopicClockWidget = () => {
         return () => clearInterval(timer);
     }, []);
 
-    const fullEtTime = formatEthiopianTime(timeObj);
+    const fullEtTime = formatEthiopianTime(timeObj); // Returns "8:03 ከሰዓት"
     const [etTime, etSuffix] = fullEtTime.split(' ');
 
-    const gregDateStr = timeObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const ethpoianDateStr = formatEthiopianDate(timeObj, true).replace(/ E\.C\./i, '').trim();
     const amhDays = ["እሑድ", "ሰኞ", "ማክሰኞ", "ረቡዕ", "ሐሙስ", "አርብ", "ቅዳሜ"];
     const ethDayName = amhDays[timeObj.getDay()];
 
     return (
-        <div className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden relative mb-6">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 dark:bg-slate-800/80 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-50/30 dark:bg-blue-900/20 rounded-full blur-2xl opacity-40 translate-y-1/2 -translate-x-1/4 pointer-events-none"></div>
+        <div className="w-full relative group mb-6">
+            {/* Background Glows */}
+            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 to-rose-500/20 rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-75 transition duration-1000"></div>
             
-            <div className="flex flex-row items-center justify-between py-6 px-10 relative">
-                <div className="flex flex-col items-start">
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-6xl font-light tracking-tight text-slate-800 dark:text-white">{etTime}</span>
-                        <span className="text-2xl text-slate-400 dark:text-slate-500 font-normal">{etSuffix}</span>
+            <div className="relative w-full bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-slate-800/40 rounded-[2.5rem] shadow-2xl shadow-indigo-500/5 overflow-hidden">
+                {/* Animated Gradient Shapes */}
+                <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 blur-[100px] -mr-40 -mt-40 rounded-full animate-pulse" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-rose-500/5 blur-[80px] -ml-32 -mb-32 rounded-full" />
+                
+                <div className="relative flex flex-col md:flex-row items-center justify-between py-10 px-12 gap-8 md:gap-4">
+                    <div className="flex flex-col items-center md:items-start">
+                        <div className="flex items-baseline gap-3">
+                            <span className="text-7xl font-black tracking-tighter bg-gradient-to-br from-slate-800 to-slate-500 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">
+                                {etTime}
+                            </span>
+                            <span className="text-2xl text-indigo-500 dark:text-indigo-400 font-bold uppercase tracking-widest">{etSuffix}</span>
+                        </div>
                     </div>
-                    <span className="text-slate-400 dark:text-slate-500 mt-2 text-base tracking-wide">{formatEthiopianDate(timeObj)}</span>
-                </div>
 
-                <div className="w-px h-16 bg-slate-200 dark:bg-slate-700/50 mx-4"></div>
+                    <div className="hidden md:block w-px h-24 bg-gradient-to-b from-transparent via-slate-200 dark:via-slate-700 to-transparent mx-8 opacity-50"></div>
 
-                <div className="flex flex-col items-end text-right">
-                    <span className="text-3xl text-slate-400 dark:text-slate-300 font-normal mb-1 tracking-wide">{ethDayName}</span>
-                    <span className="text-4xl text-slate-800 dark:text-white font-light">{ethpoianDateStr}</span>
+                    <div className="flex flex-col items-center md:items-end text-right">
+                        <span className="text-3xl text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.2em] mb-2">{ethDayName}</span>
+                        <span className="text-5xl font-black tracking-tight text-slate-800 dark:text-white">{ethpoianDateStr}</span>
+                        <div className="mt-4 flex items-center gap-2">
+                             <div className="h-1 w-12 bg-rose-500/30 rounded-full" />
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ፍኖተ ብርሃን ሰ/ቤት</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -166,7 +176,8 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
         {
             key: '/teacher/urgent',
             icon: <Badge dot color="red"><WarningOutlined /></Badge>,
-            label: <span className="text-red-500 font-bold">{t('admin.urgentMatters', 'Urgent Matters')}</span>
+            label: <span className="text-red-500 font-bold">{t('admin.urgentMatters', 'Urgent Matters')}</span>,
+            className: 'menu-item-urgent'
         },
         {
             key: '/teacher/mark-entry',
@@ -199,42 +210,52 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
 
     return (
         <div className="flex flex-col w-full gap-4 pt-4">
-            <div className="mb-2">
-                <EthiopicClockWidget />
-            </div>
-            <Card className="bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <Text type="secondary" className="text-xs uppercase tracking-wider">
+            <EthiopicClockWidget />
+            <div className="relative p-8 rounded-[2.5rem] bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm overflow-hidden mb-6">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-400/5 blur-[100px] -mr-32 -mt-32 rounded-full" />
+                <div className="relative flex flex-col md:flex-row md:items-center gap-8">
+                    <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/30 rounded-2xl flex items-center justify-center border border-indigo-100/50 dark:border-indigo-800/30 shrink-0">
+                        <UserOutlined className="text-2xl text-indigo-500/80" />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] block mb-1">
                             {t('teacher.signedInAs', 'Signed in as')}
-                        </Text>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <Title level={4} style={{ margin: 0 }} className="truncate">
+                        </span>
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white m-0 truncate">
                                 {activeTeacher.name}
-                            </Title>
-                            <Tag color="purple">{t('teacher.portal', 'Teacher Portal')}</Tag>
+                            </h2>
+                            <Tag className="rounded-full border-none bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold px-3 py-0.5 text-[10px] uppercase tracking-wider">
+                                {t('teacher.portal', 'Teacher Portal')}
+                            </Tag>
                         </div>
-                        <div className="flex flex-col gap-2 mt-3">
+
+                        <div className="flex flex-col sm:flex-row gap-4 mt-4">
                             {activeTeacher.assignedGrades?.length > 0 && (
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <Text type="secondary" className="text-xs uppercase tracking-wider font-semibold">{t('teacher.grades', 'Grades')}:</Text>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t('teacher.grades', 'Grades')}:</span>
                                     {activeTeacher.assignedGrades.slice(0, 6).map(g => (
-                                        <Tag key={`g-${g}`} color="blue" className="m-0">{formatGrade(g)}</Tag>
+                                        <span key={`g-${g}`} className="px-2.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-bold rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                                            {formatGrade(g)}
+                                        </span>
                                     ))}
                                 </div>
                             )}
                             {activeTeacher.assignedSubjects?.length > 0 && (
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <Text type="secondary" className="text-xs uppercase tracking-wider font-semibold">{t('teacher.subjects', 'Subjects')}:</Text>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t('teacher.subjects', 'Subjects')}:</span>
                                     {activeTeacher.assignedSubjects.slice(0, 6).map(s => (
-                                        <Tag key={`s-${s}`} color="geekblue" className="m-0">{s}</Tag>
+                                        <span key={`s-${s}`} className="px-2.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 dark:text-indigo-400 text-[10px] font-bold rounded-lg border border-indigo-100/50 dark:border-indigo-800/30">
+                                            {s}
+                                        </span>
                                     ))}
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
-            </Card>
+            </div>
 
             <Routes>
             </Routes>
@@ -247,9 +268,12 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
             />
 
             {/* Desktop: Sidebar + Content */}
-            <div className="flex flex-row gap-6 items-start">
-                <div className="hidden lg:flex flex-col flex-shrink-0 w-[240px] bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden teacher-sidebar">
-                    <div>
+            <Layout className="bg-transparent">
+                <Sider
+                    width={240}
+                    className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden lg:block overflow-hidden"
+                >
+                    <div className="teacher-sidebar">
                         <div style={{ padding: '16px' }}>
                             <Text strong type="secondary" style={{ fontSize: '12px', textTransform: 'uppercase' }}>
                                 {t('teacher.menu')}
@@ -266,27 +290,37 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
                     
                     <style>{`
                         .teacher-sidebar .ant-menu-item-selected {
-                            background-color: #eff6ff !important;
-                            color: #2563eb !important;
-                            border-right: 3px solid #2563eb;
-                            font-weight: 600;
+                            background-color: rgba(99, 102, 241, 0.08) !important;
+                            color: #6366f1 !important;
+                            border-right: 3px solid #6366f1;
+                            font-weight: 700;
                         }
                         .dark .teacher-sidebar .ant-menu-item-selected {
-                            background-color: #1e3a5f !important;
-                            color: #60a5fa !important;
-                            border-right: 3px solid #60a5fa;
+                            background-color: rgba(99, 102, 241, 0.15) !important;
+                            color: #818cf8 !important;
+                            border-right: 3px solid #818cf8;
                         }
                         .teacher-sidebar .ant-menu-item-selected .ant-menu-item-icon,
                         .teacher-sidebar .ant-menu-item-selected span {
                             color: inherit !important;
                         }
                         .teacher-sidebar .ant-menu-item:hover {
-                            background-color: #f0f9ff !important;
-                            color: #2563eb !important;
+                            background-color: rgba(99, 102, 241, 0.04) !important;
+                            color: #6366f1 !important;
                         }
                         .dark .teacher-sidebar .ant-menu-item:hover {
-                            background-color: #1e293b !important;
-                            color: #60a5fa !important;
+                            background-color: rgba(255, 255, 255, 0.02) !important;
+                            color: #818cf8 !important;
+                        }
+                        .menu-item-urgent.ant-menu-item-selected {
+                            background-color: rgba(244, 63, 94, 0.1) !important;
+                            color: #f43f5e !important;
+                            border-right-color: #f43f5e !important;
+                        }
+                        .dark .menu-item-urgent.ant-menu-item-selected {
+                            background-color: rgba(244, 63, 94, 0.2) !important;
+                            color: #fb7185 !important;
+                            border-right-color: #fb7185 !important;
                         }
                         .menu-item-coming-soon {
                             filter: blur(1px);
@@ -301,9 +335,9 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
                             pointer-events: none !important;
                         }
                     `}</style>
-                </div>
+                </Sider>
 
-                <div className="flex-1 min-w-0 min-h-[600px] mt-4">
+                <Content className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 p-3 sm:p-4 md:p-6 min-h-[600px]">
                     <Routes>
                         <Route path="/" element={<Navigate to="mark-entry" replace />} />
                         <Route path="/mark-entry" element={<SpeedEntryMarks teacher={activeTeacher} setProfileStudentId={setProfileStudentId} />} />
@@ -314,8 +348,8 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
                             <Route path="/assessments" element={<TeacherAssessmentManagement teacher={activeTeacher} />} />
                         )}
                     </Routes>
-                </div>
-            </div>
+                </Content>
+            </Layout>
 
             <StudentProfile
                 studentId={profileStudentId}
@@ -349,59 +383,84 @@ function TeacherLogin({ onLogin }) {
     };
 
     return (
-        <div className="flex-1 flex items-center justify-center w-full py-10">
-            <Card className="shadow-xl rounded-2xl border-slate-200 dark:border-slate-800">
-                <Title level={3} style={{ marginTop: 0 }}>{t('teacher.portalLogin', 'Teacher Portal Login')}</Title>
-                <Text type="secondary">{t('teacher.portalLoginDesc', 'Enter your access code provided by the admin.')}</Text>
-                <Divider />
-                <Form form={form} layout="vertical" onFinish={handleSubmit}>
-                    <Form.Item
-                        name="teacherName"
-                        label={<span className="dark:text-white">{t('admin.name', 'Name')}</span>}
-                        rules={[{ required: true, message: t('teacher.enterNameRequired') }]}
-                    >
-                        <Input 
-                            placeholder={t('teacher.fullNamePlaceholder')} 
-                            className="dark:bg-slate-800 dark:text-white dark:border-slate-700 dark:placeholder:text-slate-500 h-12 rounded-xl"
-                        />
-                    </Form.Item>
-                    <Form.Item
-                        name="accessCode"
-                        label={<span className="dark:text-white">{t('parent.accessCode', 'Access Code')}</span>}
-                        rules={[{ required: true, message: t('teacher.enterCodeRequired') }]}
-                    >
-                        <Input.Password 
-                            placeholder={t('teacher.accessCodePlaceholder')} 
-                            maxLength={6} 
-                            className="dark:bg-slate-800 dark:text-white dark:border-slate-700 dark:placeholder:text-slate-500 h-12 rounded-xl"
-                        />
-                    </Form.Item>
-                    <Button type="primary" htmlType="submit" block size="large">
-                        {t('common.login', 'Login')}
-                    </Button>
-                </Form>
-                {teachers.length === 0 && (
-                    <div className="mt-8 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl">
-                        <Text type="warning" strong className="block mb-2 text-center">
-                            <WarningOutlined /> {t('teacher.noDataFound', 'No teacher data found locally.')}
-                        </Text>
-                        <Paragraph className="text-xs text-center text-slate-500 mb-4">
-                            {t('teacher.syncNeededDesc')}
-                        </Paragraph>
-                        <Button 
-                            block 
-                            icon={<CloudSyncOutlined />} 
-                            onClick={async () => {
-                                message.loading(t('common.syncingCloud'), 1.5);
-                                await syncData();
-                                window.dispatchEvent(new Event('syncComplete'));
-                            }}
-                        >
-                            {t('teacher.syncFromCloud')}
-                        </Button>
+        <div className="flex-1 flex items-center justify-center w-full py-20 relative overflow-hidden font-['Inter']">
+            {/* Background Aesthetic Elements */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full -mr-64 -mt-64" />
+            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-rose-500/5 blur-[100px] rounded-full -ml-48 -mb-48" />
+
+            <div className="relative w-full max-w-lg px-6">
+                <div className="p-10 rounded-[3rem] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/20 dark:border-slate-800/40 shadow-2xl shadow-indigo-500/10">
+                    <div className="flex flex-col items-center text-center mb-10">
+                        <div className="w-20 h-20 bg-indigo-500/10 rounded-[2rem] flex items-center justify-center mb-6 border border-indigo-500/20">
+                            <UserOutlined className="text-4xl text-indigo-500" />
+                        </div>
+                        <h1 className="text-3xl font-black text-slate-800 dark:text-white m-0 tracking-tight">
+                            {t('teacher.portalLogin')}
+                        </h1>
+                        <p className="text-slate-500 dark:text-slate-400 mt-3 font-medium">
+                            {t('teacher.portalLoginDesc')}
+                        </p>
                     </div>
-                )}
-            </Card>
+
+                    <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
+                        <Form.Item
+                            name="teacherName"
+                            label={<span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{t('admin.name')}</span>}
+                            rules={[{ required: true, message: t('teacher.enterNameRequired') }]}
+                        >
+                            <Input 
+                                placeholder={t('teacher.fullNamePlaceholder')} 
+                                className="h-14 px-6 rounded-2xl bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 dark:text-white text-lg font-medium focus:bg-white dark:focus:bg-slate-800 transition-all"
+                            />
+                        </Form.Item>
+                        <Form.Item
+                            name="accessCode"
+                            label={<span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{t('parent.accessCode')}</span>}
+                            rules={[{ required: true, message: t('teacher.enterCodeRequired') }]}
+                        >
+                            <Input.Password 
+                                placeholder={t('teacher.accessCodePlaceholder')} 
+                                maxLength={6} 
+                                className="h-14 px-6 rounded-2xl bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 dark:text-white text-lg font-medium focus:bg-white dark:focus:bg-slate-800 transition-all"
+                            />
+                        </Form.Item>
+                        <Button 
+                            type="primary" 
+                            htmlType="submit" 
+                            block 
+                            className="h-14 rounded-2xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 border-none shadow-xl shadow-indigo-500/25 text-white font-bold text-base uppercase tracking-widest mt-4 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                            {t('common.login')}
+                        </Button>
+                    </Form>
+
+                    {teachers.length === 0 && (
+                        <div className="mt-10 p-6 rounded-2xl bg-rose-500/5 dark:bg-rose-400/5 border border-rose-500/10 dark:border-rose-400/10">
+                            <div className="flex items-center gap-3 mb-3">
+                                <WarningOutlined className="text-rose-500" />
+                                <span className="font-bold text-rose-600 dark:text-rose-400 text-xs uppercase tracking-widest">
+                                    {t('teacher.noDataFound')}
+                                </span>
+                            </div>
+                            <p className="text-rose-600/60 dark:text-rose-500/40 text-xs font-medium mb-4 leading-relaxed">
+                                {t('teacher.syncNeededDesc')}
+                            </p>
+                            <Button 
+                                block 
+                                icon={<SyncOutlined />} 
+                                className="h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border-none font-bold text-[10px] uppercase tracking-widest hover:bg-rose-500/20"
+                                onClick={async () => {
+                                    message.loading(t('common.syncingCloud'), 1.5);
+                                    await syncData();
+                                    window.dispatchEvent(new Event('syncComplete'));
+                                }}
+                            >
+                                {t('teacher.syncFromCloud')}
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

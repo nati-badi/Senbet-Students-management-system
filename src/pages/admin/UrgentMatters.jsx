@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Typography, Card, List, Avatar, Tag, Empty, Badge, Alert, Row, Col, Statistic, Button, Space, Tooltip, Modal, Input, App } from 'antd';
+import { Typography, Card, List, Avatar, Tag, Empty, Badge, Alert, Row, Col, Statistic, Button, Space, Tooltip, Modal, Input, App, Pagination } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { WarningOutlined, UserOutlined, ClockCircleOutlined, FormOutlined, AlertOutlined, KeyOutlined, CopyOutlined, PhoneOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -194,390 +194,296 @@ export default function UrgentMatters() {
         }
     };
 
+    const [missingInfoPage, setMissingInfoPage] = useState(1);
+    const [portalCodePage, setPortalCodePage] = useState(1);
+    const [incompleteMarksPage, setIncompleteMarksPage] = useState(1);
+    const pageSize = 5;
+
+    const paginatedMissingInfo = useMemo(() => {
+        const start = (missingInfoPage - 1) * pageSize;
+        return missingInfoStudents.slice(start, start + pageSize);
+    }, [missingInfoStudents, missingInfoPage]);
+
+    const paginatedPortalCodes = useMemo(() => {
+        const start = (portalCodePage - 1) * pageSize;
+        return missingPortalCode.slice(start, start + pageSize);
+    }, [missingPortalCode, portalCodePage]);
+
+    const paginatedIncompleteMarks = useMemo(() => {
+        const start = (incompleteMarksPage - 1) * pageSize;
+        return incompleteMarksStudents.slice(start, start + pageSize);
+    }, [incompleteMarksStudents, incompleteMarksPage]);
+
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center">
-                    <WarningOutlined className="text-2xl text-red-500" />
-                </div>
-                <div>
-                    <h2 className="text-2xl font-bold m-0">{t('admin.urgentMatters', 'Urgent Matters')}</h2>
-                    <p className="text-slate-500 m-0">{t('admin.urgentMattersDesc', 'Items that need your immediate attention')}</p>
+        <div className="flex flex-col gap-10 pb-12 font-['Inter']">
+            {/* Header Section - Minimalist & Soft */}
+            <div className="relative p-10 rounded-[2.5rem] bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm overflow-hidden">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-400/5 blur-[120px] -mr-40 -mt-40 rounded-full" />
+                <div className="relative flex flex-col md:flex-row md:items-center gap-8">
+                    <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-950/30 rounded-[2rem] flex items-center justify-center border border-indigo-100/50 dark:border-indigo-800/30">
+                        <WarningOutlined className="text-3xl text-indigo-500/80" />
+                    </div>
+                    <div>
+                        <h2 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-white m-0">
+                            {t('admin.urgentMatters')}
+                        </h2>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-2 max-w-xl">
+                            {t('admin.urgentMattersDesc')}
+                        </p>
+                    </div>
                 </div>
             </div>
 
+            {/* Status Alert Area - Integrated Glass Style */}
             {totalIssues === 0 ? (
-                <Alert
-                    message={t('admin.allCaughtUp', 'Everything looks great!')}
-                    description={t('admin.noUrgentMattersAdminDesc', 'No urgent matters found. All students have complete data and portal access codes.')}
-                    type="success"
-                    showIcon
-                    className="rounded-2xl border-none shadow-sm"
-                />
+                <div className="flex items-center gap-5 p-6 rounded-[2rem] bg-emerald-500/5 dark:bg-emerald-400/5 border border-emerald-500/10 dark:border-emerald-400/10">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                        <AlertOutlined className="text-emerald-600 dark:text-emerald-400 text-sm" />
+                    </div>
+                    <div>
+                        <div className="font-bold text-emerald-700 dark:text-emerald-400 text-sm">{t('admin.allCaughtUp')}</div>
+                        <div className="text-emerald-600/60 dark:text-emerald-500/40 text-xs mt-0.5 font-medium">
+                            {t('admin.noUrgentMattersAdminDesc')}
+                        </div>
+                    </div>
+                </div>
             ) : (
-                <Alert
-                    message={t('admin.issuesRequireAttention', { count: totalIssues, defaultValue: `${totalIssues} issue(s) require your attention` })}
-                    type="error"
-                    showIcon
-                    icon={<AlertOutlined />}
-                    className="rounded-xl border-none shadow-sm"
-                />
+                <div className="flex items-center gap-5 p-6 rounded-[2rem] bg-rose-500/5 dark:bg-rose-400/5 border border-rose-500/10 dark:border-rose-400/10">
+                    <div className="w-10 h-10 rounded-2xl bg-rose-500/10 flex items-center justify-center animate-pulse">
+                        <AlertOutlined className="text-rose-600 dark:text-rose-400 text-sm" />
+                    </div>
+                    <div>
+                        <div className="font-bold text-rose-700 dark:text-rose-400 text-xs uppercase tracking-widest">
+                            {t('admin.issuesRequireAttention', { count: totalIssues })}
+                        </div>
+                        <div className="text-rose-600/60 dark:text-rose-500/40 text-sm mt-0.5 font-medium">Please address the critical issues listed below to maintain data integrity.</div>
+                    </div>
+                </div>
             )}
 
-            <Row gutter={[16, 16]}>
-                <Col xs={24} sm={8}>
-                    <Card className="rounded-2xl border-none shadow-sm bg-red-50 dark:bg-red-900/20 text-center">
-                        <Statistic
-                            title={<span className="text-red-600 font-bold">{t('admin.missingStudentInfo', 'Missing Student Info')}</span>}
-                            value={missingInfoStudents.length}
-                            valueStyle={{ color: '#dc2626', fontWeight: 'bold', fontSize: '2.5rem' }}
-                            prefix={<FormOutlined />}
-                        />
-                    </Card>
-                </Col>
-                <Col xs={24} sm={8}>
-                    <Card className="rounded-2xl border-none shadow-sm bg-orange-50 dark:bg-orange-900/20 text-center">
-                        <Statistic
-                            title={<span className="text-orange-600 font-bold">{t('admin.noPortalCode', 'No Portal Code')}</span>}
-                            value={missingPortalCode.length}
-                            valueStyle={{ color: '#ea580c', fontWeight: 'bold', fontSize: '2.5rem' }}
-                            prefix={<UserOutlined />}
-                        />
-                    </Card>
-                </Col>
-                <Col xs={24} sm={8}>
-                    <Card className="rounded-2xl border-none shadow-sm bg-yellow-50 dark:bg-yellow-900/20 text-center cursor-pointer hover:bg-yellow-100 transition-colors" onClick={() => navigate('/assessments')}>
-                        <Statistic
-                            title={<span className="text-yellow-700 font-bold">{t('admin.incompleteMarks', 'Incomplete Marks')}</span>}
-                            value={incompleteMarksStudents.length}
-                            valueStyle={{ color: '#ca8a04', fontWeight: 'bold', fontSize: '2.5rem' }}
-                            prefix={<ClockCircleOutlined />}
-                        />
-                    </Card>
-                </Col>
-            </Row>
-
-            {missingInfoStudents.length > 0 && (
-                <Card
-                    title={
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center">
-                                <FormOutlined className="text-red-500" />
-                            </div>
-                            <span className="font-bold">{t('admin.studentsMissingInfoTitle', 'Students with Missing Information')}</span>
-                            <Badge count={missingInfoStudents.length} color="red" />
+            {/* Main Issues - Grouped by Category */}
+            <div className="space-y-12">
+                {/* 1. Missing Student Info */}
+                {missingInfoStudents.length > 0 && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between px-4">
+                            <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] flex items-center gap-4 m-0">
+                                {t('admin.studentsMissingInfoTitle')}
+                                <Badge count={missingInfoStudents.length} color="rgba(244, 63, 94, 0.2)" style={{ color: '#f43f5e', fontWeight: 'bold' }} />
+                            </h3>
                         </div>
-                    }
-                    className="rounded-2xl border-l-4 border-l-red-500 shadow-sm"
-                >
-                    <List
-                        dataSource={missingInfoStudents}
-                        rowKey="id"
-                        renderItem={student => {
-                            const missing = [];
-                            if (!student.name) missing.push(t('admin.fullName', 'Name'));
-                            if (!student.baptismalName && !student.baptismalname) missing.push(t('admin.baptismalNameField', 'Baptismal Name'));
-                            if (!student.grade) missing.push(t('admin.gradeClass', 'Grade'));
-                            if (!student.parentContact && !student.parentcontact) missing.push(t('admin.parentContact', 'Contact'));
-                            if (!student.portalCode && !student.portalcode) missing.push(t('admin.portalCode', 'Portal Code'));
-                            return (
-                                <List.Item 
-                                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg"
-                                    actions={[
-                                        !student.portalCode && (
-                                            <Tooltip key="gen" title={t('admin.generateCode', 'Generate code')}>
-                                                <Button
-                                                    size="small"
-                                                    icon={<KeyOutlined />}
-                                                    onClick={async (e) => {
-                                                        e.stopPropagation();
-                                                        const code = await generatePortalCode(student.id);
-                                                        message.success(`${t('admin.portalCodeGenerated', 'Portal code created')}: ${code}`);
-                                                    }}
-                                                >
-                                                    {t('admin.generateCode', 'Generate code')}
-                                                </Button>
-                                            </Tooltip>
-                                        ),
-                                        (student.parentContact || student.parentcontact) && (
-                                            <Tooltip key="call" title={t('admin.callParent', 'Call parent')}>
-                                                <Button
-                                                    size="small"
-                                                    icon={<PhoneOutlined />}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const contact = student.parentContact || student.parentcontact;
-                                                        if (contact) window.open(`tel:${contact}`, '_self');
-                                                    }}
-                                                >
-                                                    {t('admin.callParent', 'Call parent')}
-                                                </Button>
-                                            </Tooltip>
-                                        ),
-                                        (student.parentContact || student.parentcontact) && (
-                                            <Tooltip key="copy" title={t('admin.copyContact', 'Copy parent contact')}>
-                                                <Button
-                                                    size="small"
-                                                    icon={<CopyOutlined />}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const contact = student.parentContact || student.parentcontact;
-                                                        if (contact) void copyToClipboard(contact, t('admin.contactCopied', 'Contact copied'));
-                                                    }}
-                                                />
-                                            </Tooltip>
-                                        ),
-                                        <Button
-                                            key="fix"
-                                            size="small"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                goToRegisterAndSearch(student.name);
-                                            }}
-                                        >
-                                            {t('admin.fixNow', 'Fix now')}
-                                        </Button>,
-                                        <Button
-                                            key="view"
-                                            type="link"
-                                            size="small"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setProfileStudentId(student.id);
-                                            }}
-                                        >
-                                            {t('admin.view', 'View')}
-                                        </Button>
-                                    ].filter(Boolean)}
-                                    onClick={() => setProfileStudentId(student.id)}
-                                >
-                                    <List.Item.Meta
-                                        avatar={
-                                            <Avatar
-                                                size={44}
-                                                icon={<FormOutlined />}
-                                                style={avatarStyle('#fef2f2', '#b91c1c', '#fca5a5')}
-                                            />
-                                        }
-                                        title={
-                                            <Space>
-                                                <span className="font-bold">{student.name || <Text type="danger">{t('admin.noName', 'No Name')}</Text>}</span>
-                                                {(student.baptismalName || student.baptismalname) && (
-                                                    <Text type="secondary" className="text-xs font-normal italic">
-                                                        ({student.baptismalName || student.baptismalname})
-                                                    </Text>
-                                                )}
-                                            </Space>
-                                        }
-                                        description={
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                {missing.map(field => (
-                                                    <Tag key={field} color="error" className="text-xs">{t('admin.missingField', { field, defaultValue: `Missing: ${field}` })}</Tag>
-                                                ))}
-                                                {student.grade && <Tag color="green">{formatGrade(student.grade)}</Tag>}
+
+                        <div className="grid gap-4">
+                            {paginatedMissingInfo.map(student => {
+                                const missing = [];
+                                if (!student.name) missing.push(t('admin.fullName', 'Name'));
+                                if (!student.baptismalName && !student.baptismalname) missing.push(t('admin.baptismalNameField', 'Baptismal Name'));
+                                if (!student.grade) missing.push(t('admin.gradeClass', 'Grade'));
+                                if (!student.parentContact && !student.parentcontact) missing.push(t('admin.parentContact', 'Contact'));
+                                if (!student.portalCode && !student.portalcode) missing.push(t('admin.portalCode', 'Portal Code'));
+
+                                return (
+                                    <div key={student.id} className="group p-8 rounded-[2.5rem] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-rose-500/20 dark:hover:border-rose-400/20 transition-all duration-500 hover:shadow-2xl hover:shadow-rose-500/5">
+                                        <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-center">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-3 mb-3 flex-wrap">
+                                                    <h4 className="text-xl font-bold text-slate-800 dark:text-white m-0">
+                                                        {student.name || <span className="text-rose-500 italic">{t('admin.noName')}</span>}
+                                                    </h4>
+                                                    {student.grade && (
+                                                        <Tag className="rounded-full border-none bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold px-3">
+                                                            {formatGrade(student.grade)}
+                                                        </Tag>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {missing.map(field => (
+                                                        <span key={field} className="px-3 py-1 bg-rose-500/5 dark:bg-rose-400/5 border border-rose-500/10 dark:border-rose-400/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold rounded-lg uppercase tracking-wider">
+                                                            {t('admin.missingField', { field })}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        }
-                                    />
-                                </List.Item>
-                            );
-                        }}
-                        pagination={{ pageSize: 5 }}
-                    />
-                </Card>
-            )}
-
-            {missingPortalCode.length > 0 && (
-                <Card
-                    title={
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-orange-100 rounded-xl flex items-center justify-center">
-                                <UserOutlined className="text-orange-500" />
-                            </div>
-                            <span className="font-bold">{t('admin.studentsWithoutPortalCodeTitle', 'Students Without Portal Access Code')}</span>
-                            <Badge count={missingPortalCode.length} color="orange" />
+                                            <div className="flex flex-wrap gap-3 shrink-0 lg:justify-end">
+                                                {!student.portalCode && (
+                                                    <Button
+                                                        size="middle"
+                                                        icon={<KeyOutlined />}
+                                                        className="rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-slate-600 dark:text-slate-400 font-bold text-xs uppercase tracking-wider"
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            const code = await generatePortalCode(student.id);
+                                                            message.success(`${t('admin.portalCodeGenerated')}: ${code}`);
+                                                        }}
+                                                    >
+                                                        {t('admin.generateCode')}
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    type="primary"
+                                                    size="middle"
+                                                    className="h-12 px-8 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 border-none shadow-lg shadow-indigo-500/20 text-white font-bold text-xs tracking-wide hover:scale-105 transition-transform"
+                                                    onClick={() => goToRegisterAndSearch(student.name)}
+                                                >
+                                                    {t('admin.fixNow')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    }
-                    className="rounded-2xl border-l-4 border-l-orange-500 shadow-sm"
-                    extra={
-                        <Space wrap>
-                            <Button size="small" icon={<KeyOutlined />} onClick={generateAllPortalCodes}>
-                                {t('admin.generateAll', 'Generate all')}
+                        {missingInfoStudents.length > pageSize && (
+                            <div className="flex justify-center pt-4">
+                                <div className="p-2 rounded-2xl bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60">
+                                    <Pagination
+                                        current={missingInfoPage}
+                                        total={missingInfoStudents.length}
+                                        pageSize={pageSize}
+                                        onChange={setMissingInfoPage}
+                                        size="small"
+                                        showSizeChanger={false}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* 2. Missing Portal Codes */}
+                {missingPortalCode.length > 0 && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between px-4">
+                            <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] flex items-center gap-4 m-0">
+                                {t('admin.studentsWithoutPortalCodeTitle')}
+                                <Badge count={missingPortalCode.length} color="rgba(99, 102, 241, 0.2)" style={{ color: '#6366f1', fontWeight: 'bold' }} />
+                            </h3>
+                            <Button 
+                                size="small" 
+                                icon={<KeyOutlined />} 
+                                className="rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-none font-bold text-[10px] uppercase tracking-widest px-4"
+                                onClick={generateAllPortalCodes}
+                            >
+                                {t('admin.generateAll')}
                             </Button>
-                            <Text type="secondary" className="text-sm">
-                                {t('admin.bulkGenerateCodes', 'Bulk-generate missing codes')}
-                            </Text>
-                        </Space>
-                    }
-                >
-                    <Paragraph type="secondary" className="mb-4">
-                        {t('admin.missingPortalCodeDesc', "These students' parents cannot log in to the Parent Portal. Assign portal access codes from the Student Registration page.")}
-                    </Paragraph>
-                    <List
-                        dataSource={missingPortalCode}
-                        rowKey="id"
-                        renderItem={student => (
-                            <List.Item
-                                className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg"
-                                actions={[
-                                    <Tooltip key="gen" title={t('admin.generateCode', 'Generate access code')}>
-                                        <Button
-                                            size="small"
-                                            icon={<KeyOutlined />}
-                                            onClick={async (e) => {
-                                                e.stopPropagation();
-                                                const code = await generatePortalCode(student.id);
-                                                message.success(`${t('admin.portalCodeGenerated', 'Portal code created')}: ${code}`);
-                                            }}
-                                        >
-                                            {t('admin.generateCode', 'Generate')}
-                                        </Button>
-                                    </Tooltip>,
-                                    (student.parentContact || student.parentcontact) && (
-                                        <Tooltip key="call" title={t('admin.callParent', 'Call parent')}>
+                        </div>
+
+                        <div className="grid gap-4">
+                            {paginatedPortalCodes.map(student => (
+                                <div key={student.id} className="group p-6 rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-indigo-500/20 dark:hover:border-indigo-400/20 transition-all duration-300">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-lg font-bold text-slate-800 dark:text-white m-0">
+                                                {student.name}
+                                            </h4>
+                                            <div className="flex items-center gap-3 mt-2">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{formatGrade(student.grade)}</span>
+                                                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                                <span className="text-xs font-medium text-slate-500">{student.parentContact || student.parentcontact || 'No Contact'}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 shrink-0">
                                             <Button
-                                                size="small"
-                                                icon={<PhoneOutlined />}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const contact = student.parentContact || student.parentcontact;
-                                                    if (contact) window.open(`tel:${contact}`, '_self');
+                                                size="middle"
+                                                icon={<KeyOutlined />}
+                                                className="rounded-xl bg-indigo-500/5 text-indigo-600 dark:text-indigo-400 border-none font-bold text-xs"
+                                                onClick={async () => {
+                                                    const code = await generatePortalCode(student.id);
+                                                    message.success(`${t('admin.portalCodeGenerated')}: ${code}`);
                                                 }}
                                             >
-                                                {t('admin.callParent', 'Call parent')}
+                                                {t('admin.generateCode')}
                                             </Button>
-                                        </Tooltip>
-                                    ),
-                                    (student.parentContact || student.parentcontact) && (
-                                        <Tooltip key="copy" title={t('admin.copyContact', 'Copy parent contact')}>
                                             <Button
-                                                size="small"
-                                                icon={<CopyOutlined />}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const contact = student.parentContact || student.parentcontact;
-                                                    if (contact) void copyToClipboard(contact, t('admin.contactCopied', 'Contact copied'));
-                                                }}
-                                            />
-                                        </Tooltip>
-                                        ),
-                                    <Button
-                                        key="view"
-                                        type="link"
-                                        size="small"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setProfileStudentId(student.id);
-                                        }}
-                                    >
-                                        {t('admin.view', 'View')}
-                                    </Button>
-                                ]}
-                                onClick={() => setProfileStudentId(student.id)}
-                            >
-                                <List.Item.Meta
-                                    avatar={
-                                        <Avatar
-                                            size={44}
-                                            icon={<UserOutlined />}
-                                            style={avatarStyle('#fff7ed', '#c2410c', '#fdba74')}
-                                        />
-                                    }
-                                    title={
-                                        <Space>
-                                            <span className="font-bold">{student.name}</span>
-                                            {(student.baptismalName || student.baptismalname) && (
-                                                <Text type="secondary" className="text-xs font-normal italic">
-                                                    ({student.baptismalName || student.baptismalname})
-                                                </Text>
-                                            )}
-                                        </Space>
-                                    }
-                                    description={<div><Tag color="green">{formatGrade(student.grade)}</Tag> <Text type="secondary">{student.parentContact || student.parentcontact}</Text></div>}
-                                />
-                            </List.Item>
-                        )}
-                        pagination={{ 
-                            pageSize: 5, 
-                            locale: { items_per_page: t('common.perPage', '/ page') } 
-                        }}
-                    />
-                </Card>
-            )}
-
-            {incompleteMarksStudents.length > 0 && (
-                <Card
-                    title={
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-yellow-100 rounded-xl flex items-center justify-center">
-                                <ClockCircleOutlined className="text-yellow-600" />
-                            </div>
-                            <span className="font-bold">{t('admin.studentsWithIncompleteMarksTitle', 'Students with Incomplete Marks')}</span>
-                            <Badge count={incompleteMarksStudents.length} color="gold" />
+                                                type="text"
+                                                size="middle"
+                                                className="rounded-xl text-slate-400 hover:text-indigo-500 font-bold text-xs"
+                                                onClick={() => setProfileStudentId(student.id)}
+                                            >
+                                                {t('admin.view')}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    }
-                    className="rounded-2xl border-l-4 border-l-yellow-500 shadow-sm"
-                >
-                    <Paragraph type="secondary" className="mb-4">
-                        {t('admin.incompleteMarksDesc', 'These students have missing assessment marks for')} <Text strong>{currentSemester === 'Semester I' ? t('admin.semester1', 'Semester I') : currentSemester === 'Semester II' ? t('admin.semester2', 'Semester II') : currentSemester}</Text>. {t('admin.useMarkEntryToRecord', 'Use the Teacher Portal or Mark Entry to record their scores.')}
-                    </Paragraph>
-                    <List
-                        dataSource={incompleteMarksStudents}
-                        rowKey="id"
-                        renderItem={student => (
-                            <List.Item 
-                                className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors px-4 rounded-lg"
-                                actions={[
-                                    <Button
-                                        key="open"
+                        {missingPortalCode.length > pageSize && (
+                            <div className="flex justify-center pt-4">
+                                <div className="p-2 rounded-2xl bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60">
+                                    <Pagination
+                                        current={portalCodePage}
+                                        total={missingPortalCode.length}
+                                        pageSize={pageSize}
+                                        onChange={setPortalCodePage}
                                         size="small"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            navigate('/teacher');
-                                        }}
-                                    >
-                                        {t('admin.openMarkEntry', 'Open mark entry')}
-                                    </Button>,
-                                    <Button
-                                        key="view"
-                                        type="link"
-                                        size="small"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setProfileStudentId(student.id);
-                                        }}
-                                    >
-                                        {t('admin.view', 'View')}
-                                    </Button>
-                                ]}
-                                onClick={() => setProfileStudentId(student.id)}
-                            >
-                                <List.Item.Meta
-                                    avatar={
-                                        <Avatar
-                                            size={44}
-                                            icon={<ClockCircleOutlined />}
-                                            style={avatarStyle('#fefce8', '#a16207', '#fde68a')}
-                                        />
-                                    }
-                                    title={<span className="font-bold">{student.name}</span>}
-                                    description={<Tag color="green">{formatGrade(student.grade)}</Tag>}
-                                />
-                            </List.Item>
+                                        showSizeChanger={false}
+                                    />
+                                </div>
+                            </div>
                         )}
-                        pagination={{ 
-                            pageSize: 5, 
-                            locale: { items_per_page: t('common.perPage', '/ page') } 
-                        }}
-                    />
-                </Card>
-            )}
+                    </div>
+                )}
 
+                {/* 3. Incomplete Marks */}
+                {incompleteMarksStudents.length > 0 && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between px-4">
+                            <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] flex items-center gap-4 m-0">
+                                {t('admin.incompleteMarks')}
+                                <Badge count={incompleteMarksStudents.length} color="rgba(234, 88, 12, 0.2)" style={{ color: '#ea580c', fontWeight: 'bold' }} />
+                            </h3>
+                        </div>
+
+                        <div className="grid gap-4">
+                            {paginatedIncompleteMarks.map(student => (
+                                <div key={student.id} className="group p-6 rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-orange-500/20 dark:hover:border-orange-400/20 transition-all duration-300">
+                                    <div className="flex items-center gap-6">
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-lg font-bold text-slate-800 dark:text-white m-0">
+                                                {student.name}
+                                            </h4>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">{formatGrade(student.grade)}</span>
+                                        </div>
+                                        <Button
+                                            type="primary"
+                                            size="middle"
+                                            className="h-10 px-6 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 border-none font-bold text-xs hover:bg-orange-500 hover:text-white transition-all"
+                                            onClick={() => navigate('/teacher')}
+                                        >
+                                            {t('admin.openMarkEntry')}
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        {incompleteMarksStudents.length > pageSize && (
+                            <div className="flex justify-center pt-4">
+                                <div className="p-2 rounded-2xl bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60">
+                                    <Pagination
+                                        current={incompleteMarksPage}
+                                        total={incompleteMarksStudents.length}
+                                        pageSize={pageSize}
+                                        onChange={setIncompleteMarksPage}
+                                        size="small"
+                                        showSizeChanger={false}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Empty State - Subtle */}
             {totalIssues === 0 && (
-                <Card className="rounded-2xl border-none shadow-sm">
-                    <Empty description={t('admin.noUrgentMattersAdminDesc', 'No urgent matters found. All records are in order.')} />
-                </Card>
+                <div className="py-24 flex flex-col items-center justify-center rounded-[3rem] border border-dashed border-slate-200 dark:border-slate-800">
+                    <div className="w-20 h-20 rounded-[2rem] bg-slate-50 dark:bg-slate-900 flex items-center justify-center mb-6">
+                        <AlertOutlined className="text-3xl text-slate-300 dark:text-slate-700" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest">{t('admin.allCaughtUp')}</h3>
+                    <p className="text-slate-400/60 text-sm mt-2 font-medium">All student records are complete and up to date.</p>
+                </div>
             )}
-
 
             <StudentProfile 
                 studentId={profileStudentId} 

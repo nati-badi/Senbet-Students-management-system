@@ -134,7 +134,9 @@ export default function TeacherUrgentMatters({ teacher }) {
                         <div className="font-bold text-rose-700 dark:text-rose-400 text-xs uppercase tracking-widest">
                             {t(totalIssues === 1 ? 'teacher.issuesRequireAttention' : 'teacher.issuesRequireAttention_plural', { count: totalIssues })}
                         </div>
-                        <div className="text-rose-600/60 dark:text-rose-500/40 text-sm mt-0.5 font-medium">Detailed review required for the items below.</div>
+                        <div className="text-rose-600/60 dark:text-rose-500/40 text-sm mt-0.5 font-medium">
+                            {t('teacher.detailedReviewRequired')}
+                        </div>
                     </div>
                 </div>
             )}
@@ -177,7 +179,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                                         {/* Student Pills - Minimalist */}
                                         <div className="flex flex-wrap gap-2.5">
                                             {ungradedStudents.map(st => (
-                                                <span key={st.id} className="px-4 py-1.5 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50 rounded-xl text-slate-500 dark:text-slate-400 text-[11px] font-medium hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors whitespace-nowrap">
+                                                <span key={st.id} className="px-4 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 text-[11px] font-bold hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors whitespace-nowrap shadow-sm">
                                                     {st.name}
                                                 </span>
                                             ))}
@@ -201,7 +203,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                                                 })}
                                             >
                                                 <EditOutlined className="text-xl group-hover/btn:rotate-12 transition-transform" />
-                                                <span className="text-sm uppercase tracking-[0.15em]">{t('teacher.fixNow')}</span>
+                                                <span className="text-sm tracking-wide">{t('teacher.fixNow')}</span>
                                             </Button>
                                         </Tooltip>
                                     </div>
@@ -219,7 +221,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                         <AlertOutlined className="text-3xl text-slate-300 dark:text-slate-700" />
                     </div>
                     <h3 className="text-xl font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest">{t('teacher.noUrgentMatters')}</h3>
-                    <p className="text-slate-400/60 text-sm mt-2 font-medium">All student marks are up to date for this semester.</p>
+                    <p className="text-slate-400/60 text-sm mt-2 font-medium">{t('teacher.allMarksRecorded')}</p>
                 </div>
             )}
         </div>

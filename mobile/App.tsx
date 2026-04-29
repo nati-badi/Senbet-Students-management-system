@@ -82,34 +82,34 @@ const generateUUID = () => {
 // ── Theme Management ──────────────────────────────────────────
 const THEMES = {
   dark: {
-    bg: '#0f172a',
-    card: '#1e293b',
-    border: 'transparent',
-    accent: '#6366f1', // Richer Indigo
-    accentMuted: 'rgba(99, 102, 241, 0.15)',
-    green: '#10b981',
-    amber: '#f59e0b',
-    red: '#ef4444',
-    slate: '#94a3b8',
-    text: '#f8fafc',
-    muted: '#64748b',
-    input: '#1e293b', // Elevated background
+    bg: '#020617', // Slate-950
+    card: '#0f172a', // Slate-900
+    border: 'rgba(30, 41, 59, 0.5)', // Slate-800/50
+    accent: '#818cf8', // Indigo-400 (Vibrant for dark)
+    accentMuted: 'rgba(129, 140, 248, 0.15)',
+    green: '#34d399', // Emerald-400
+    amber: '#fbbf24', // Amber-400
+    red: '#fb7185', // Rose-400
+    slate: '#94a3b8', // Slate-400
+    text: '#f8fafc', // Slate-50
+    muted: '#64748b', // Slate-500
+    input: '#1e293b', // Slate-800
     glass: 'rgba(15, 23, 42, 0.7)',
     isDark: true,
   },
   light: {
-    bg: '#f8fafc',
+    bg: '#f8fafc', // Slate-50
     card: '#ffffff',
-    border: '#e2e8f0',
-    accent: '#3b82f6',
-    accentMuted: '#3b82f611',
-    green: '#059669',
-    amber: '#d97706',
-    red: '#dc2626',
-    slate: '#64748b',
-    text: '#020617',
-    muted: '#64748b',
-    input: '#f1f5f9',
+    border: '#e2e8f0', // Slate-200
+    accent: '#6366f1', // Indigo-500
+    accentMuted: 'rgba(99, 102, 241, 0.08)',
+    green: '#10b981', // Emerald-500
+    amber: '#f59e0b', // Amber-500
+    red: '#f43f5e', // Rose-500
+    slate: '#64748b', // Slate-500
+    text: '#0f172a', // Slate-900
+    muted: '#94a3b8', // Slate-400
+    input: '#f1f5f9', // Slate-100
     glass: 'rgba(255, 255, 255, 0.8)',
     isDark: false,
   },

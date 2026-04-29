@@ -47,30 +47,40 @@ const EthiopicClockWidget = () => {
     const fullEtTime = formatEthiopianTime(timeObj); // Returns "8:03 ከሰዓት"
     const [etTime, etSuffix] = fullEtTime.split(' ');
 
-    const gregDateStr = timeObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const ethpoianDateStr = formatEthiopianDate(timeObj, true).replace(/ E\.C\./i, '').trim();
     const amhDays = ["እሑድ", "ሰኞ", "ማክሰኞ", "ረቡዕ", "ሐሙስ", "አርብ", "ቅዳሜ"];
     const ethDayName = amhDays[timeObj.getDay()];
 
     return (
-        <div className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden relative mb-6">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 dark:bg-slate-800/80 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-50/30 dark:bg-blue-900/20 rounded-full blur-2xl opacity-40 translate-y-1/2 -translate-x-1/4 pointer-events-none"></div>
+        <div className="w-full relative group">
+            {/* Background Glows */}
+            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 to-rose-500/20 rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-75 transition duration-1000"></div>
             
-            <div className="flex flex-row items-center justify-between py-6 px-10 relative">
-                <div className="flex flex-col items-start">
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-6xl font-light tracking-tight text-slate-800 dark:text-white">{etTime}</span>
-                        <span className="text-2xl text-slate-400 dark:text-slate-500 font-normal">{etSuffix}</span>
+            <div className="relative w-full bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-white/20 dark:border-slate-800/40 rounded-[2.5rem] shadow-2xl shadow-indigo-500/5 overflow-hidden">
+                {/* Animated Gradient Shapes */}
+                <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 blur-[100px] -mr-40 -mt-40 rounded-full animate-pulse" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-rose-500/5 blur-[80px] -ml-32 -mb-32 rounded-full" />
+                
+                <div className="relative flex flex-col md:flex-row items-center justify-between py-10 px-12 gap-8 md:gap-4">
+                    <div className="flex flex-col items-center md:items-start">
+                        <div className="flex items-baseline gap-3">
+                            <span className="text-7xl font-black tracking-tighter bg-gradient-to-br from-slate-800 to-slate-500 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">
+                                {etTime}
+                            </span>
+                            <span className="text-2xl text-indigo-500 dark:text-indigo-400 font-bold uppercase tracking-widest">{etSuffix}</span>
+                        </div>
                     </div>
-                    <span className="text-slate-400 dark:text-slate-500 mt-2 text-base tracking-wide">{formatEthiopianDate(timeObj)}</span>
-                </div>
 
-                <div className="w-px h-16 bg-slate-200 dark:bg-slate-700/50 mx-4"></div>
+                    <div className="hidden md:block w-px h-24 bg-gradient-to-b from-transparent via-slate-200 dark:via-slate-700 to-transparent mx-8 opacity-50"></div>
 
-                <div className="flex flex-col items-end text-right">
-                    <span className="text-3xl text-slate-400 dark:text-slate-300 font-normal mb-1 tracking-wide">{ethDayName}</span>
-                    <span className="text-4xl text-slate-800 dark:text-white font-light">{ethpoianDateStr}</span>
+                    <div className="flex flex-col items-center md:items-end text-right">
+                        <span className="text-3xl text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.2em] mb-2">{ethDayName}</span>
+                        <span className="text-5xl font-black tracking-tight text-slate-800 dark:text-white">{ethpoianDateStr}</span>
+                        <div className="mt-4 flex items-center gap-2">
+                             <div className="h-1 w-12 bg-rose-500/30 rounded-full" />
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ፍኖተ ብርሃን ሰ/ቤት</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -95,7 +105,8 @@ export default function AdminDashboard() {
                 {
                     key: '/admin/urgent',
                     icon: <Badge dot color="red"><WarningOutlined /></Badge>,
-                    label: <span className="text-red-500 font-bold">{t('admin.urgentMatters', 'Urgent Matters')}</span>
+                    label: <span className="text-red-500 font-bold">{t('admin.urgentMatters', 'Urgent Matters')}</span>,
+                    className: 'menu-item-urgent'
                 },
                 {
                     key: '/admin/register',
@@ -167,39 +178,43 @@ export default function AdminDashboard() {
         <div className="flex flex-col w-full h-full">
             <style>{`
                 .admin-sidebar .ant-menu-item-selected {
-                    background-color: #f0fdf4 !important;
-                    color: #166534 !important;
-                    border-right: 3px solid #166534;
+                    background-color: rgba(99, 102, 241, 0.08) !important;
+                    color: #6366f1 !important;
+                    border-right: 3px solid #6366f1;
                     font-weight: 700;
                 }
                 .dark .admin-sidebar .ant-menu-item-selected {
-                    background-color: rgba(22, 101, 52, 0.2) !important;
-                    color: #4ade80 !important;
-                    border-right: 3px solid #4ade80;
+                    background-color: rgba(99, 102, 241, 0.15) !important;
+                    color: #818cf8 !important;
+                    border-right: 3px solid #818cf8;
                 }
                 .admin-sidebar .ant-menu-item-selected .ant-menu-item-icon,
                 .admin-sidebar .ant-menu-item-selected span {
                     color: inherit !important;
                 }
                 .admin-sidebar .ant-menu-item:hover {
-                    background-color: #f8fafc !important;
-                    color: #166534 !important;
+                    background-color: rgba(99, 102, 241, 0.04) !important;
+                    color: #6366f1 !important;
                 }
                 .dark .admin-sidebar .ant-menu-item:hover {
-                    background-color: #1e293b !important;
-                    color: #4ade80 !important;
+                    background-color: rgba(255, 255, 255, 0.02) !important;
+                    color: #818cf8 !important;
+                }
+                .menu-item-urgent.ant-menu-item-selected {
+                    background-color: rgba(244, 63, 94, 0.1) !important;
+                    color: #f43f5e !important;
+                    border-right-color: #f43f5e !important;
+                }
+                .dark .menu-item-urgent.ant-menu-item-selected {
+                    background-color: rgba(244, 63, 94, 0.2) !important;
+                    color: #fb7185 !important;
+                    border-right-color: #fb7185 !important;
                 }
                 .menu-item-coming-soon {
                     filter: blur(1px);
                     opacity: 0.6;
                     cursor: not-allowed !important;
                     pointer-events: none;
-                }
-                .ant-menu-item-disabled.menu-item-coming-soon:hover {
-                    background: transparent !important;
-                }
-                .menu-item-coming-soon * {
-                    pointer-events: none !important;
                 }
             `}</style>
             {/* Tablet/Mobile Navigation (Sidebar is lg+) */}

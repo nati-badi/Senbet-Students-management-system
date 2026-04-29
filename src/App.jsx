@@ -448,37 +448,50 @@ function AdminLogin({ onLogin }) {
     form.resetFields();
   };
 
-  return (
-    <div className="flex-1 flex items-center justify-center w-full py-12">
-      <Card 
-        className="w-full max-w-md shadow-2xl rounded-3xl overflow-hidden border-slate-100 dark:border-slate-800"
-        title={
-          <div className="text-center pt-4">
-            <LockOutlined className="text-3xl text-forest-600 mb-2" />
-            <br/>
-            <Title level={4}>{t('admin.portalAccess', 'Staff Portal Access')}</Title>
-          </div>
-        }
-      >
-        <Form 
-          form={form}
-          layout="vertical" 
-          onFinish={handleSubmit}
-          requiredMark={false}
-        >
-          <Form.Item 
-            label={t('common.password', 'Master Password')} 
-            name="password" 
-            rules={[{ required: true, message: 'Password required' }]}
-            extra={t('parent.masterPwdExtra')}
-          >
-            <Input.Password prefix={<LockOutlined className="text-slate-300" />} placeholder="Enter password" size="large" className="rounded-xl" />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" block size="large" className="h-12 font-bold rounded-xl shadow-lg mt-2">
-            Login
-          </Button>
-        </Form>
-      </Card>
-    </div>
-  );
+    return (
+        <div className="flex-1 flex items-center justify-center w-full py-20 relative overflow-hidden font-['Inter']">
+            {/* Background Aesthetic Elements */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full -mr-64 -mt-64" />
+            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-rose-500/5 blur-[100px] rounded-full -ml-48 -mb-48" />
+
+            <div className="relative w-full max-w-md px-6">
+                <div className="p-10 rounded-[3rem] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/20 dark:border-slate-800/40 shadow-2xl shadow-indigo-500/10">
+                    <div className="flex flex-col items-center text-center mb-10">
+                        <div className="w-20 h-20 bg-indigo-500/10 rounded-[2rem] flex items-center justify-center mb-6 border border-indigo-500/20">
+                            <LockOutlined className="text-4xl text-indigo-500" />
+                        </div>
+                        <h1 className="text-3xl font-black text-slate-800 dark:text-white m-0 tracking-tight">
+                            {t('admin.portalAccess', 'Staff Portal Access')}
+                        </h1>
+                        <p className="text-slate-500 dark:text-slate-400 mt-3 font-medium">
+                            {t('parent.masterPwdExtra')}
+                        </p>
+                    </div>
+
+                    <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
+                        <Form.Item
+                            name="password"
+                            label={<span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{t('common.password', 'Master Password')}</span>}
+                            rules={[{ required: true, message: 'Password required' }]}
+                        >
+                            <Input.Password 
+                                prefix={<LockOutlined className="text-slate-300 mr-2" />}
+                                placeholder="Enter password" 
+                                size="large"
+                                className="h-14 px-6 rounded-2xl bg-white/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 dark:text-white text-lg font-medium focus:bg-white dark:focus:bg-slate-800 transition-all"
+                            />
+                        </Form.Item>
+                        <Button 
+                            type="primary" 
+                            htmlType="submit" 
+                            block 
+                            className="h-14 rounded-2xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 border-none shadow-xl shadow-indigo-500/25 text-white font-bold text-base uppercase tracking-widest mt-4 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                            Login
+                        </Button>
+                    </Form>
+                </div>
+            </div>
+        </div>
+    );
 }

@@ -4,10 +4,67 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  /* Brand Palette */
+  --color-primary: #6366f1; /* Indigo 500 */
+  --color-primary-hover: #4f46e5; /* Indigo 600 */
+  --color-urgent: #f43f5e; /* Rose 500 */
+  --color-success: #10b981; /* Emerald 500 */
+  
+  /* Backgrounds & Text */
   --color-holy-white: #fdfdfd;
-  --color-navy: #0f172a;
-  --color-forest: #166534;
+  --bg-layout: #f8fafc; /* Slate 50 */
+  --text-main: #1e293b; /* Slate 800 */
+  --text-sub: #64748b; /* Slate 500 */
+  
+  /* Glass Tokens - Light */
+  --glass-bg: rgba(255, 255, 255, 0.4);
+  --glass-border: rgba(226, 232, 240, 0.6); /* Slate 200/60 */
+  --glass-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.05);
+  
   color-scheme: light;
+}
+
+.dark {
+  /* Brand Palette - Slightly more vibrant in dark mode */
+  --color-primary: #818cf8; /* Indigo 400 */
+  --color-primary-hover: #6366f1;
+  --color-urgent: #fb7185; /* Rose 400 */
+  --color-success: #34d399; /* Emerald 400 */
+
+  /* Backgrounds & Text */
+  --bg-layout: #020617; /* Slate 950 */
+  --text-main: #f8fafc;
+  --text-sub: #94a3b8;
+  
+  /* Glass Tokens - Dark */
+  --glass-bg: rgba(15, 23, 42, 0.4); /* Slate 900/40 */
+  --glass-border: rgba(30, 41, 59, 0.6); /* Slate 800/60 */
+  --glass-shadow: 0 15px 35px -12px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
+}
+
+/* Glassmorphism Utilities */
+@layer components {
+  .glass-card {
+    @apply bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm rounded-[2.5rem];
+  }
+  
+  .glass-header {
+    @apply relative p-10 rounded-[2.5rem] bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm overflow-hidden;
+  }
+  
+  .btn-primary {
+    @apply h-14 px-10 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 border-none shadow-xl shadow-indigo-500/25 text-white font-bold flex items-center justify-center gap-3 transition-all hover:scale-[1.03] active:scale-95;
+  }
+  
+  .badge-indigo {
+    @apply px-3 py-1 bg-indigo-500/10 dark:bg-indigo-400/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold rounded-full uppercase tracking-widest border border-indigo-200/30 dark:border-indigo-800/30;
+  }
+  
+  .badge-rose {
+    @apply px-3 py-1 bg-rose-500/10 dark:bg-rose-400/10 text-rose-600 dark:text-rose-400 text-[10px] font-bold rounded-full uppercase tracking-widest border border-rose-200/30 dark:border-rose-800/30;
+  }
 }
 
 html,
@@ -23,23 +80,17 @@ body,
   flex-direction: column;
 }
 
-
 body {
-  background-color: var(--color-holy-white);
-  color: var(--color-navy);
+  background-color: var(--bg-main);
+  color: var(--text-main);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Document specific font utilities (Now global for consistency) */
-.cert-container { font-family: 'Inter', sans-serif; }
-.cert-amharic { font-family: 'Noto Sans Ethiopic', 'Inter', sans-serif; }
-.cert-serif { font-family: 'Playfair Display', serif; }
-
 /* Dark mode body background fix */
 .dark body {
-  background-color: #020617; /* Matches colorBgLayout in App.jsx */
+  background-color: var(--bg-main);
 }
 
 /* Global Pointer Cursor for Interactive Elements */

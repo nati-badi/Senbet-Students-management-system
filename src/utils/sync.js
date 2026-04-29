@@ -68,10 +68,10 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
             } else if (tableName === 'assessments') {
                 if (serverRecord.subjectname !== undefined) { mapped.subjectName = serverRecord.subjectname; delete mapped.subjectname; }
                 if (serverRecord.maxscore !== undefined) { mapped.maxScore = serverRecord.maxscore; delete mapped.maxscore; }
-                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete serverRecord.academicyear; }
+                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete mapped.academicyear; }
             } else if (tableName === 'attendance') {
                 if (serverRecord.studentid !== undefined) { mapped.studentId = serverRecord.studentid; delete mapped.studentid; }
-                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete serverRecord.academicyear; }
+                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete mapped.academicyear; }
                 if (serverRecord.last_modified_by !== undefined) { mapped.markedBy = serverRecord.last_modified_by; }
             } else if (tableName === 'marks') {
                 if (serverRecord.studentid !== undefined) { mapped.studentId = serverRecord.studentid; delete mapped.studentid; }
@@ -80,7 +80,7 @@ async function processCloudData(tableName, cloudData, tableDb, tableStatus, pull
                 if (serverRecord.assessmentid !== undefined) { mapped.assessmentId = serverRecord.assessmentid; delete mapped.assessmentid; }
                 if (serverRecord.assessmentId !== undefined && mapped.assessmentId === undefined) { mapped.assessmentId = serverRecord.assessmentId; }
                 
-                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete serverRecord.academicyear; }
+                if (serverRecord.academicyear !== undefined) { mapped.academicYear = serverRecord.academicyear; delete mapped.academicyear; }
 
                 if (serverRecord.assessmentdate !== undefined) { mapped.assessmentDate = serverRecord.assessmentdate; delete mapped.assessmentdate; }
                 if (serverRecord.subject !== undefined) { mapped.subject = serverRecord.subject; }
