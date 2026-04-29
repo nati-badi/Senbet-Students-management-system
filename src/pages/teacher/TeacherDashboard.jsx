@@ -219,34 +219,34 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] block mb-1">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2 opacity-80">
                             {t('teacher.signedInAs', 'Signed in as')}
                         </span>
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white m-0 truncate">
+                        <div className="flex items-center gap-4 flex-wrap">
+                            <h2 className="text-3xl font-black text-slate-800 dark:text-white m-0 tracking-tighter">
                                 {activeTeacher.name}
                             </h2>
-                            <Tag className="rounded-full border-none bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold px-3 py-0.5 text-[10px] uppercase tracking-wider">
+                            <Tag className="rounded-full border-none bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-black px-4 py-1 text-[10px] uppercase tracking-widest shadow-sm">
                                 {t('teacher.portal', 'Teacher Portal')}
                             </Tag>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                        <div className="flex flex-col sm:flex-row gap-6 mt-6">
                             {activeTeacher.assignedGrades?.length > 0 && (
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t('teacher.grades', 'Grades')}:</span>
-                                    {activeTeacher.assignedGrades.slice(0, 6).map(g => (
-                                        <span key={`g-${g}`} className="px-2.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-bold rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('teacher.grades', 'Grades')}:</span>
+                                    {activeTeacher.assignedGrades.slice(0, 8).map(g => (
+                                        <span key={`g-${g}`} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[11px] font-bold rounded-xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm">
                                             {formatGrade(g)}
                                         </span>
                                     ))}
                                 </div>
                             )}
                             {activeTeacher.assignedSubjects?.length > 0 && (
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t('teacher.subjects', 'Subjects')}:</span>
-                                    {activeTeacher.assignedSubjects.slice(0, 6).map(s => (
-                                        <span key={`s-${s}`} className="px-2.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 dark:text-indigo-400 text-[10px] font-bold rounded-lg border border-indigo-100/50 dark:border-indigo-800/30">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('teacher.subjects', 'Subjects')}:</span>
+                                    {activeTeacher.assignedSubjects.slice(0, 8).map(s => (
+                                        <span key={`s-${s}`} className="px-3 py-1 bg-indigo-500/5 dark:bg-indigo-400/10 text-indigo-600 dark:text-indigo-300 text-[11px] font-bold rounded-xl border border-indigo-200/50 dark:border-indigo-800/30 shadow-sm">
                                             {s}
                                         </span>
                                     ))}
