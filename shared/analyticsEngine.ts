@@ -45,18 +45,20 @@ export const calculateStudentStats = (
   let totalScore = 0;
   let totalMax = 0;
 
+  // Pre-index marks by assessmentId for O(1) lookup
+  const marksMap = new Map();
+  allMarks.forEach(m => {
+    const sId = m.studentId || m.studentid;
+    const aId = m.assessmentId || m.assessmentid;
+    if (sId === student.id) {
+      marksMap.set(aId, m);
+    }
+  });
+
   relevantAssessments.forEach(a => {
     const aId = a.id || a.assessmentId;
-    
-    // Find mark for this specific student
-    const mark = allMarks.find(m => {
-        const mStudentId = m.studentId || m.studentid;
-        const mAssessmentId = m.assessmentId || m.assessmentid;
-        return mStudentId === student.id && mAssessmentId === aId;
-    });
+    const mark = marksMap.get(aId);
 
-    // Progressive Average: Only count this assessment in the total if this specific student has a mark recorded.
-    // This ensures averages represent "Performance on completed work".
     if (mark) {
         const mScore = Number(a.maxScore || a.maxscore || a.max_score || 0);
         totalMax += mScore;
@@ -87,6 +89,16 @@ export const calculateRankings = (
   // Exclude non-academic assessments (conduct, etc.)
   const academicAssessments = assessments.filter(a => !isConductAssessment(a));
 
+  // Pre-index marks by studentId for faster lookup in calculateStudentStats
+  const studentMarksMap = new Map<string, UnifiedMark[]>();
+  marks.forEach(m => {
+    const sId = m.studentId || m.studentid;
+    if (sId) {
+      if (!studentMarksMap.has(sId)) studentMarksMap.set(sId, []);
+      studentMarksMap.get(sId)!.push(m);
+    }
+  });
+
   const studentsWithStats = students.map(s => {
     const sGradeNorm = normalizeGrade(s.grade);
     
@@ -95,7 +107,8 @@ export const calculateRankings = (
       normalizeGrade(a.grade) === sGradeNorm
     );
 
-    const stats = calculateStudentStats(s, sGradeAssessments, marks);
+    const sMarks = studentMarksMap.get(s.id) || [];
+    const stats = calculateStudentStats(s, sGradeAssessments, sMarks);
     
     return {
       ...s,
@@ -208,27 +221,30 @@ export const calculateSubjectRows = (
   const uniqueSubjectNames = [...new Set(gradeAssessments.map(a => a.subjectName || a.subjectname))].sort();
 
   return uniqueSubjectNames.map(subName => {
+    // Pre-index student marks for this subject lookup
+    const studentMarksForSubject = marks.filter(m => 
+      (m.studentId === student.id || m.studentid === student.id)
+    );
+
+    const marksMap = new Map();
+    studentMarksForSubject.forEach(m => {
+      marksMap.set(m.assessmentId || m.assessmentid, m);
+    });
+
     // Utility to get score for a set of assessments
     const getScoreForSet = (assessmentSet: UnifiedAssessment[]) => {
-      const earned = assessmentSet.reduce((acc, a) => {
+      let earned = 0;
+      let max = 0;
+      let hasData = false;
+
+      assessmentSet.forEach(a => {
         const aId = a.id || a.assessmentId;
-        const m = marks.find(mark => 
-          (mark.studentId === student.id || mark.studentid === student.id) && 
-          (mark.assessmentId === aId || mark.assessmentid === aId)
-        );
-        return acc + (m ? (Number(m.score) || 0) : 0);
-      }, 0);
-      
-      const max = assessmentSet.reduce((acc, a) => 
-        acc + (Number(a.maxScore || a.maxscore || a.max_score) || 0), 0
-      );
-      
-      const hasData = assessmentSet.some(a => {
-        const aId = a.id || a.assessmentId;
-        return marks.find(m => 
-          (m.studentId === student.id || m.studentid === student.id) && 
-          (m.assessmentId === aId || m.assessmentid === aId)
-        );
+        const m = marksMap.get(aId);
+        if (m) {
+          earned += (Number(m.score) || 0);
+          hasData = true;
+        }
+        max += (Number(a.maxScore || a.maxscore || a.max_score) || 0);
       });
 
       return { earned, max, hasData };

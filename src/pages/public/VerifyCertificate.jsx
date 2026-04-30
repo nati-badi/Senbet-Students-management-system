@@ -58,6 +58,12 @@ export default function VerifyCertificate() {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setError(null);
+        
+        if (!supabase) {
+          throw new Error("Supabase client is not initialized. Please check your environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY).");
+        }
+
         const { data: studentData, error: studentError } = await supabase
           .from('students')
           .select('*')
@@ -76,9 +82,15 @@ export default function VerifyCertificate() {
           supabase.from('students').select('*').eq('grade', studentData.grade)
         ]);
 
+        // Check for errors in parallel requests
+        const firstError = mRes.error || aRes.error || subRes.error || setRes.error || allStudentsRes.error;
+        if (firstError) throw firstError;
+
         const allStudents = allStudentsRes.data || [];
         const studentIdsInGrade = allStudents.map(s => s.id);
         const allMarksRes = await supabase.from('marks').select('*').in('studentid', studentIdsInGrade);
+        
+        if (allMarksRes.error) throw allMarksRes.error;
 
         const studentMarks = mRes.data || [];
         const allMarks = allMarksRes.data || [];
@@ -117,9 +129,12 @@ export default function VerifyCertificate() {
       setDownloading(true);
       const hideMsg = message.loading('Preparing Official High-Resolution Document...', 0);
 
-      // Ensure fonts are loaded
+      // Ensure fonts are loaded with a timeout to prevent hanging
       if (document.fonts) {
-        await document.fonts.ready;
+        await Promise.race([
+          document.fonts.ready,
+          new Promise(resolve => setTimeout(resolve, 2000))
+        ]);
       }
 
       // Small delay to ensure hidden div is properly rendered
@@ -161,8 +176,27 @@ export default function VerifyCertificate() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><Spin size="large" /></div>;
-  if (error || !student) return <div className="min-h-screen flex items-center justify-center bg-white"><Text type="danger">Verification Error</Text></div>;
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
+      <Spin size="large" />
+      <Text type="secondary" className="cert-amharic">መረጃ በመጫን ላይ... / Loading data...</Text>
+    </div>
+  );
+
+  if (error || !student) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 text-center">
+      <Result
+        status="error"
+        title="Verification Error"
+        subTitle={error || "Student not found or link is invalid."}
+        extra={[
+          <Button type="primary" key="home" onClick={() => window.location.href = '/'}>
+            Return Home
+          </Button>
+        ]}
+      />
+    </div>
+  );
 
   const scoreNum = parseFloat(overallAvg);
   const avgColor = scoreNum >= 70 ? '#166534' : (scoreNum >= 50 ? '#A67C00' : '#991B1B');
@@ -235,7 +269,7 @@ export default function VerifyCertificate() {
                             <td style={{ textAlign: 'center' }}>{row.semI}</td>
                             <td style={{ textAlign: 'center' }}>{row.semII}</td>
                             <td style={{ textAlign: 'center' }}>
-                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontWeight: '900', background: parseFloat(row.avg) >= 70 ? '#DCFCE7' : '#F1F5F9', color: parseFloat(row.avg) >= 70 ? '#166534' : '#1A1A1A' }}>{row.avg}%</span>
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontWeight: '900', background: parseFloat(row.avg) >= 70 ? '#DCFCE7' : '#F1F5F9', color: parseFloat(row.avg) >= 70 ? '#166534' : '#1A1A1A' }}>{row.avg}</span>
                             </td>
                         </tr>
                     ))}
