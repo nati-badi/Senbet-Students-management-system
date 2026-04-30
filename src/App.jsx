@@ -461,7 +461,7 @@ function AdminLogin({ onLogin }) {
                             <LockOutlined className="text-4xl text-indigo-500" />
                         </div>
                         <h1 className="text-3xl font-black text-slate-800 dark:text-white m-0 tracking-tight">
-                            {t('admin.portalAccess', 'Staff Portal Access')}
+                            {t('admin.portalAccess', 'Admin Portal Access')}
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 mt-3 font-medium">
                             {t('parent.masterPwdExtra')}

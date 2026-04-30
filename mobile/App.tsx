@@ -35,106 +35,7 @@ import { AssessmentManagementTab } from './components/AssessmentManagementTab';
 import { StudentProfileModal } from './components/StudentProfileModal';
 import { LandingPage, ParentPortal, TeacherLogin } from './components/AuthScreens';
 
-// ── Grade helpers ──────────────────────────────────────────────
-const GRADE_LABELS: Record<string, string> = {
-  '1': '1ኛ ክፍል', '2': '2ኛ ክፍል', '3': '3ኛ ክፍል', '4': '4ኛ ክፍል',
-  '5': '5ኛ ክፍል', '6': '6ኛ ክፍል', '7': '7ኛ ክፍል', '8': '8ኛ ክፍል',
-  '9': '9ኛ ክፍል', '10': '10ኛ ክፍል', '11': '11ኛ ክፍል', '12': '12ኛ ክፍል',
-};
-const fmtGrade = (g: string | number) => GRADE_LABELS[String(g)] ?? `${g}ኛ ክፍል`;
-
-// ── Types (matching Supabase lowercase column names as seen in screenshot) ──────────
-interface Student {
-  id: string;
-  name: string;
-  grade: string;
-  baptismalname?: string;
-  parentcontact?: string;
-  academicyear?: string;
-  portalcode?: string;
-}
-interface Assessment {
-  id: string;
-  name: string;
-  subjectname: string;
-  grade: string;
-  maxscore: number;
-  date: string;
-}
-interface Teacher {
-  id: string;
-  name: string;
-  accesscode: string;
-  assignedgrades?: string[];
-  assignedsubjects?: string[];
-  cancreateassessments?: boolean;
-  canCreateAssessments?: boolean;
-}
-
-// ── Polyfills & Helpers ──────────────────────────────────────────
-const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
-
-// ── Theme Management ──────────────────────────────────────────
-const THEMES = {
-  dark: {
-    bg: '#020617', // Slate-950
-    card: '#0f172a', // Slate-900
-    border: 'rgba(30, 41, 59, 0.5)', // Slate-800/50
-    accent: '#818cf8', // Indigo-400 (Vibrant for dark)
-    accentMuted: 'rgba(129, 140, 248, 0.15)',
-    green: '#34d399', // Emerald-400
-    amber: '#fbbf24', // Amber-400
-    red: '#fb7185', // Rose-400
-    slate: '#94a3b8', // Slate-400
-    text: '#f8fafc', // Slate-50
-    muted: '#64748b', // Slate-500
-    input: '#1e293b', // Slate-800
-    glass: 'rgba(15, 23, 42, 0.7)',
-    isDark: true,
-  },
-  light: {
-    bg: '#f8fafc', // Slate-50
-    card: '#ffffff',
-    border: '#e2e8f0', // Slate-200
-    accent: '#6366f1', // Indigo-500
-    accentMuted: 'rgba(99, 102, 241, 0.08)',
-    green: '#10b981', // Emerald-500
-    amber: '#f59e0b', // Amber-500
-    red: '#f43f5e', // Rose-500
-    slate: '#64748b', // Slate-500
-    text: '#0f172a', // Slate-900
-    muted: '#94a3b8', // Slate-400
-    input: '#f1f5f9', // Slate-100
-    glass: 'rgba(255, 255, 255, 0.8)',
-    isDark: false,
-  },
-};
-
-// ── Grade helpers ──────────────────────────────────────────────
-const normG = (g: any) => {
-  if (!g) return '';
-  const m = String(g).match(/\d+/);
-  return m ? m[0] : String(g).trim();
-};
-
-// ── Subject helpers ────────────────────────────────────────────
-const normS = (s: any) => {
-  if (!s) return '';
-  return String(s).trim().toLowerCase();
-};
-
-const isConduct = (a: any) => {
-  if (!a) return false;
-  const sName = (a.subjectname || a.subjectName || '').toLowerCase();
-  const aName = (a.name || '').toLowerCase();
-  const keywords = ['conduct', 'attitude', 'behaviour', 'behavior', 'ስነ-ምግባር', 'ስነ ምግባር'];
-  return keywords.some(kw => sName.includes(kw) || aName.includes(kw));
-};
+import { THEMES, GRADE_LABELS, fmtGrade, normG, normS, isConduct, Student, Assessment, Teacher } from './utils';
 
 
 import Svg, { Rect, Circle, Path } from 'react-native-svg';
@@ -218,6 +119,26 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [lastSyncIso, setLastSyncIso] = useState<string | null>(null);
   const [profileStudent, setProfileStudent] = useState<Student | null>(null);
+  const [parentStudent, setParentStudent] = useState<Student | null>(null);
+
+  const handleUpdateParentProfile = async (id: string, updates: Partial<Student>) => {
+    try {
+      const { error } = await supabase
+        .from('students')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      
+      if (error) throw error;
+      if (parentStudent && parentStudent.id === id) {
+        setParentStudent({ ...parentStudent, ...updates });
+      }
+      showToast(t('common.saveSuccess', 'Profile updated successfully'), 'success');
+      return true;
+    } catch (e: any) {
+      showToast(e.message || t('common.error'), 'error');
+      return false;
+    }
+  };
 
   const C = isDark ? THEMES.dark : THEMES.light;
   const s = makeStyles(C);
@@ -498,7 +419,19 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
 
   if (!teacher) {
     if (authMode === 'parent_portal') {
-      return <ParentPortal isDark={isDark} onBack={() => setAuthMode('landing')} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} isOnline={isOnline} s={s} />;
+      return (
+        <ParentPortal 
+          isDark={isDark} 
+          onBack={() => setAuthMode('landing')} 
+          toggleTheme={toggleTheme} 
+          toggleLanguage={toggleLanguage} 
+          isOnline={isOnline} 
+          s={s} 
+          student={parentStudent}
+          setStudent={setParentStudent}
+          onUpdateProfile={handleUpdateParentProfile}
+        />
+      );
     }
     if (authMode === 'teacher_login') {
       return <TeacherLogin onLogin={handleLogin} onBack={() => setAuthMode('landing')} isDark={isDark} toggleTheme={toggleTheme} toggleLanguage={toggleLanguage} isOnline={isOnline} s={s} />;
@@ -741,7 +674,17 @@ function makeStyles(C: any) {
     loginSub: { color: C.accent, fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: 32 },
     loginCard: { backgroundColor: C.card, borderRadius: 24, padding: 24 },
     inputLabel: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
-    loginInput: { backgroundColor: C.input, color: C.text, borderRadius: 12, padding: 14, fontSize: 16 },
+    loginInput: { 
+      backgroundColor: C.input, 
+      color: C.text, 
+      borderRadius: 12, 
+      padding: 14, 
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: C.border + '20',
+      /* @ts-ignore */
+      outlineStyle: 'none',
+    },
     loginBtn: { backgroundColor: C.accent, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 32 },
     loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
     header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },

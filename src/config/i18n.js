@@ -140,6 +140,7 @@ const resources = {
                 "assessmentAdded": "Assessment added successfully!",
                 "assessmentDeleted": "Assessment deleted successfully!",
                 "urgentMatters": "Urgent Matters",
+                "portalAccess": "Admin Portal Access",
                 "syncCenterSubtitle": "Keep your Local Desktop and Teacher Mobile data in sync via Supabase Cloud.",
                 "forceSync": "Force Full Re-sync",
                 "syncNow": "Start Sync Now",
@@ -578,7 +579,7 @@ const resources = {
                 "subject": "Subject",
                 "message": "Message",
                 "loginDesc": "Enter details to view academic progress",
-                "masterPwdExtra": "Staff-only access for Admin and Teacher portals."
+                "masterPwdExtra": "Secure administrator-only access for school management."
             }
         }
     },
@@ -719,6 +720,7 @@ const resources = {
                 "assessmentAdded": "ምዘና በተሳካ ሁኔታ ተጨምሯል!",
                 "assessmentDeleted": "ምዘና በተሳካ ሁኔታ ተሰርዟል!",
                 "urgentMatters": "አስቸኳይ ጉዳዮች",
+                "portalAccess": "የአስተዳዳሪ መግቢያ",
                 "syncCenterSubtitle": "የዴስክቶፕ እና የሞባይል ዳታዎችን በደመና (Supabase) አማካኝነት ያመሳስሉ።",
                 "forceSync": "ሙሉ በሙሉ በኃይል አመሳስል",
                 "syncNow": "አሁኑኑ ማመሳሰል ጀምር",
@@ -1156,7 +1158,7 @@ const resources = {
                 "subject": "ጉዳዩ",
                 "message": "መልዕክት",
                 "loginDesc": "የትምህርት እድገትን ለማየት ዝርዝሮችን ያስገቡ",
-                "masterPwdExtra": "ለአስተዳዳሪ እና ለመምህራን ፖርታል የሰራተኞች ብቻ መግቢያ።"
+                "masterPwdExtra": "ለትምህርት ቤት አስተዳደር ደህንነቱ የተጠበቀ የአስተዳዳሪ ብቻ መግቢያ።"
             }
         }
     }

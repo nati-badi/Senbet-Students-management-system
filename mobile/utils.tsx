@@ -71,28 +71,28 @@ export const paginate = (data: any[], page: number) => data.slice(0, (page + 1) 
 // ── Theme Management ──────────────────────────────────────────
 export const THEMES = {
   dark: {
-    bg: '#0f172a',
-    card: '#1e293b',
-    border: 'transparent',
-    accent: '#6366f1', // Richer Indigo
-    accentMuted: 'rgba(99, 102, 241, 0.15)',
-    green: '#10b981',
+    bg: '#0f172a', // Slate-900 (High-visibility deep blue)
+    card: '#1e293b', // Slate-800 (Distinct cards)
+    border: '#334155', // Slate-700
+    accent: '#818cf8', // Vibrant Indigo-400 (Better for OLED/Dark mode)
+    accentMuted: 'rgba(129, 140, 248, 0.15)',
+    green: '#22c55e',
     amber: '#f59e0b',
     red: '#ef4444',
     slate: '#94a3b8',
     text: '#f8fafc',
-    muted: '#64748b',
-    input: '#1e293b', // Elevated background
-    glass: 'rgba(15, 23, 42, 0.7)',
+    muted: '#94a3b8', // High contrast secondary text
+    input: '#334155',
+    glass: 'rgba(15, 23, 42, 0.8)',
     isDark: true,
   },
   light: {
     bg: '#f8fafc',
     card: '#ffffff',
     border: '#e2e8f0',
-    accent: '#3b82f6',
-    accentMuted: '#3b82f611',
-    green: '#059669',
+    accent: '#6366f1', // Standard Indigo-500
+    accentMuted: 'rgba(99, 102, 241, 0.08)',
+    green: '#10b981',
     amber: '#d97706',
     red: '#dc2626',
     slate: '#64748b',

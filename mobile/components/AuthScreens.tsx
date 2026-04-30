@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { 
     View, Text, ScrollView, TouchableOpacity, TextInput, Image as RNImage, 
     KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, 
-    ActivityIndicator, Alert 
+    ActivityIndicator, Alert, Modal 
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { 
@@ -14,9 +14,12 @@ import { LiveCertificate } from './LiveCertificate';
 import { SchoolInfoTab } from './SchoolInfoTab';
 import { EthiopicClockWidget } from './EthiopicClockWidget';
 import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
+import { StyleSheet } from 'react-native';
 import { supabase } from '../supabase';
 import { THEMES, Teacher, Student, Assessment, fmtGrade } from '../utils';
 import { formatEthiopianDate } from '../dateUtils';
+import { useToast } from './ToastContext';
 
 export const LandingPage = React.memo(({ onSelectMode, isDark, t, C, s }: { onSelectMode: (m: 'teacher' | 'parent') => void, isDark: boolean, t: any, C: any, s: any }) => {
   return (
@@ -56,17 +59,18 @@ export const LandingPage = React.memo(({ onSelectMode, isDark, t, C, s }: { onSe
   );
 });
 
-export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme, toggleLanguage, s }: { isDark: boolean, onBack: () => void, isOnline: boolean, toggleTheme: () => void, toggleLanguage: () => void, s: any }) => {
+export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme, toggleLanguage, s, student, setStudent, onUpdateProfile }: { 
+  isDark: boolean, onBack: () => void, isOnline: boolean, toggleTheme: () => void, toggleLanguage: () => void, s: any,
+  student: Student | null, setStudent: (s: Student | null) => void, onUpdateProfile: (id: string, u: Partial<Student>) => Promise<boolean>
+}) => {
   const { t, i18n } = useTranslation();
   const C = isDark ? THEMES.dark : THEMES.light;
   const [activeTab, setActiveTab] = useState<'home' | 'marks' | 'info' | 'profile'>('home');
   
   const [studentName, setStudentName] = useState('');
-  const [accessCode, setAccessCode] = useState('');
-  const [showCode, setShowCode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const accessCodeRef = useRef<any>(null);
-  const [student, setStudent] = useState<Student | null>(null);
   const [marks, setMarks] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
@@ -84,12 +88,19 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
   const [baptName, setBaptName] = useState('');
   const [parentContact, setParentContact] = useState('');
 
+  const [accessCode, setAccessCode] = useState('');
+  const [showCode, setShowCode] = useState(false);
+  const { showToast } = useToast();
+
   const doSearch = async () => {
+    setErrorMsg('');
     if (!isOnline) {
-      return Alert.alert(t('common.offline', 'Offline'), t('common.offlineMessage', 'Please check your internet connection and try again.'));
+      setErrorMsg(t('common.offlineMessage', 'Please check your internet connection and try again.'));
+      return;
     }
     if (!studentName.trim() || !accessCode.trim()) {
-      return Alert.alert(t('common.error', 'Error'), t('parent.loginFieldsRequired', 'Both Student Name and Access Code are required.'));
+      setErrorMsg(t('parent.loginFieldsRequired', 'Both Student Name and Access Code are required.'));
+      return;
     }
     
     setLoading(true);
@@ -102,7 +113,10 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
         .maybeSingle();
 
       if (error) throw error;
-      if (!data) return Alert.alert(t('parent.notFound', 'Student Not Found'), t('parent.loginFailed', 'Incorrect name or portal access code. Please try again.'));
+      if (!data) {
+        setErrorMsg(t('parent.loginFailed', 'Incorrect name or portal access code. Please try again.'));
+        return;
+      }
 
       setLoadingAnns(true);
       setStudent(data);
@@ -147,7 +161,7 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
       setStudentName('');
       setAccessCode('');
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      setErrorMsg(err.message || t('common.error'));
     } finally {
       setLoading(false);
     }
@@ -192,49 +206,43 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
     }
   };
 
-  const handleUpdateProfile = async () => {
+  const handleLocalUpdateProfile = async () => {
     if (!student) return;
     setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('students')
-        .update({ name: editableName, baptismalname: baptName, parentcontact: parentContact, updated_at: new Date().toISOString() })
-        .eq('id', student.id);
-      
-      if (error) throw error;
-      setStudent({ ...student, name: editableName, baptismalname: baptName, parentcontact: parentContact });
-      setEditingProfile(false);
-      Alert.alert('✅ ' + t('common.saveSuccess'));
-    } catch (e: any) {
-      Alert.alert('❌ Error', e.message);
-    } finally {
-      setLoading(false);
-    }
+    const success = await onUpdateProfile(student.id, { name: editableName, baptismalname: baptName, parentcontact: parentContact });
+    if (success) setEditingProfile(false);
+    setLoading(false);
   };
 
   const renderSearchForm = () => (
     <ScrollView
       style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={{ padding: 24, paddingBottom: 200 }}
-      keyboardShouldPersistTaps={Platform.OS === 'web' ? undefined : "handled"}
-      keyboardDismissMode={Platform.OS === 'web' ? "none" : "on-drag"}
+      contentContainerStyle={{ padding: 24, paddingTop: 40, paddingBottom: 250 }}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      keyboardDismissMode="on-drag"
     >
       <View style={{ alignItems: 'center', marginBottom: 40 }}>
         <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}>
-          <Search size={48} color={C.accent} />
+          <Users size={48} color={C.accent} />
         </View>
-        <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', marginTop: 20, textAlign: 'center' }}>{t('parent.searchTitle', 'Find Student Results')}</Text>
-        <Text style={{ color: C.muted, textAlign: 'center', marginTop: 10, fontSize: 15, lineHeight: 22 }}>{t('parent.searchDesc', 'Enter the student full name or their ID/Portal code to view academic records.')}</Text>
+        <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', marginTop: 20, textAlign: 'center' }}>{t('parent.title', 'Parent Portal')}</Text>
+        <Text style={{ color: C.muted, textAlign: 'center', marginTop: 10, fontSize: 15, lineHeight: 22 }}>{t('parent.searchDesc', 'Enter the student full name and their portal access code to view records.')}</Text>
       </View>
 
       <View style={[s.loginCard, { padding: 24 }]}>
+        {errorMsg ? (
+          <View style={{ backgroundColor: C.red + '15', padding: 14, borderRadius: 14, marginBottom: 24 }}>
+             <Text style={{ color: C.red, fontSize: 13, textAlign: 'center', fontWeight: '800' }}>{errorMsg}</Text>
+          </View>
+        ) : null}
          <Text style={s.inputLabel}>{t('parent.studentFullName', 'Student Full Name')}</Text>
          <TextInput 
            style={[s.loginInput, { height: 56, marginBottom: 16 }]}
            placeholder={t('parent.namePlaceholder', 'e.g. Abebe Kebede')}
            placeholderTextColor={C.muted}
            value={studentName}
-           onChangeText={setStudentName}
+           onChangeText={(t) => { setStudentName(t); setErrorMsg(''); }}
            autoCorrect={false}
            returnKeyType="next"
            onSubmitEditing={() => accessCodeRef.current?.focus()}
@@ -245,12 +253,12 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
            <TextInput 
              ref={accessCodeRef}
              style={[s.loginInput, { height: 56, paddingRight: 50 }]}
-             placeholder="------"
+             placeholder={t('parent.accessCodePlaceholder', '6-digit code')}
              keyboardType="numeric"
              maxLength={6}
              placeholderTextColor={C.muted}
              value={accessCode}
-             onChangeText={setAccessCode}
+             onChangeText={(t) => { setAccessCode(t); setErrorMsg(''); }}
              secureTextEntry={!showCode}
              returnKeyType="search"
              onSubmitEditing={doSearch}
@@ -388,63 +396,96 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
                 )}
              </View>
 
-             {editingProfile ? (
-                 <View>
-                    <Text style={s.inputLabel}>{t('admin.studentName', 'Student Full Name')}</Text>
-                    <TextInput 
-                        style={[s.loginInput, { marginBottom: 16 }]} 
-                        value={editableName} 
-                        onChangeText={setEditableName} 
-                    />
-                    <Text style={s.inputLabel}>{t('admin.baptismalName')}</Text>
-                    <TextInput 
-                        style={s.loginInput} 
-                        value={baptName} 
-                        onChangeText={setBaptName} 
-                    />
-                    <Text style={[s.inputLabel, { marginTop: 16 }]}>{t('admin.parentContact')}</Text>
-                    <TextInput 
-                        style={s.loginInput} 
-                        value={parentContact} 
-                        onChangeText={setParentContact} 
-                        keyboardType="phone-pad"
-                    />
-                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
-                        <TouchableOpacity 
-                            style={[s.loginBtn, { flex: 1, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border }]} 
-                            onPress={() => setEditingProfile(false)}
-                        >
-                            <Text style={{ color: C.text }}>{t('common.cancel')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                            style={[s.loginBtn, { flex: 1, backgroundColor: C.accent }]} 
-                            onPress={handleUpdateProfile}
-                        >
-                            <Text style={s.loginBtnText}>{t('common.save')}</Text>
-                        </TouchableOpacity>
-                    </View>
-                 </View>
-             ) : (
-                 <View>
-                    <View style={{ marginBottom: 16 }}>
-                        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('admin.studentName', 'Student Full Name')}</Text>
-                        <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.name}</Text>
-                    </View>
-                    <View style={{ marginBottom: 16 }}>
-                        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('admin.baptismalName')}</Text>
-                        <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.baptismalname || '—'}</Text>
-                    </View>
-                    <View style={{ marginBottom: 16 }}>
-                        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('admin.parentContact')}</Text>
-                        <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.parentcontact || '—'}</Text>
-                    </View>
-                    <View>
-                        <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('parent.portalCode')}</Text>
-                        <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.portalcode}</Text>
-                    </View>
-                 </View>
-             )}
-        </View>
+              <View>
+                <View style={{ marginBottom: 16 }}>
+                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('admin.studentName', 'Student Full Name')}</Text>
+                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.name}</Text>
+                </View>
+                <View style={{ marginBottom: 16 }}>
+                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('admin.baptismalName')}</Text>
+                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.baptismalname || '—'}</Text>
+                </View>
+                <View style={{ marginBottom: 16 }}>
+                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('admin.parentContact')}</Text>
+                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.parentcontact || '—'}</Text>
+                </View>
+                <View>
+                    <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{t('parent.portalCode')}</Text>
+                    <Text style={{ color: C.text, fontSize: 16, fontWeight: '600', marginTop: 4 }}>{student?.portalcode}</Text>
+                </View>
+              </View>
+         </View>
+
+         <Modal 
+            visible={editingProfile} 
+            transparent 
+            animationType="fade" 
+            onRequestClose={() => setEditingProfile(false)}
+         >
+            <TouchableWithoutFeedback onPress={() => setEditingProfile(false)}>
+                <View style={s.modalOverlay}>
+                    <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={isDark ? 'dark' : 'light'} />
+                    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center' }}>
+                        <TouchableWithoutFeedback>
+                            <View style={[s.modalCard, { padding: 24 }]}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                                    <Text style={[s.modalTitle, { marginBottom: 0 }]}>
+                                        {t('teacher.editProfile', 'Edit Profile')}
+                                    </Text>
+                                    <TouchableOpacity onPress={() => setEditingProfile(false)} style={{ padding: 4 }}>
+                                        <Text style={{ color: C.muted, fontSize: 24 }}>×</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView showsVerticalScrollIndicator={false}>
+                                    <Text style={s.inputLabel}>{t('admin.studentName', 'Student Full Name')}</Text>
+                                    <TextInput 
+                                        style={[s.loginInput, { marginBottom: 16 }]} 
+                                        value={editableName} 
+                                        onChangeText={setEditableName} 
+                                        placeholderTextColor={C.muted}
+                                        selectionColor={C.accent}
+                                    />
+                                    <Text style={s.inputLabel}>{t('admin.baptismalName')}</Text>
+                                    <TextInput 
+                                        style={[s.loginInput, { marginBottom: 16 }]} 
+                                        value={baptName} 
+                                        onChangeText={setBaptName} 
+                                        placeholderTextColor={C.muted}
+                                        selectionColor={C.accent}
+                                    />
+                                    <Text style={s.inputLabel}>{t('admin.parentContact')}</Text>
+                                    <TextInput 
+                                        style={[s.loginInput, { marginBottom: 24 }]} 
+                                        value={parentContact} 
+                                        onChangeText={setParentContact} 
+                                        keyboardType="phone-pad"
+                                        placeholderTextColor={C.muted}
+                                        selectionColor={C.accent}
+                                    />
+
+                                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                                        <TouchableOpacity 
+                                            style={[s.modalBtn, { backgroundColor: C.border }]} 
+                                            onPress={() => setEditingProfile(false)}
+                                        >
+                                            <Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            style={[s.modalBtn, { backgroundColor: C.accent }]} 
+                                            onPress={handleLocalUpdateProfile}
+                                            disabled={loading}
+                                        >
+                                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.modalBtnText}>{t('common.save')}</Text>}
+                                        </TouchableOpacity>
+                                    </View>
+                                </ScrollView>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </KeyboardAvoidingView>
+                </View>
+            </TouchableWithoutFeedback>
+         </Modal>
 
         <View style={[s.dashboardCard, { padding: 24 }]}>
             <Text style={{ fontSize: 18, fontWeight: '800', color: C.text, marginBottom: 20 }}>{t('common.settings', 'Settings')}</Text>
@@ -485,15 +526,15 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
       {!student ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
-          <TouchableOpacity onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border }}>
-            <ArrowLeft size={20} color={C.text} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 44, paddingBottom: 16, backgroundColor: C.bg, borderBottomWidth: 1, borderBottomColor: C.border + '10' }}>
+          <TouchableOpacity onPress={onBack} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, elevation: 2 }}>
+            <ArrowLeft size={22} color={C.text} />
           </TouchableOpacity>
           <Text style={{ color: C.text, fontSize: 18, fontWeight: '900' }}>{t('parent.title', 'Parent Portal')}</Text>
-          <View style={{ width: 40 }} />
+          <View style={{ width: 44 }} />
         </View>
       ) : (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 40, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 54 : 40, paddingBottom: 12, backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
              <View style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2, padding: 2 }}>
                 <RNImage source={require('../assets/logo.png')} style={{ width: '100%', height: '100%', borderRadius: 6 }} resizeMode="contain" />
@@ -602,7 +643,7 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, toggleTheme, 
   const renderLoginForm = () => (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={{ padding: 24, paddingTop: 96, paddingBottom: 250 }}
+      contentContainerStyle={{ padding: 24, paddingTop: 40, paddingBottom: 250 }}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       keyboardDismissMode="on-drag"
@@ -611,8 +652,8 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, toggleTheme, 
         <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: C.accent + '15', justifyContent: 'center', alignItems: 'center' }}>
           <Key size={48} color={C.accent} />
         </View>
-        <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', marginTop: 20, textAlign: 'center' }}>{t('teacher.portalLogin', 'Teacher Portal')}</Text>
-        <Text style={{ color: C.muted, textAlign: 'center', marginTop: 10, fontSize: 15, lineHeight: 22 }}>Enter your full name and the 6-digit access code provided by the school admin.</Text>
+        <Text style={{ color: C.text, fontSize: 24, fontWeight: '900', marginTop: 20, textAlign: 'center' }}>{t('teacher.portalLogin', 'Teacher Login')}</Text>
+        <Text style={{ color: C.muted, textAlign: 'center', marginTop: 10, fontSize: 15, lineHeight: 22 }}>{t('teacher.loginDesc', 'Enter your full name and the 6-digit access code provided by the school admin.')}</Text>
       </View>
 
       <View style={s.loginCard}>
@@ -622,12 +663,12 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, toggleTheme, 
           </View>
         ) : null}
 
-        <Text style={s.inputLabel}>{t('teacher.name', 'Full Name')}</Text>
+        <Text style={s.inputLabel}>{t('teacher.fullName', 'Teacher Full Name')}</Text>
         <TextInput
           style={s.loginInput}
           value={name}
           onChangeText={(text) => { setName(text); setErrorMsg(''); }}
-          placeholder="e.g. Abebe Kebede"
+          placeholder={t('parent.namePlaceholder', 'e.g. Abebe Kebede')}
           placeholderTextColor={C.muted}
           returnKeyType="next"
           onSubmitEditing={() => accessCodeRef.current?.focus()}
@@ -641,7 +682,7 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, toggleTheme, 
             value={code}
             onChangeText={(text) => { setCode(text); setErrorMsg(''); }}
             secureTextEntry={!showCode}
-            placeholder="6-digit code"
+            placeholder={t('teacher.accessCodePlaceholder', '6-digit code')}
             placeholderTextColor={C.muted}
             keyboardType="numeric"
             maxLength={6}
@@ -653,7 +694,7 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, toggleTheme, 
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={[s.loginBtn, { marginTop: 32, height: 62, borderRadius: 18, shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 }]} onPress={doLogin} disabled={loading}>
+        <TouchableOpacity style={[s.loginBtn, { marginTop: 32, height: 60, borderRadius: 16, shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 }]} onPress={doLogin} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={[s.loginBtnText, { fontSize: 17, fontWeight: '800' }]}>{t('teacher.login', 'Login')}</Text>}
         </TouchableOpacity>
       </View>
@@ -663,10 +704,13 @@ export const TeacherLogin = React.memo(({ onLogin, onBack, isDark, toggleTheme, 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar style={isDark ? "light" : "dark"} animated={true} translucent={true} />
-      <View style={{ position: 'absolute', top: Platform.OS === 'ios' ? 48 : 32, left: 24, zIndex: 100 }}>
-         <TouchableOpacity onPress={onBack} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, elevation: 2 }}>
-           <ArrowLeft size={22} color={C.text} />
-         </TouchableOpacity>
+      
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: Platform.OS === 'ios' ? 60 : 44, paddingBottom: 16, backgroundColor: C.bg, borderBottomWidth: 1, borderBottomColor: C.border + '10' }}>
+        <TouchableOpacity onPress={onBack} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.border, elevation: 2 }}>
+          <ArrowLeft size={22} color={C.text} />
+        </TouchableOpacity>
+        <Text style={{ color: C.text, fontSize: 18, fontWeight: '900' }}>{t('teacher.portalLogin', 'Teacher Login')}</Text>
+        <View style={{ width: 44 }} />
       </View>
       {Platform.OS === 'web' ? (
         <View style={{ flex: 1 }}>{renderLoginForm()}</View>

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, Linking, Animated } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, ShieldCheck, Heart, MapPin, Phone, Mail, ChevronRight, GraduationCap } from 'lucide-react-native';
+import { BookOpen, ShieldCheck, Heart, MapPin, Phone, Send, ChevronRight, GraduationCap } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -127,16 +127,19 @@ export const SchoolInfoTab = React.memo(({ C, s }: { C: any, s: any }) => {
             </View>
             <View style={styles.contactRow}>
                 <Phone size={20} color="#fff" />
-                <Text style={styles.contactText}>+251 912 345 678</Text>
+                <Text style={styles.contactText}>0924095210</Text>
             </View>
-            <View style={styles.contactRow}>
-                <Mail size={20} color="#fff" />
-                <Text style={styles.contactText}>info@senbetschool.com</Text>
-            </View>
+            <TouchableOpacity 
+                style={styles.contactRow}
+                onPress={() => Linking.openURL('https://t.me/NATI_BADI')}
+            >
+                <Send size={20} color="#fff" />
+                <Text style={styles.contactText}>@NATI_BADI (Telegram)</Text>
+            </TouchableOpacity>
             
             <TouchableOpacity 
                 style={styles.ctaButton}
-                onPress={() => Linking.openURL('tel:+251912345678')}
+                onPress={() => Linking.openURL('tel:0924095210')}
             >
                 <Text style={[styles.ctaText, { color: C.accent }]}>{t('school.callNow', 'Call Office')}</Text>
                 <ChevronRight size={18} color={C.accent} />
