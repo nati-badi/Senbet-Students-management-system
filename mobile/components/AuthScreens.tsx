@@ -18,7 +18,7 @@ import { BlurView } from 'expo-blur';
 import { StyleSheet } from 'react-native';
 import { supabase } from '../supabase';
 import { THEMES, Teacher, Student, Assessment, fmtGrade } from '../utils';
-import { formatEthiopianDate } from '../dateUtils';
+import { formatEthiopianDate, computeEthiopianYear } from '../dateUtils';
 import { useToast } from './ToastContext';
 
 export const LandingPage = React.memo(({ onSelectMode, isDark, t, C, s }: { onSelectMode: (m: 'teacher' | 'parent') => void, isDark: boolean, t: any, C: any, s: any }) => {
@@ -53,7 +53,7 @@ export const LandingPage = React.memo(({ onSelectMode, isDark, t, C, s }: { onSe
           <Text style={[s.loginBtnText, { color: C.accent, fontSize: 18 }]}>{t('parent.title', 'Parent Portal')}</Text>
         </TouchableOpacity>
 
-        <Text style={{ color: C.muted, textAlign: 'center', marginTop: 40, marginBottom: 20, fontSize: 12 }}>v2.4.0 • ©{new Date().getFullYear()}</Text>
+        <Text style={{ color: C.muted, textAlign: 'center', marginTop: 40, marginBottom: 20, fontSize: 12 }}>v2.4.0 • ©{computeEthiopianYear()}</Text>
       </ScrollView>
     </View>
   );
