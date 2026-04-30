@@ -159,14 +159,20 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
       try {
         initDB(); // Initialize SQLite DB on boot (no-op on web)
         
-        const [savedAuth, savedTheme, savedLastSync, savedLastSyncIso] = await Promise.all([
+        const [savedAuth, savedParentAuth, savedTheme, savedLastSync, savedLastSyncIso] = await Promise.all([
           AsyncStorage.getItem('senbet_teacher_auth'),
+          AsyncStorage.getItem('senbet_parent_auth'),
           AsyncStorage.getItem('senbet_theme'),
           AsyncStorage.getItem('last_sync_time'),
           AsyncStorage.getItem('last_sync_iso'),
         ]);
 
-        if (savedAuth) setTeacher(JSON.parse(savedAuth));
+        if (savedAuth) {
+          setTeacher(JSON.parse(savedAuth));
+        } else if (savedParentAuth) {
+          setParentStudent(JSON.parse(savedParentAuth));
+          setAuthMode('parent_portal');
+        }
         if (savedTheme) setIsDark(savedTheme === 'dark');
         
         // Try loading from SQLite first (native). If empty, fall back to AsyncStorage (web).
@@ -406,11 +412,13 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
 
   const handleLogout = async () => {
     setTeacher(null);
+    setParentStudent(null);
+    setAuthMode('landing');
     setStudents([]); setAssessments([]); setMarks([]); setAttendance([]); setSubjects([]); setSettings({});
     setLastSync(null); setLastSyncIso(null);
     clearDB(); // Wipe SQLite on native
     await AsyncStorage.multiRemove([
-      'senbet_teacher_auth', 'last_sync_time', 'last_sync_iso',
+      'senbet_teacher_auth', 'senbet_parent_auth', 'last_sync_time', 'last_sync_iso',
       'cached_students', 'cached_assessments', 'cached_marks', 'cached_attendance', 'cached_subjects', 'cached_settings'
     ]);
   };

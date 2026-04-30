@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
     View, Text, ScrollView, TouchableOpacity, TextInput, Image as RNImage, 
     KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, 
     ActivityIndicator, Alert, Modal 
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import { 
     Key, Users, ArrowLeft, Search, Eye, EyeOff, User, CalendarCheck, Clock, 
@@ -102,6 +103,11 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
       setErrorMsg(t('parent.loginFieldsRequired', 'Both Student Name and Access Code are required.'));
       return;
     }
+
+    // Load cached announcements if any
+    AsyncStorage.getItem('senbet_announcements').then(saved => {
+        if (saved) setAnnouncements(JSON.parse(saved));
+    });
     
     setLoading(true);
     try {
@@ -120,6 +126,7 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
 
       setLoadingAnns(true);
       setStudent(data);
+      await AsyncStorage.setItem('senbet_parent_auth', JSON.stringify(data));
       setEditableName(data.name || '');
       setBaptName(data.baptismalname || '');
       setParentContact(data.parentcontact || '');
@@ -149,7 +156,10 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
       setAllMarksInGrade(allMarksRes.data || []);
       
       supabase.from('announcements').select('*').eq('active', 1).order('date', { ascending: false })
-        .then(({ data }) => setAnnouncements(data || []))
+        .then(({ data }) => {
+            setAnnouncements(data || []);
+            if (data) AsyncStorage.setItem('senbet_announcements', JSON.stringify(data));
+        })
         .finally(() => setLoadingAnns(false));
       
       if (setRes.data) {
@@ -192,6 +202,7 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
       setAllStudentsInGrade(studentsInGrade);
       setAllMarksInGrade(allMarksRes.data || []);
       setAnnouncements(annRes.data || []);
+      if (annRes.data) AsyncStorage.setItem('senbet_announcements', JSON.stringify(annRes.data));
       
       if (setRes.data) {
           const sMap: any = {};
@@ -205,6 +216,51 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
       setIsSyncing(false);
     }
   };
+
+  // NEW: Fetch announcements and other data on mount if student is already logged in
+  useEffect(() => {
+    if (student) {
+        // Load cache first
+        AsyncStorage.getItem('senbet_announcements').then(saved => {
+            if (saved) setAnnouncements(JSON.parse(saved));
+        });
+
+        // Fetch fresh
+        setLoadingAnns(true);
+        Promise.all([
+            supabase.from('announcements').select('*').eq('active', 1).order('date', { ascending: false }),
+            supabase.from('marks').select('*').eq('studentid', student.id),
+            supabase.from('assessments').select('*').eq('grade', student.grade),
+            supabase.from('attendance').select('*').eq('studentid', student.id).order('date', { ascending: false }),
+            supabase.from('subjects').select('*'),
+            supabase.from('settings').select('*'),
+            supabase.from('students').select('*').eq('grade', student.grade)
+        ]).then(([annRes, mRes, aRes, attRes, subRes, setRes, allStudentsRes]) => {
+            if (annRes.data) {
+                setAnnouncements(annRes.data);
+                AsyncStorage.setItem('senbet_announcements', JSON.stringify(annRes.data));
+            }
+            if (mRes.data) setMarks(mRes.data);
+            if (aRes.data) setAssessments(aRes.data);
+            if (attRes.data) setAttendance(attRes.data);
+            if (subRes.data) setSubjects(subRes.data);
+            if (allStudentsRes.data) setAllStudentsInGrade(allStudentsRes.data);
+            if (setRes.data) {
+                const sMap: any = {};
+                setRes.data.forEach((r: any) => { sMap[r.key] = r.value; });
+                setSettings(sMap);
+            }
+            
+            // Also fetch all marks in grade for ranking
+            if (allStudentsRes.data) {
+                const ids = allStudentsRes.data.map(s => s.id);
+                supabase.from('marks').select('*').in('studentid', ids).then(res => {
+                    if (res.data) setAllMarksInGrade(res.data);
+                });
+            }
+        }).finally(() => setLoadingAnns(false));
+    }
+  }, [student?.id]);
 
   const handleLocalUpdateProfile = async () => {
     if (!student) return;
@@ -510,7 +566,7 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
             </TouchableOpacity>
 
             <TouchableOpacity 
-                onPress={() => { setStudent(null); setActiveTab('home'); }} 
+                onPress={handleParentLogout} 
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 24, paddingVertical: 12 }}
             >
                 <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: C.red + '15', justifyContent: 'center', alignItems: 'center' }}>
@@ -521,6 +577,12 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
         </View>
     </ScrollView>
   );
+
+  const handleParentLogout = async () => {
+    setStudent(null);
+    await AsyncStorage.removeItem('senbet_parent_auth');
+    setActiveTab('home');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -548,7 +610,7 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
             <TouchableOpacity onPress={handleSync} disabled={isSyncing} style={{ padding: 8, borderRadius: 10, backgroundColor: C.accent + '10' }}>
               {isSyncing ? <ActivityIndicator size="small" color={C.accent} /> : <RefreshCw size={18} color={C.accent} />}
             </TouchableOpacity>
-             <TouchableOpacity onPress={() => { setStudent(null); setActiveTab('home'); }} style={{ padding: 8, borderRadius: 10, backgroundColor: C.red + '10' }}>
+             <TouchableOpacity onPress={handleParentLogout} style={{ padding: 8, borderRadius: 10, backgroundColor: C.red + '10' }}>
               <LogOut size={18} color={C.red} />
             </TouchableOpacity>
           </View>
