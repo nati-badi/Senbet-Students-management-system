@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { View, Text, ScrollView, RefreshControl } from "react-native";
 import { useTranslation } from "react-i18next";
-import { TrendingUp, BarChart3 } from "lucide-react-native";
+import { TrendingUp, BarChart3, Filter } from "lucide-react-native";
 import {
   Student,
   Assessment,
@@ -9,9 +9,11 @@ import {
   normG,
   normS,
   isConduct,
+  fmtGrade,
 } from "../utils";
 import { computeEthiopianYear } from "../dateUtils";
 import { calculateRankings, calculateGroupAverage } from "../analyticsEngine";
+import { PremiumDropdown } from "./PremiumDropdown";
 
 export const AnalyticsTab = React.memo(
   ({
@@ -36,74 +38,57 @@ export const AnalyticsTab = React.memo(
     subjects: any[];
   }) => {
     const { t } = useTranslation();
-    const assignedGradesRaw =
-      (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
-    const hasTeacherAssignedGrades =
-      Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
+    const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;
+    const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
     const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
-
-    const students = useMemo(
-      () =>
-        allStudents.filter(
-          (st) =>
-            !hasTeacherAssignedGrades ||
-            myGrades.includes(normG(st.grade)) ||
-            myGrades.includes(st.grade),
-        ),
-      [allStudents, hasTeacherAssignedGrades, myGrades],
-    );
-
-    const assessments = useMemo(
-      () =>
-        allAssessments.filter((a) => {
-          const assessmentSubjectName = a.subjectname || (a as any).subjectName;
-          const isGradeMatch =
-            !hasTeacherAssignedGrades ||
-            myGrades.includes(normG(a.grade)) ||
-            myGrades.includes(a.grade);
-          const subject = subjects.find(
-            (sub) => normS(sub.name) === normS(assessmentSubjectName),
-          );
-          const assessmentSemester = subject?.semester || "Semester I";
-          return (
-            isGradeMatch &&
-            !isConduct(a) &&
-            assessmentSemester === (settings.currentSemester || "Semester I")
-          );
-        }),
-      [allAssessments, myGrades, subjects, settings.currentSemester],
-    );
 
     const etYear = computeEthiopianYear();
     const [refreshing, setRefreshing] = useState(false);
+    
+    // Filters
+    const [selectedGrade, setSelectedGrade] = useState<string>(() => {
+      return hasTeacherAssignedGrades ? String(myGrades[0]) : 'All';
+    });
+    const [selectedSemester, setSelectedSemester] = useState<string>(settings.currentSemester || "Semester I");
+    const [selectedSubject, setSelectedSubject] = useState<string>("All");
+
     const handleRefresh = async () => {
       setRefreshing(true);
       if (onRefresh) await onRefresh();
       setRefreshing(false);
     };
 
-    const currentSemester = settings.currentSemester || "Semester I";
+    const students = useMemo(
+      () =>
+        allStudents.filter(
+          (st) => {
+            const isMatchGrade = selectedGrade === 'All' || normG(st.grade) === normG(selectedGrade);
+            return isMatchGrade && (!hasTeacherAssignedGrades || myGrades.some(mg => normG(mg) === normG(st.grade)));
+          }
+        ),
+      [allStudents, hasTeacherAssignedGrades, myGrades, selectedGrade],
+    );
 
-    // Use a cumulative assessment set for rankings and school average:
-    // If we are in Semester II, include Semester I to match standard report card rules.
     const semesterAssessments = useMemo(
       () =>
         allAssessments.filter((a) => {
           const assessmentSubjectName = a.subjectname || (a as any).subjectName;
           const assessmentGradeNorm = normG(a.grade);
           
-          const isGradeMatch =
-            !hasTeacherAssignedGrades ||
-            myGrades.some(mg => normG(mg) === assessmentGradeNorm || mg === a.grade);
+          const isGradeMatch = selectedGrade === 'All' || assessmentGradeNorm === normG(selectedGrade);
+          const isTeacherMatch = !hasTeacherAssignedGrades || myGrades.some(mg => normG(mg) === assessmentGradeNorm);
 
-          if (!isGradeMatch || isConduct(a)) return false;
+          if (!isGradeMatch || !isTeacherMatch || isConduct(a)) return false;
+
+          const isSubjectMatch = selectedSubject === 'All' || normS(assessmentSubjectName) === normS(selectedSubject);
+          if (!isSubjectMatch) return false;
 
           const subject = subjects.find(
             (sub) => normS(sub.name) === normS(assessmentSubjectName),
           );
           const subjSem = subject?.semester || "Semester I";
 
-          if (currentSemester === "Semester I") {
+          if (selectedSemester === "Semester I") {
             return subjSem === "Semester I";
           }
           // Semester II is cumulative
@@ -113,10 +98,32 @@ export const AnalyticsTab = React.memo(
         allAssessments,
         myGrades,
         subjects,
-        currentSemester,
+        selectedSemester,
+        selectedGrade,
+        selectedSubject,
         hasTeacherAssignedGrades,
       ],
     );
+
+    // Derived filters
+    const gradeOptions = useMemo(() => {
+        const base = hasTeacherAssignedGrades ? myGrades : [...new Set(allStudents.map(s => s.grade))];
+        return base.map(g => ({ key: String(g), label: fmtGrade(g) }));
+    }, [hasTeacherAssignedGrades, myGrades, allStudents]);
+
+    const subjectOptions = useMemo(() => {
+        const filteredSubs = subjects.filter(s => s.semester === selectedSemester);
+        const uniqueNames = [...new Set(filteredSubs.map(s => s.name))];
+        return [
+            { key: 'All', label: t('admin.allSubjects', 'All Subjects') },
+            ...uniqueNames.map(n => ({ key: n, label: n }))
+        ];
+    }, [subjects, selectedSemester, t]);
+
+    const semesterOptions = [
+        { key: 'Semester I', label: t('admin.semester1', 'Semester I') },
+        { key: 'Semester II', label: t('admin.semester2', 'Semester II') }
+    ];
 
     const studentStats = useMemo(() => {
       // Only include students visible to this teacher
@@ -151,10 +158,49 @@ export const AnalyticsTab = React.memo(
           />
         }
       >
-        <View style={{ marginBottom: 24 }}>
-          <Text style={{ color: C.muted, fontSize: 13, fontWeight: "600" }}>
-            📅 {etYear} E.C. • {currentSemester}
-          </Text>
+        <View style={{ marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Filter size={14} color={C.accent} style={{ marginRight: 6 }} />
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '800' }}>{t('common.filters', 'Analytics Filters')}</Text>
+          </View>
+          
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1.2 }}>
+              <PremiumDropdown 
+                label={t('admin.grade', 'Grade')} 
+                placeholder={t('admin.selectGrade', 'Select Grade')} 
+                items={gradeOptions} 
+                selectedKey={selectedGrade} 
+                onSelect={setSelectedGrade} 
+                C={C} s={s} 
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <PremiumDropdown 
+                label={t('admin.semester', 'Semester')} 
+                placeholder={t('admin.selectSemester', 'Select Sem')} 
+                items={semesterOptions} 
+                selectedKey={selectedSemester} 
+                onSelect={setSelectedSemester} 
+                C={C} s={s} 
+              />
+            </View>
+          </View>
+          
+          <PremiumDropdown 
+            label={t('admin.subject', 'Subject')} 
+            placeholder={t('admin.allSubjects', 'All Subjects')} 
+            items={subjectOptions} 
+            selectedKey={selectedSubject} 
+            onSelect={setSelectedSubject} 
+            C={C} s={s} 
+          />
+          
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: C.accent + '10', padding: 8, borderRadius: 12 }}>
+            <Text style={{ color: C.muted, fontSize: 11, fontWeight: "700" }}>
+              📅 {etYear} E.C. • {selectedSemester} • {selectedGrade === 'All' ? t('admin.overall', 'Overall') : fmtGrade(selectedGrade)}
+            </Text>
+          </View>
         </View>
 
         <View style={[s.dashboardCard, { borderRadius: 24, padding: 20 }]}>
@@ -258,7 +304,7 @@ export const AnalyticsTab = React.memo(
               {t("teacher.classTrend")}
             </Text>
           </View>
-          {assessments.slice(0, 5).map((ass, i) => {
+          {semesterAssessments.slice(0, 5).map((ass, i) => {
             const aMarks = marks.filter(
               (m) => (m.assessmentid || m.assessmentId) === ass.id,
             );
@@ -308,7 +354,7 @@ export const AnalyticsTab = React.memo(
               </View>
             );
           })}
-          {assessments.length === 0 && (
+          {semesterAssessments.length === 0 && (
             <Text style={[s.empty, { marginTop: 20 }]}>
               {t("teacher.noAssData")}
             </Text>
