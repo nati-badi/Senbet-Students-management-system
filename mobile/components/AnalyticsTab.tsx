@@ -120,10 +120,10 @@ export const AnalyticsTab = React.memo(
         ];
     }, [subjects, selectedSemester, t]);
 
-    const semesterOptions = [
-        { key: 'Semester I', label: t('admin.semester1', 'Semester I') },
-        { key: 'Semester II', label: t('admin.semester2', 'Semester II') }
-    ];
+    const semesterOptions = useMemo(() => [
+        { key: 'Semester I', label: t('admin.semester1') },
+        { key: 'Semester II', label: t('admin.semester2') }
+    ], [t]);
 
     const studentStats = useMemo(() => {
       // Only include students visible to this teacher
@@ -161,14 +161,14 @@ export const AnalyticsTab = React.memo(
         <View style={{ marginBottom: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
             <Filter size={14} color={C.accent} style={{ marginRight: 6 }} />
-            <Text style={{ color: C.text, fontSize: 13, fontWeight: '800' }}>{t('common.filters', 'Analytics Filters')}</Text>
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '800' }}>{t('common.filters')}</Text>
           </View>
           
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1.2 }}>
               <PremiumDropdown 
-                label={t('admin.grade', 'Grade')} 
-                placeholder={t('admin.selectGrade', 'Select Grade')} 
+                label={t('admin.grade')} 
+                placeholder={t('admin.selectGrade')} 
                 items={gradeOptions} 
                 selectedKey={selectedGrade} 
                 onSelect={setSelectedGrade} 
@@ -177,8 +177,8 @@ export const AnalyticsTab = React.memo(
             </View>
             <View style={{ flex: 1 }}>
               <PremiumDropdown 
-                label={t('admin.semester', 'Semester')} 
-                placeholder={t('admin.selectSemester', 'Select Sem')} 
+                label={t('admin.semester')} 
+                placeholder={t('admin.selectSemester')} 
                 items={semesterOptions} 
                 selectedKey={selectedSemester} 
                 onSelect={setSelectedSemester} 
@@ -188,8 +188,8 @@ export const AnalyticsTab = React.memo(
           </View>
           
           <PremiumDropdown 
-            label={t('admin.subject', 'Subject')} 
-            placeholder={t('admin.allSubjects', 'All Subjects')} 
+            label={t('admin.subject')} 
+            placeholder={t('admin.allSubjects')} 
             items={subjectOptions} 
             selectedKey={selectedSubject} 
             onSelect={setSelectedSubject} 
@@ -198,7 +198,7 @@ export const AnalyticsTab = React.memo(
           
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: C.accent + '10', padding: 8, borderRadius: 12 }}>
             <Text style={{ color: C.muted, fontSize: 11, fontWeight: "700" }}>
-              📅 {etYear} E.C. • {selectedSemester} • {selectedGrade === 'All' ? t('admin.overall', 'Overall') : fmtGrade(selectedGrade)}
+              📅 {etYear} E.C. • {selectedSemester === 'Semester I' ? t('admin.semester1') : t('admin.semester2')} • {selectedGrade === 'All' ? t('admin.overall') : fmtGrade(selectedGrade)}
             </Text>
           </View>
         </View>
@@ -225,7 +225,7 @@ export const AnalyticsTab = React.memo(
           </View>
           <Text
             style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}
-          >{`Average ${studentStats.length ? schoolAverage.toFixed(1) : 0}%`}</Text>
+          >{`${t('admin.average')}: ${studentStats.length ? schoolAverage.toFixed(1) : 0}%`}</Text>
           {studentStats.slice(0, 5).map((st, i) => {
             const rank = 1 + studentStats.filter(s => s.perc > st.perc).length;
             return (

@@ -106,6 +106,7 @@ const resources = {
         "saveSuccess": "Saved successfully!",
         "language": "Language",
         "settings": "Settings",
+        "filters": "Analytics Filters",
         "welcome": "Welcome back",
         "goodMorning": "Good Morning",
         "goodAfternoon": "Good Afternoon",
@@ -239,7 +240,17 @@ const resources = {
       "admin": {
         "studentName": "Student Full Name",
         "baptismalName": "Baptismal Name",
-        "parentContact": "Parent Contact"
+        "parentContact": "Parent Contact",
+        "grade": "Grade",
+        "selectGrade": "Select Grade",
+        "semester": "Semester",
+        "selectSemester": "Select Semester",
+        "semester1": "Semester I",
+        "semester2": "Semester II",
+        "subject": "Subject",
+        "allSubjects": "All Subjects",
+        "overall": "Overall",
+        "average": "Average"
       }
     }
   },
@@ -346,6 +357,7 @@ const resources = {
         "saveSuccess": "በተሳካ ሁኔታ ተቀምጧል!",
         "language": "ቋንቋ",
         "settings": "ቅንብሮች",
+        "filters": "የትንታኔ ማጣሪያዎች",
         "welcome": "እንኳን ደህና መጡ",
         "goodMorning": "እንደምን አደሩ",
         "goodAfternoon": "እንደምን ዋሉ",
@@ -479,7 +491,17 @@ const resources = {
       "admin": {
         "studentName": "የተማሪው ሙሉ ስም",
         "baptismalName": "የክርስትና ስም",
-        "parentContact": "የወላጅ ስልክ"
+        "parentContact": "የወላጅ ስልክ",
+        "grade": "ክፍል",
+        "selectGrade": "ክፍል ይምረጡ",
+        "semester": "መንፈቀ ትምህርት",
+        "selectSemester": "መንፈቀ ትምህርት ይምረጡ",
+        "semester1": "1ኛው መንፈቅ ዓመት",
+        "semester2": "2ኛው መንፈቅ ዓመት",
+        "subject": "የትምህርት ዓይነት",
+        "allSubjects": "ሁሉም የትምህርት ዓይነቶች",
+        "overall": "አጠቃላይ",
+        "average": "አማካይ"
       }
     }
   }
