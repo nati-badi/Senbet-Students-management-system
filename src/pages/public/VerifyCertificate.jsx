@@ -141,17 +141,18 @@ export default function VerifyCertificate() {
       await new Promise(r => setTimeout(r, 500));
 
       const canvas = await html2canvas(hiddenCertRef.current, {
-        scale: 2.5, // High resolution
+        scale: 2, // Sufficient resolution for A4
         useCORS: true,
-        allowTaint: false,
-        logging: false,
+        allowTaint: true,
+        logging: true, // Enable for debugging if needed
         backgroundColor: '#ffffff',
-        width: 210 * 3.7795, // Force pixel width for A4
-        height: 297 * 3.7795,
         onclone: (clonedDoc) => {
-            // Ensure the cloned element is visible for the capture engine
             const el = clonedDoc.getElementById('hidden-cert-capture');
-            if (el) el.style.display = 'flex';
+            if (el) {
+                el.style.visibility = 'visible';
+                el.style.opacity = '1';
+                el.style.position = 'static';
+            }
         }
       });
 
@@ -206,9 +207,11 @@ export default function VerifyCertificate() {
   // SHARED CERTIFICATE COMPONENT TO ENSURE PREVIEW AND HIDDEN CAPTURE ARE IDENTICAL
   const CertificateContent = ({ isCapture = false }) => (
     <div className="cert-body" style={{
-        width: '210mm', minHeight: '297mm', background: 'linear-gradient(180deg, #FAFAFA 0%, #F5F5F0 100%)',
+        width: isCapture ? '794px' : '210mm', // 210mm at 96dpi is ~794px
+        minHeight: isCapture ? '1123px' : '297mm', // 297mm at 96dpi is ~1123px
+        background: 'linear-gradient(180deg, #FAFAFA 0%, #F5F5F0 100%)',
         padding: '24px', display: 'flex', flexDirection: 'column', position: 'relative', color: '#1A1A1A',
-        boxSizing: 'border-box', border: isCapture ? 'none' : 'none'
+        boxSizing: 'border-box', border: 'none'
     }}>
         {/* Borders */}
         <div style={{ position: 'absolute', inset: '12px', border: '2.5px solid #C9A227', pointerEvents: 'none' }} />
@@ -350,7 +353,7 @@ export default function VerifyCertificate() {
       </button>
 
       {/* HIDDEN FULL-SCALE CERTIFICATE FOR CAPTURE (Essential for Quality) */}
-      <div style={{ position: 'absolute', top: '-10000px', left: '-10000px', visibility: 'hidden' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
         <div ref={hiddenCertRef} id="hidden-cert-capture" style={{ display: 'flex' }}>
             <CertificateContent isCapture={true} />
         </div>
