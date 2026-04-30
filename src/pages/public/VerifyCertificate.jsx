@@ -140,18 +140,29 @@ export default function VerifyCertificate() {
       // Small delay to ensure hidden div is properly rendered
       await new Promise(r => setTimeout(r, 500));
 
-      const canvas = await html2canvas(hiddenCertRef.current, {
-        scale: 2, // Sufficient resolution for A4
+      // Reset scroll to 0 to avoid capture offsets
+      window.scrollTo(0, 0);
+
+      const captureEl = hiddenCertRef.current;
+      if (!captureEl) throw new Error("Capture element not found");
+
+      const canvas = await html2canvas(captureEl, {
+        scale: 2,
         useCORS: true,
         allowTaint: true,
-        logging: true, // Enable for debugging if needed
         backgroundColor: '#ffffff',
+        logging: true,
+        scrollX: 0,
+        scrollY: 0,
         onclone: (clonedDoc) => {
-            const el = clonedDoc.getElementById('hidden-cert-capture');
+            const el = clonedDoc.getElementById('cert-capture-target');
             if (el) {
-                el.style.visibility = 'visible';
-                el.style.opacity = '1';
+                // Remove all scaling/transforms for the capture document
+                el.style.transform = 'none';
+                el.style.margin = '0';
                 el.style.position = 'static';
+                el.style.width = '210mm';
+                el.style.height = '297mm';
             }
         }
       });
@@ -352,16 +363,21 @@ export default function VerifyCertificate() {
         {downloading ? <Spin size="small" /> : <DownloadOutlined style={{ fontSize: '28px' }} />}
       </button>
 
-      {/* HIDDEN FULL-SCALE CERTIFICATE FOR CAPTURE (Essential for Quality) */}
-      <div style={{ position: 'fixed', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
-        <div ref={hiddenCertRef} id="hidden-cert-capture" style={{ display: 'flex' }}>
-            <CertificateContent isCapture={true} />
-        </div>
-      </div>
 
-      {/* VISIBLE SCALED PREVIEW */}
+
+      {/* VISIBLE SCALED PREVIEW (Used for both viewing and high-res capture) */}
       <div className="flex-1 w-full flex flex-col items-center pt-8 pb-24 px-2">
-        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top center', marginBottom: `calc(297mm * ${1 - scale} * -1)` }}>
+        <div 
+          ref={hiddenCertRef}
+          id="cert-capture-target"
+          style={{ 
+            transform: `scale(${scale})`, 
+            transformOrigin: 'top center', 
+            marginBottom: `calc(297mm * ${1 - scale} * -1)`,
+            backgroundColor: 'white',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.1)'
+          }}
+        >
           <CertificateContent />
         </div>
       </div>
