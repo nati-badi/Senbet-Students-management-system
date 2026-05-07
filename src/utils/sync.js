@@ -266,6 +266,15 @@ export async function syncData({ force = false } = {}) {
                         if (error) {
                             console.error(`Failed to push deletions for ${tName}:`, error);
                         } else {
+                            // Record the deletion in the cloud tombstone table so other clients can sync it
+                            const tombstones = idsToDelete.map(rid => ({
+                                table_name: tName,
+                                record_id: rid,
+                                deleted_at: new Date().toISOString()
+                            }));
+                            const { error: tombError } = await supabase.from('deleted_records').insert(tombstones);
+                            if (tombError) console.warn("Failed to record cloud tombstones:", tombError);
+
                             const dIds = dRecords.map(d => d.id);
                             await db.deleted_records.bulkDelete(dIds);
                             console.log(`Successfully pushed ${idsToDelete.length} deletions to ${tName}`);

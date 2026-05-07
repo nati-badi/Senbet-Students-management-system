@@ -235,6 +235,15 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       if (toDeleteIds.length > 0) {
         const { error } = await supabase.from('marks').delete().in('id', toDeleteIds);
         if (error) throw error;
+
+        // Record the deletion in the cloud tombstone table so other clients can sync it
+        const tombstones = toDeleteIds.map(rid => ({
+          table_name: 'marks',
+          record_id: rid,
+          deleted_at: new Date().toISOString()
+        }));
+        const { error: tombError } = await supabase.from('deleted_records').insert(tombstones);
+        if (tombError) console.warn("Failed to record cloud tombstones:", tombError);
       }
 
       showToast?.('✅ Marks saved successfully', 'success');

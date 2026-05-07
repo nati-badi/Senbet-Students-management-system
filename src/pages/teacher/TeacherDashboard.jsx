@@ -780,6 +780,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                 for (const old of allExisting) {
                     idsToDelete.push(old.id);
                     await db.marks.delete(old.id);
+                    await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'marks', recordId: old.id });
                 }
 
                 const isCleared = value === '' || value === null || value === undefined;
@@ -788,6 +789,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     if (existingMark) {
                         idsToDelete.push(existingMark.id);
                         await db.marks.delete(existingMark.id);
+                        await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'marks', recordId: existingMark.id });
                     }
                     continue;
                 }

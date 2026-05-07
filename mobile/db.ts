@@ -228,6 +228,24 @@ export const insertSubjects = (subjects: any[]) => {
   }
 };
 
+export const deleteRecords = (tableName: string, ids: string[]) => {
+  const database = getDB();
+  if (!database || !ids || ids.length === 0) return;
+  const statement = database.prepareSync(`DELETE FROM ${tableName} WHERE id = ?`);
+  try {
+    database.withTransactionSync(() => {
+      for (const id of ids) {
+        statement.executeSync([id]);
+      }
+    });
+    console.log(`🗑️ Deleted ${ids.length} records from ${tableName} in SQLite`);
+  } catch (error) {
+    console.error(`❌ Failed to delete from ${tableName}:`, error);
+  } finally {
+    statement.finalizeSync();
+  }
+};
+
 export const insertSettings = (settings: any[]) => {
   const database = getDB();
   if (!database || !settings || settings.length === 0) return;

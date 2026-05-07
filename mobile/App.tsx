@@ -12,7 +12,7 @@ import { supabase } from './supabase';
 import { formatEthiopianDate, formatEthiopianTime, computeEthiopianYear } from './dateUtils';
 import { useTranslation } from 'react-i18next';
 import './i18n';
-import { initDB, clearDB, insertStudents, insertAssessments, insertMarks, insertAttendance, insertSubjects, insertSettings, getAllStudents, getAllAssessments, getAllMarks, getAllAttendance, getAllSubjects, getAllSettings } from './db';
+import { initDB, clearDB, insertStudents, insertAssessments, insertMarks, insertAttendance, insertSubjects, insertSettings, deleteRecords, getAllStudents, getAllAssessments, getAllMarks, getAllAttendance, getAllSubjects, getAllSettings } from './db';
 
 // Premium Navigation
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
@@ -321,6 +321,18 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
       };
 
       const isWeb = Platform.OS === 'web';
+
+      // Explicitly purge deleted records from local SQLite on native
+      if (!isWeb && deletions.length > 0) {
+        const syncTables = ['students', 'assessments', 'marks', 'attendance', 'subjects'];
+        syncTables.forEach(t => {
+          const tableDeletions = deletions.filter((d: any) => d.table_name === t);
+          if (tableDeletions.length > 0) {
+            const delIds = tableDeletions.map((d: any) => d.record_id);
+            deleteRecords(t, delIds);
+          }
+        });
+      }
 
       setStudents(prev => {
         const next = applySync(prev, (sRes.status === 'fulfilled' ? sRes.value.data : null), 'students');
