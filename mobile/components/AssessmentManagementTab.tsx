@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, FileText, Edit, Trash2 } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../supabase';
-import { Student, Assessment, Teacher, normG, normS, generateUUID, fmtGrade } from '../utils';
+import { Student, Assessment, Teacher, normG, normS, generateUUID, fmtGrade, getSubj, getMax } from '../utils';
 import { PremiumDropdown } from './PremiumDropdown';
 import { useToast } from './ToastContext';
 
@@ -18,8 +18,12 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
 
   const myAssessments = useMemo(() => allAssessments.filter(a =>
     myGrades.some((g: string) => normG(g) === normG(a.grade)) &&
-    mySubjects.some((sub: string) => normS(sub) === normS(a.subjectname))
-  ), [allAssessments, myGrades, mySubjects]);
+    mySubjects.some((sub: string) => normS(sub) === normS(getSubj(a)))
+  ).sort((a, b) => {
+    const dA = a.date ? new Date(a.date).getTime() : 0;
+    const dB = b.date ? new Date(b.date).getTime() : 0;
+    return dB - dA;
+  }), [allAssessments, myGrades, mySubjects]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState('');
@@ -39,9 +43,26 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
     if (mySubjects.length === 1 && !selectedSubject) setSelectedSubject(mySubjects[0]);
   }, [myGrades, mySubjects]);
 
+  const filteredSubjects = useMemo(() => {
+    const allowed = new Map<string, string>();
+    const subjectsInGrade = subjects.filter(s => normG(s.grade) === normG(selectedGrade));
+    const activeSemester = settings.currentSemester || 'Semester I';
+
+    (mySubjects || []).forEach((subj: string) => {
+      const key = normS(subj);
+      const metadata = subjectsInGrade.find(s => normS(s.name) === key);
+      
+      if (metadata && metadata.semester === activeSemester && !allowed.has(key)) {
+        allowed.set(key, subj);
+      }
+    });
+
+    return [...allowed.entries()].map(([key, label]) => ({ key, label }));
+  }, [mySubjects, subjects, selectedGrade, settings.currentSemester]);
+
   const filteredAssessments = useMemo(() => myAssessments.filter(a => {
     if (selectedGrade && normG(a.grade) !== normG(selectedGrade)) return false;
-    if (selectedSubject && normS(a.subjectname) !== normS(selectedSubject)) return false;
+    if (selectedSubject && normS(getSubj(a)) !== normS(selectedSubject)) return false;
     return true;
   }), [myAssessments, selectedGrade, selectedSubject]);
 
@@ -55,9 +76,9 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
 
   const handleEdit = (a: Assessment) => {
     setSelectedGrade(a.grade);
-    setSelectedSubject(a.subjectname);
+    setSelectedSubject(getSubj(a));
     setName(a.name);
-    setMaxScore(String(a.maxscore));
+    setMaxScore(String(getMax(a)));
     setEditingId(a.id);
     setModalError(null);
     setModalVisible(true);
@@ -82,8 +103,10 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
         id: editingId || generateUUID(),
         name: name.trim(),
         subjectname: selectedSubject,
+        subjectName: selectedSubject, // Save both variants for consistency
         grade: selectedGrade,
         maxscore: ms,
+        maxScore: ms, // Save both variants
         date: new Date().toISOString().split('T')[0],
         updated_at: new Date().toISOString()
       };
@@ -162,7 +185,7 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
             <View key={a.id} style={[s.dashboardCard, { borderRadius: 16, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center' }]}>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: C.text, fontWeight: '700', fontSize: 15 }}>{a.name}</Text>
-                <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{a.subjectname} • {fmtGrade(a.grade)} • Max: {a.maxscore}</Text>
+                <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{getSubj(a)} • {fmtGrade(a.grade)} • Max: {getMax(a)}</Text>
               </View>
               <TouchableOpacity onPress={() => handleEdit(a)} style={{ padding: 10, marginRight: 4, backgroundColor: C.accent + '10', borderRadius: 10 }}>
                 <Edit size={18} color={C.accent} />
@@ -203,14 +226,14 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
                     placeholder={t('common.selectGrade')} 
                     items={myGrades.map((g: string) => ({ key: g, label: fmtGrade(g) }))} 
                     selectedKey={selectedGrade} 
-                    onSelect={setSelectedGrade} 
+                    onSelect={(key: string) => { setSelectedGrade(key); setSelectedSubject(''); }} 
                     C={C} s={s} 
                   />
 
                   <PremiumDropdown 
                     label={t('assessment.subject')} 
                     placeholder={t('common.selectSubject')} 
-                    items={mySubjects.map((sub: string) => ({ key: sub, label: sub }))} 
+                    items={filteredSubjects} 
                     selectedKey={selectedSubject} 
                     onSelect={setSelectedSubject} 
                     C={C} s={s} 

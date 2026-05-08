@@ -173,7 +173,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                     <span className="text-slate-500">{t('admin.viewPerformingStudents', 'View top-performing students and class statistics.')}</span>
                 </div>
                 
-                <Space className="bg-white dark:bg-slate-900 p-2 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                <Space className="bg-white dark:bg-slate-900 p-2 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-x-auto w-full max-w-full sm:w-auto hide-scrollbar">
                     <Select 
                         value={selectedSemester} 
                         onChange={setSelectedSemester} 
@@ -192,9 +192,19 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                         showSearch
                     >
                         <Option value="All">{t('admin.allSubjects')}</Option>
-                        {[...new Set(subjects.filter(s => s.semester === selectedSemester).map(s => s.name))].map(sub => (
-                            <Option key={sub} value={sub}>{sub}</Option>
-                        ))}
+                        {(() => {
+                            const mySubKeys = isTeacherView && teacher?.assignedSubjects ? new Set(teacher.assignedSubjects.map(s => normalizeSubject(s))) : null;
+                            const filtered = subjects.filter(s => {
+                                const matchesSem = s.semester === selectedSemester;
+                                const matchesGrade = selectedGrade === 'All' || normalizeGrade(s.grade) === normalizeGrade(selectedGrade);
+                                const matchesTeacher = !mySubKeys || mySubKeys.has(normalizeSubject(s.name));
+                                return matchesSem && matchesGrade && matchesTeacher;
+                            });
+                            const uniqueNames = [...new Set(filtered.map(s => s.name))];
+                            return uniqueNames.map(sub => (
+                                <Option key={sub} value={sub}>{sub}</Option>
+                            ));
+                        })()}
                     </Select>
                     <Divider type="vertical" className="h-6" />
                     <Select 
@@ -284,6 +294,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
                         dataSource={top10Students}
                         rowKey="id"
                         pagination={false}
+                        scroll={{ x: 'max-content' }}
                         className="leaderboard-table"
                     />
                 ) : (

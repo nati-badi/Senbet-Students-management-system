@@ -61,6 +61,8 @@ const resources = {
                 "priority_high": "High"
             },
             "admin": {
+                "portal": "Admin Portal",
+                "management": "System Management",
                 "successGenText": "Successfully generated documents for",
                 "fileSaveText": "Your PDF file",
                 "savedToComputer": "has been downloaded to your computer.",
@@ -646,6 +648,8 @@ const resources = {
                 "priority_high": "ከፍተኛ"
             },
             "admin": {
+                "portal": "የአስተዳዳሪ ማዕከል",
+                "management": "የስርዓት አስተዳደር",
                 "successGenText": "የሚከተሉትን ተማሪዎች ሰነድ በተሳካ ሁኔታ ተፈጥሯል፡",
                 "fileSaveText": "የእርስዎ PDF ፋይል",
                 "savedToComputer": "ወደ ኮምፒውተርዎ ወርዷል።",

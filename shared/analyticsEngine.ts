@@ -218,7 +218,8 @@ export const calculateSubjectRows = (
     return isTargetGrade && !isConductAssessment(a);
   });
 
-  const uniqueSubjectNames = [...new Set(gradeAssessments.map(a => a.subjectName || a.subjectname))].sort();
+  const relevantSubjects = subjects.filter(s => normalizeGrade(s.grade) === gradeNorm);
+  const uniqueSubjectNames = [...new Set(relevantSubjects.map(s => s.name))].sort();
 
   return uniqueSubjectNames.map(subName => {
     // Pre-index student marks for this subject lookup

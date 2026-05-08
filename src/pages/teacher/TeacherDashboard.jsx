@@ -97,21 +97,21 @@ const EthiopicClockWidget = () => {
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[60px] -mr-32 -mt-32 rounded-full" />
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-rose-500/5 blur-[40px] -ml-24 -mb-24 rounded-full" />
                 
-                <div className="relative flex flex-col md:flex-row items-center justify-between py-10 px-12 gap-8 md:gap-4">
+                <div className="relative flex flex-col md:flex-row items-center justify-between py-6 px-8 lg:py-10 lg:px-12 gap-8 md:gap-4">
                     <div className="flex flex-col items-center md:items-start">
                         <div className="flex items-baseline gap-3">
-                            <span className="text-7xl font-black tracking-tighter bg-gradient-to-br from-slate-800 to-slate-500 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">
+                            <span className="text-5xl lg:text-7xl font-black tracking-tighter bg-gradient-to-br from-slate-800 to-slate-500 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">
                                 {etTime}
                             </span>
-                            <span className="text-2xl text-indigo-500 dark:text-indigo-400 font-bold uppercase tracking-widest">{etSuffix}</span>
+                            <span className="text-xl lg:text-2xl text-indigo-500 dark:text-indigo-400 font-bold uppercase tracking-widest">{etSuffix}</span>
                         </div>
                     </div>
 
                     <div className="hidden md:block w-px h-24 bg-gradient-to-b from-transparent via-slate-200 dark:via-slate-700 to-transparent mx-8 opacity-50"></div>
 
                     <div className="flex flex-col items-center md:items-end text-right">
-                        <span className="text-3xl text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.2em] mb-2">{ethDayName}</span>
-                        <span className="text-5xl font-black tracking-tight text-slate-800 dark:text-white">{ethpoianDateStr}</span>
+                        <span className="text-xl lg:text-3xl text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.2em] mb-2">{ethDayName}</span>
+                        <span className="text-3xl lg:text-5xl font-black tracking-tight text-slate-800 dark:text-white">{ethpoianDateStr}</span>
                         <div className="mt-4 flex items-center gap-2">
                              <div className="h-1 w-12 bg-rose-500/30 rounded-full" />
                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ፍኖተ ብርሃን ሰ/ቤት</span>
@@ -128,6 +128,7 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
     const navigate = useNavigate();
     const { message, notification, modal } = App.useApp();
     const [profileStudentId, setProfileStudentId] = useState(null);
+    const [isDrawerVisible, setIsDrawerVisible] = useState(false);
 
     const [syncKey, setSyncKey] = useState(0);
     useEffect(() => {
@@ -211,11 +212,13 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
     return (
         <div className="flex flex-col w-full gap-4 pt-4">
             <EthiopicClockWidget />
-            <div className="relative p-8 rounded-[2.5rem] bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm overflow-hidden mb-6">
+            <div className="glass-header mb-6">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-400/5 blur-[40px] -mr-32 -mt-32 rounded-full" />
-                <div className="relative flex flex-col md:flex-row md:items-center gap-8">
-                    <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/30 rounded-2xl flex items-center justify-center border border-indigo-100/50 dark:border-indigo-800/30 shrink-0">
-                        <UserOutlined className="text-2xl text-indigo-500/80" />
+                <div className="relative flex flex-col md:flex-row md:items-center gap-6 lg:gap-8">
+                    <div className="flex items-center justify-between w-full md:w-auto">
+                        <div className="w-12 h-12 lg:w-16 lg:h-16 bg-indigo-50 dark:bg-indigo-950/30 rounded-2xl flex items-center justify-center border border-indigo-100/50 dark:border-indigo-800/30 shrink-0">
+                            <UserOutlined className="text-xl lg:text-2xl text-indigo-500/80" />
+                        </div>
                     </div>
                     
                     <div className="flex-1 min-w-0">
@@ -223,7 +226,7 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
                             {t('teacher.signedInAs', 'Signed in as')}
                         </span>
                         <div className="flex items-center gap-4 flex-wrap">
-                            <h2 className="text-3xl font-black text-slate-800 dark:text-white m-0 tracking-tighter">
+                            <h2 className="text-2xl lg:text-3xl font-black text-slate-800 dark:text-white m-0 tracking-tighter">
                                 {activeTeacher.name}
                             </h2>
                             <Tag className="rounded-full border-none bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-black px-4 py-1 text-[10px] uppercase tracking-widest shadow-sm">
@@ -269,9 +272,30 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
 
             {/* Desktop: Sidebar + Content */}
             <Layout className="bg-transparent">
+                <Modal
+                    title={t('teacher.menu')}
+                    open={isDrawerVisible}
+                    onCancel={() => setIsDrawerVisible(false)}
+                    footer={null}
+                    className="lg:hidden"
+                    width={280}
+                    style={{ top: 20, left: 20, margin: 0 }}
+                >
+                    <Menu
+                        mode="inline"
+                        selectedKeys={[location.pathname]}
+                        items={menuItems}
+                        onClick={({ key }) => {
+                            navigate(key);
+                            setIsDrawerVisible(false);
+                        }}
+                        className="border-none teacher-sidebar"
+                    />
+                </Modal>
+
                 <Sider
                     width={240}
-                    className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden lg:block overflow-hidden"
+                    className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-4 lg:mr-6 hidden lg:block overflow-hidden"
                 >
                     <div className="teacher-sidebar">
                         <div style={{ padding: '16px' }}>
@@ -561,16 +585,24 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
             (allowedSubjects.length === 0 || normalizedAllowedSubjects.includes(normalizeSubject(rawSubj)));
     });
 
-    // Build subject dropdown options directly from the teacher-assigned subject list
-    // (like the desktop "SUBJECTS:" box). Assessments will be filtered separately by grade/semester.
-    const allowedSubjectKeyToLabel = new Map();
-    (allowedSubjects || []).forEach((s) => {
-        const key = normalizeSubject(s);
-        if (!key) return;
-        if (!allowedSubjectKeyToLabel.has(key)) allowedSubjectKeyToLabel.set(key, s);
-    });
-    const subjectOptions = [...allowedSubjectKeyToLabel.entries()]
-        .map(([key, label]) => ({ value: key, label }));
+    // Build subject dropdown options strictly filtered by the selected grade
+    const subjectOptions = useMemo(() => {
+        if (!selectedGrade) return [];
+        
+        const mySubKeys = new Set((allowedSubjects || []).map(s => normalizeSubject(s)));
+        const filteredSubs = allSubjects.filter(s => 
+            normalizeGrade(s.grade) === normalizeGrade(selectedGrade) && 
+            (allowedSubjects.length === 0 || mySubKeys.has(normalizeSubject(s.name)))
+        );
+        
+        const uniqueNames = new Map();
+        filteredSubs.forEach(s => {
+            const key = normalizeSubject(s.name);
+            if (!uniqueNames.has(key)) uniqueNames.set(key, s.name);
+        });
+
+        return [...uniqueNames.entries()].map(([value, label]) => ({ value, label }));
+    }, [allSubjects, allowedSubjects, selectedGrade]);
 
     const filteredAssessments = selectedSubject
         ? assessmentsForGrade.filter(a => normalizeSubject(a.subjectName) === selectedSubject)

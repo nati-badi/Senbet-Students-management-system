@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import { useCameraPermissions } from 'expo-camera';
 import { formatEthiopianDate } from '../dateUtils';
 import { supabase } from '../supabase';
-import { Student, Teacher, normG, fmtGrade, generateUUID } from '../utils';
+import { Student, Teacher, normG, fmtGrade, generateUUID, getSubj } from '../utils';
 import { useToast } from './ToastContext';
 
 export const AttendanceTab = React.memo(({ route, navigation, teacher, students: allStudents, attendanceData, setAttendanceData, onRefresh, C, s, settings }: {
@@ -21,7 +21,11 @@ export const AttendanceTab = React.memo(({ route, navigation, teacher, students:
   const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
   
   const students = useMemo(() => 
-    allStudents.filter(st => st.archived !== 1 && (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))),
+    allStudents.filter(st => 
+      st.archived !== 1 && 
+      !getSubj(st) && // Safety: exclude assessments
+      (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))
+    ),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
 

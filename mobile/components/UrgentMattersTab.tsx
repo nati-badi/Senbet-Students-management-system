@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Users, BarChart3, TrendingUp } from 'lucide-react-native';
-import { Student, Assessment, Teacher, normG, normS, isConduct, fmtGrade } from '../utils';
+import { Student, Assessment, Teacher, normG, normS, isConduct, fmtGrade, getSubj, getMax } from '../utils';
 import { getEthiopianYear } from '../dateUtils';
 
 export const UrgentMattersTab = React.memo(({ navigation, teacher, students: allStudents, assessments: allAssessments, marksData, subjects, settings, C, s, onRefresh }: {
@@ -17,15 +17,19 @@ export const UrgentMattersTab = React.memo(({ navigation, teacher, students: all
   const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
 
   const students = useMemo(() => 
-    allStudents.filter(st => st.archived !== 1 && (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))),
+    allStudents.filter(st => 
+      st.archived !== 1 && 
+      !getSubj(st) && // Safety: exclude assessments
+      (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))
+    ),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
   
   const assessments = useMemo(() => 
     allAssessments.filter(a => {
       const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
-      const isSubjectMatch = !hasTeacherAssignedSubjects || mySubjects.includes(a.subjectname);
-      const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
+      const isSubjectMatch = !hasTeacherAssignedSubjects || mySubjects.includes(getSubj(a));
+      const subject = subjects.find(sub => normS(sub.name) === normS(getSubj(a)));
       const assessmentSemester = subject?.semester || 'Semester I';
       const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
 
@@ -63,7 +67,7 @@ export const UrgentMattersTab = React.memo(({ navigation, teacher, students: all
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}><BarChart3 size={20} color={C.amber} stroke={C.amber} /><Text style={[s.issueTitle, { marginLeft: 8, marginBottom: 0 }]}>{t('urgent.incompleteAssessments')}</Text><View style={{ flex: 1 }} /><View style={{ backgroundColor: C.amber + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 }}><Text style={{ color: C.amber, fontSize: 12, fontWeight: '800' }}>{missingMarksByAssessment.length}</Text></View></View>
           <Text style={s.issueSub}>{t('urgent.missingScoresDesc')}</Text>
           {displayedAssessments.map(item => (
-            <TouchableOpacity key={item.assessment.id} style={[s.issueRow, { borderTopColor: C.border, flexDirection: 'column', alignItems: 'stretch' }]} onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text style={s.issueText}>{item.assessment.name}</Text><Text style={s.issueSub}>{item.assessment.subjectname} • {fmtGrade(item.assessment.grade)} • {t('urgent.missingCount', { count: item.count })}</Text></View><TouchableOpacity onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })} style={{ backgroundColor: C.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{t('urgent.fixNow')}</Text></TouchableOpacity></View><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>{item.students.map(st => (<View key={st.id} style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: C.amber + '30' }}><Text style={{ fontSize: 11, color: C.amber, fontWeight: '700' }}>{st.name}</Text></View>))}</View></TouchableOpacity>
+            <TouchableOpacity key={item.assessment.id} style={[s.issueRow, { borderTopColor: C.border, flexDirection: 'column', alignItems: 'stretch' }]} onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ flex: 1 }}><Text style={s.issueText}>{item.assessment.name}</Text><Text style={s.issueSub}>{getSubj(item.assessment)} • {fmtGrade(item.assessment.grade)} • {t('urgent.missingCount', { count: item.count })}</Text></View><TouchableOpacity onPress={() => navigation.navigate('Main', { screen: 'Marks', params: { assessmentId: item.assessment.id, grade: item.assessment.grade, highlightEmpty: true, nonce: Date.now() } })} style={{ backgroundColor: C.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{t('urgent.fixNow')}</Text></TouchableOpacity></View><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>{item.students.map(st => (<View key={st.id} style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: C.amber + '30' }}><Text style={{ fontSize: 11, color: C.amber, fontWeight: '700' }}>{st.name}</Text></View>))}</View></TouchableOpacity>
           ))}
           {missingMarksByAssessment.length > PAGE_SIZE && (<TouchableOpacity onPress={() => setShowAllAssessments(!showAllAssessments)} style={{ alignSelf: 'center', marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: C.amber + '12' }}><Text style={{ color: C.amber, fontWeight: '700', fontSize: 13 }}>{showAllAssessments ? t('urgent.showLess') : t('urgent.showAllAssessments', { count: missingMarksByAssessment.length })}</Text></TouchableOpacity>)}
         </View>

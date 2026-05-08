@@ -161,7 +161,8 @@ const resources = {
         "clearAllMarks": "Clear All Marks",
         "confirmClearAll": "Are you sure you want to clear all marks for this assessment?",
         "login": "Login",
-        "profile": "Profile"
+        "profile": "Profile",
+        "selectAssessmentDesc": "Please select an assessment from the dropdown to start entering marks."
       },
       "urgent": {
         "everyoneUpToDate": "Everything is up to date!",
@@ -412,7 +413,8 @@ const resources = {
         "clearAllMarks": "ሁሉንም ውጤቶች አጥፋ",
         "confirmClearAll": "ለዚህ ምዘና የተመዘገቡ ሁሉንም ውጤቶች ለማጥፋት እርግጠኛ ነዎት?",
         "login": "ግባ",
-        "profile": "መገለጫ"
+        "profile": "መገለጫ",
+        "selectAssessmentDesc": "ውጤት ለመመዝገብ እባክዎ ከላይ ካለው ዝርዝር ውስጥ ምዘና ይምረጡ።"
       },
       "urgent": {
         "everyoneUpToDate": "ሁሉም ነገር ወቅታዊ ነው!",

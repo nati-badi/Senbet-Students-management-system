@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { TrendingUp, Edit, Trash2, ChevronRight, Clock } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../supabase';
-import { Student, Assessment, Teacher, normG, normS, isConduct, generateUUID, fmtGrade, paginate } from '../utils';
+import { Student, Assessment, Teacher, normG, normS, isConduct, generateUUID, fmtGrade, paginate, getSubj, getMax } from '../utils';
 import { getEthiopianYear } from '../dateUtils';
 import { PremiumDropdown } from './PremiumDropdown';
 import { useToast } from './ToastContext';
@@ -25,26 +25,35 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
   const normalizedMySubjects = useMemo(() => mySubjects.map(normS).filter(Boolean), [mySubjects]);
   
   const myStudents = useMemo(() => 
-    allStudents.filter(st => st.archived !== 1 && (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))),
+    allStudents.filter(st => 
+      st.archived !== 1 && 
+      !getSubj(st) && // Safety: exclude assessments
+      (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))
+    ),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
 
   const myAssessments = useMemo(() => 
     allAssessments.filter(a => {
       const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
-      const isSubjectMatch = !hasTeacherAssignedSubjects || normalizedMySubjects.includes(normS(a.subjectname));
-
-      const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
+      const isSubjectMatch = !hasTeacherAssignedSubjects || normalizedMySubjects.includes(normS(getSubj(a)));
+      const subject = subjects.find(sub => normS(sub.name) === normS(getSubj(a)));
       const assessmentSemester = subject?.semester || 'Semester I';
       const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
 
       // Academic year filtering (matches web app logic)
       const currentYear = settings.currentAcademicYear;
       const targetYearNum = currentYear ? getEthiopianYear(currentYear) : null;
-      const assessmentYearNum = a.academicyear ? getEthiopianYear(a.academicyear) : null;
+      const assessmentYearNum = (a as any).academicyear || (a as any).academicYear ? getEthiopianYear((a as any).academicyear || (a as any).academicYear) : null;
       const isYearMatch = !targetYearNum || !assessmentYearNum || assessmentYearNum === targetYearNum;
       
-      return isGradeMatch && isSubjectMatch && !isConduct(a) && isSemesterMatch && isYearMatch;
+      // Remove !isConduct(a) filter because mobile doesn't have a separate conduct tab
+      // This allows subjects like "Christian Ethics" to be graded here.
+      return isGradeMatch && isSubjectMatch && isSemesterMatch && isYearMatch;
+    }).sort((a, b) => {
+      const dA = a.date ? new Date(a.date).getTime() : 0;
+      const dB = b.date ? new Date(b.date).getTime() : 0;
+      return dB - dA;
     }),
     [allAssessments, hasTeacherAssignedGrades, myGrades, hasTeacherAssignedSubjects, normalizedMySubjects, subjects, settings.currentSemester, settings.currentAcademicYear]
   );
@@ -72,25 +81,46 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
   const lastRoutedNonce = useRef<number | null>(null);
 
   const grades = useMemo(() => {
-    return [...new Set(myStudents.map((st) => String(st.grade)))].sort((a, b) => Number(a) - Number(b));
-  }, [myStudents]);
+    // Combine grades from assigned list AND current students for maximum coverage
+    const fromAssigned = (myGrades || []).map(g => String(g));
+    const fromStudents = [...new Set(myStudents.map((st) => String(st.grade)))];
+    const combined = [...new Set([...fromAssigned, ...fromStudents])].filter(Boolean);
+    return combined.sort((a, b) => Number(normG(a)) - Number(normG(b)));
+  }, [myStudents, myGrades]);
 
   const gradeAssessments = useMemo(() => myAssessments.filter((a) => normG(a.grade) === normG(selectedGrade)), [myAssessments, selectedGrade]);
 
   const gradeSubjects = useMemo(() => {
     const allowedSubjectKeyToLabel = new Map<string, string>();
+    // Filter subjects by selected grade first
+    const subjectsInGrade = subjects.filter(s => normG(s.grade) === normG(selectedGrade));
+    const activeSemester = settings.currentSemester || 'Semester I';
+
     (mySubjects || []).forEach((subj) => {
       const key = normS(subj);
-      if (!key) return;
-      if (!allowedSubjectKeyToLabel.has(key)) allowedSubjectKeyToLabel.set(key, subj);
+      const metadata = subjectsInGrade.find(s => normS(s.name) === key);
+      const isSemesterMatch = metadata && metadata.semester === activeSemester;
+
+      if (metadata && isSemesterMatch && !allowedSubjectKeyToLabel.has(key)) {
+        allowedSubjectKeyToLabel.set(key, subj);
+      }
     });
+
+    // Fallback: If no metadata matches, show all assigned subjects to avoid "disappearing" data
+    if (allowedSubjectKeyToLabel.size === 0 && (mySubjects || []).length > 0) {
+      (mySubjects || []).forEach(subj => {
+        const key = normS(subj);
+        if (key && !allowedSubjectKeyToLabel.has(key)) allowedSubjectKeyToLabel.set(key, subj);
+      });
+    }
+
     return [...allowedSubjectKeyToLabel.entries()].map(([key, label]) => ({ key, label }));
-  }, [mySubjects]);
+  }, [mySubjects, subjects, selectedGrade, settings.currentSemester]);
 
   const selectedSubjectKey = normS(selectedSubject);
   
   const filteredAssessments = useMemo(() => selectedSubject
-    ? gradeAssessments.filter(a => normS(a.subjectname) === selectedSubjectKey)
+    ? gradeAssessments.filter(a => normS(getSubj(a)) === selectedSubjectKey)
     : gradeAssessments, [selectedSubject, gradeAssessments, selectedSubjectKey]);
   
   const filteredStudents = useMemo(() => {
@@ -127,7 +157,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       const ass = myAssessments.find(a => a.id === route.params.assessmentId);
       if (ass) {
         setSelectedGrade(String(ass.grade));
-        setSelectedSubject(normS(ass.subjectname));
+        setSelectedSubject(normS(getSubj(ass)));
         setSelectedAssessment(ass);
       }
     } else if (route.params?.grade && !route.params.assessmentId) {
@@ -174,7 +204,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
     const map: Record<string, string> = {};
     const idMap: Record<string, string> = {};
     marksData
-      .filter(m => m.assessmentid === (selectedAssessment.id || (selectedAssessment as any).assessmentId))
+      .filter(m => (m.assessmentid || m.assessmentId) === (selectedAssessment.id || (selectedAssessment as any).assessmentId))
       .forEach(m => { 
         map[m.studentid || m.studentId] = String(m.score);
         idMap[m.studentid || m.studentId] = m.id;
@@ -272,8 +302,9 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
   const applyBulkFill = () => {
     setModalError(null);
     const val = parseFloat(bulkScore);
-    if (isNaN(val) || val < 0 || val > selectedAssessment!.maxscore) {
-      setModalError(`❌ ${t('teacher.validScore')}: 0–${selectedAssessment!.maxscore}`);
+    const maxVal = getMax(selectedAssessment);
+    if (isNaN(val) || val < 0 || val > maxVal) {
+      setModalError(`❌ ${t('teacher.validScore')}: 0–${maxVal}`);
       return;
     }
     const gradeStudents = myStudents.filter((st) => normG(st.grade) === normG(selectedGrade));
@@ -322,14 +353,14 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       return;
     }
 
-    const targetSubject = normS(selectedAssessment.subjectname);
+    const targetSubject = normS(getSubj(selectedAssessment));
     const studentsWithHistory = [];
     for (const student of studentsWithoutMarks) {
       const historyCount = marksData.filter(m => (m.studentid || m.studentId) === student.id).filter(m => {
         const markSubject = m.subject ? normS(m.subject) : null;
         if (markSubject) return markSubject === targetSubject;
         const a = allAssessments.find(ax => ax.id === (m.assessmentid || m.assessmentId));
-        return a && normS(a.subjectname) === targetSubject;
+        return a && normS(getSubj(a)) === targetSubject;
       }).length;
       if (historyCount > 0) studentsWithHistory.push(student);
     }
@@ -339,7 +370,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       return;
     }
     setModalError(null);
-    setPredictDetails({ count: studentsWithHistory.length, subject: selectedAssessment.subjectname, students: studentsWithHistory });
+    setPredictDetails({ count: studentsWithHistory.length, subject: getSubj(selectedAssessment), students: studentsWithHistory });
     setPredictVisible(true);
   };
 
@@ -348,21 +379,22 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
     for (const student of predictDetails.students) {
       const subjectMarks = marksData.filter(m => (m.studentid || m.studentId) === student.id).filter(m => {
         const a = allAssessments.find(ax => ax.id === (m.assessmentid || m.assessmentId));
-        return a && normS(a.subjectname) === normS(predictDetails.subject);
+        return a && normS(getSubj(a)) === normS(predictDetails.subject);
       });
       if (subjectMarks.length > 0) {
         let totalPercentage = 0;
         let validCount = 0;
         for (const m of subjectMarks) {
           const assessment = allAssessments.find(a => a.id === (m.assessmentid || m.assessmentId));
-          if (assessment && assessment.maxscore > 0) {
-            totalPercentage += (Number(m.score) / assessment.maxscore);
+          const maxS = getMax(assessment);
+          if (assessment && maxS > 0) {
+            totalPercentage += (Number(m.score) / maxS);
             validCount++;
           }
         }
         if (validCount > 0) {
           const avgPercentage = totalPercentage / validCount;
-          const predictedScore = Math.round(avgPercentage * selectedAssessment!.maxscore * 10) / 10;
+          const predictedScore = Math.round(avgPercentage * getMax(selectedAssessment) * 10) / 10;
           updates[student.id] = predictedScore.toString();
         }
       }
@@ -388,7 +420,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
           placeholder="0" 
           placeholderTextColor={C.muted} 
           value={marks[item.id] || ''} 
-          onChangeText={(val) => { const score = parseFloat(val); if (val !== '' && !isNaN(score) && selectedAssessment && score > selectedAssessment.maxscore) { showToast?.(`❌ Max score is ${selectedAssessment.maxscore}`, 'error'); return; } setMarks(prev => ({ ...prev, [item.id]: val })); }} 
+          onChangeText={(val) => { const score = parseFloat(val); const maxVal = getMax(selectedAssessment); if (val !== '' && !isNaN(score) && selectedAssessment && score > maxVal) { showToast?.(`❌ Max score is ${maxVal}`, 'error'); return; } setMarks(prev => ({ ...prev, [item.id]: val })); }} 
           editable={!!selectedAssessment}
           returnKeyType="next"
           onSubmitEditing={() => focusNext(index)}
@@ -410,7 +442,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
             <PremiumDropdown label={t('assessment.subject', 'Subject')} placeholder={t('common.selectSubject', 'Select Subject')} items={gradeSubjects} selectedKey={selectedSubjectKey} onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }} C={C} s={s} disabled={!selectedGrade} />
           </View>
           <View style={{ flex: 1 }}>
-            <PremiumDropdown label={t('assessment.label', 'Assessment')} placeholder={t('common.selectAssessment', 'Select Assessment')} items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))} selectedKey={selectedAssessment?.id || null} onSelect={(key) => { const a = filteredAssessments.find(ax => ax.id === key); if (a) { setSelectedSubject(normS(a.subjectname)); setSelectedAssessment(a); } }} C={C} s={s} disabled={!selectedSubjectKey} />
+            <PremiumDropdown label={t('assessment.label', 'Assessment')} placeholder={t('common.selectAssessment', 'Select Assessment')} items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))} selectedKey={selectedAssessment?.id || null} onSelect={(key) => { const a = filteredAssessments.find(ax => ax.id === key); if (a) { setSelectedSubject(normS(getSubj(a))); setSelectedAssessment(a); } }} C={C} s={s} disabled={!selectedSubjectKey} />
           </View>
         </View>
         <TextInput style={[s.searchInput, { margin: 0, marginBottom: 16 }]} placeholder={t('common.searchStudents')} placeholderTextColor={C.muted} value={search} onChangeText={setSearch} />
@@ -418,19 +450,32 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
 
       <FlatList 
         ref={flatListRef} 
-        data={paginate(filteredStudents, page)} 
+        data={selectedAssessment ? paginate(filteredStudents, page) : []} 
         keyExtractor={item => item.id} 
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.accent} />} 
         extraData={[selectedAssessment?.id, marks]} 
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }} 
         keyboardShouldPersistTaps="handled" 
-        keyboardDismissMode="on-drag" 
+        keyboardDismissMode="on-drag"
+        ListEmptyComponent={!selectedAssessment ? (
+          <View style={{ alignItems: 'center', marginTop: 100, padding: 40 }}>
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: C.accent + '10', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+              <Clock size={40} color={C.accent} />
+            </View>
+            <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', textAlign: 'center' }}>{t('common.selectAssessment')}</Text>
+            <Text style={{ color: C.muted, fontSize: 14, textAlign: 'center', marginTop: 8 }}>{t('teacher.selectAssessmentDesc', 'Please select an assessment from the dropdown to start entering marks.')}</Text>
+          </View>
+        ) : filteredStudents.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 100 }}>
+             <Text style={s.empty}>{t('common.noStudentsFound')}</Text>
+          </View>
+        ) : null}
         ListHeaderComponent={selectedAssessment ? (
           <View style={{ marginBottom: 20 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                <View>
                   <Text style={{ color: C.text, fontWeight: '800', fontSize: 16 }}>{selectedAssessment.name}</Text>
-                  <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600' }}>{t('teacher.maxScoreLabel')}: {selectedAssessment.maxscore}</Text>
+                  <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600' }}>{t('teacher.maxScoreLabel')}: {getMax(selectedAssessment)}</Text>
                </View>
                <View style={{ backgroundColor: C.accent + '20', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
                   <Text style={{ color: C.accent, fontSize: 11, fontWeight: '800' }}>{t('common.active').toUpperCase()}</Text>
@@ -468,7 +513,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
             <TouchableWithoutFeedback>
               <View style={s.modalCard}>
                 <Text style={s.modalTitle}>{t('teacher.fillConstant')}</Text>
-                <Text style={s.modalSub}>{t('teacher.fillConstantDesc')} (Max: {selectedAssessment?.maxscore})</Text>
+                <Text style={s.modalSub}>{t('teacher.fillConstantDesc')} (Max: {getMax(selectedAssessment)})</Text>
 
                 {modalError && (
                   <View style={{ backgroundColor: C.red + '15', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: C.red + '30' }}>
@@ -476,7 +521,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
                   </View>
                 )}
 
-                <TextInput style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]} keyboardType="numeric" placeholder={`0 - ${selectedAssessment?.maxscore || 10}`} placeholderTextColor={C.muted} value={bulkScore} onChangeText={(val) => { setBulkScore(val); setModalError(null); }} autoFocus />
+                <TextInput style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]} keyboardType="numeric" placeholder={`0 - ${getMax(selectedAssessment) || 10}`} placeholderTextColor={C.muted} value={bulkScore} onChangeText={(val) => { setBulkScore(val); setModalError(null); }} autoFocus />
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <TouchableOpacity onPress={() => { setBulkVisible(false); setBulkScore(''); }} style={[s.modalBtn, { backgroundColor: C.card }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
                   <TouchableOpacity onPress={applyBulkFill} style={s.modalBtn}><Text style={s.modalBtnText}>{t('common.apply')}</Text></TouchableOpacity>

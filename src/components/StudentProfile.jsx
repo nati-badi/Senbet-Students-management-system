@@ -74,6 +74,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
     const isLoading = student === undefined || allAssessments === undefined || allSubjects === undefined || allStudents === undefined || allMarks === undefined || settings === undefined;
 
     const activeSemester = useMemo(() => settings?.find(s => s.key === 'currentSemester')?.value || 'Semester I', [settings]);
+    const currentAcademicYear = useMemo(() => settings?.find(s => s.key === 'currentAcademicYear')?.value, [settings]);
 
 
     // --- Formatters ---
@@ -124,12 +125,16 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
     const activeYearToUse = useMemo(() => {
         if (selectedYear) return selectedYear;
-        // If student year is valid, use it. Otherwise fallback to global current year.
+        // Prioritize current academic year from settings for default view
+        if (currentAcademicYear && getEthiopianYear(currentAcademicYear) !== '—') {
+            return currentAcademicYear;
+        }
+        // Fallback to student admission year
         if (student?.academicYear && getEthiopianYear(student.academicYear) !== '—') {
             return student.academicYear;
         }
         return new Date().toISOString(); // Fallback to current system time
-    }, [selectedYear, student?.academicYear]);
+    }, [selectedYear, student?.academicYear, currentAcademicYear]);
 
     // Generate Heatmap Data (Last 90 days)
     const heatmapDays = useMemo(() => {
@@ -159,39 +164,39 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
         return allAssessments.filter(a => {
             if (normalizeGrade(a.grade) !== studentGradeNorm) return false;
             
-            // Resolve the year of the assessment
             const assessmentYearNum = a.academicYear ? getEthiopianYear(a.academicYear) : null;
             
-            // INTUITIVE MATCHING: 
-            // 1. If the assessment matches the target year exactly, show it.
-            // 2. If the assessment has NO year, it's a template; show it.
-            // 3. If we are in the current year (2018) and the assessment is from the legacy baseline (2017),
-            //    show it because it serves as the structure for the new year.
-            // 4. If we are in a historical view (e.g. looking back at 2017), only show 2017 data.
-            
-            if (assessmentYearNum === targetYearNum) return true;
-            if (!assessmentYearNum) return true;
-            
-            // Baseline Fallback: 2017 assessments are visible in 2018 as templates
-            if (assessmentYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም') return true;
+            // Year Match Logic:
+            // 1. Matches target year exactly
+            // 2. Is a template (no year)
+            // 3. Fallback: 2017 assessments are visible in 2018 (baseline data)
+            const matchesYear = assessmentYearNum === targetYearNum || 
+                               !assessmentYearNum || 
+                               (assessmentYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም');
 
-            return false;
-            
-            return !isConductAssessment(a);
-        });
+            return matchesYear;
+        }).filter(a => !isConductAssessment(a));
     }, [allAssessments, studentGradeNorm, activeYearToUse]);
 
     // Map marks to assessments
     const markHistory = useMemo(() => {
-        if (!gradeAssessments.length) return [];
-        return gradeAssessments.map(assessment => {
+        // 1. Get all subjects for this grade
+        const relevantSubjects = allSubjects.filter(s => normalizeGrade(s.grade) === studentGradeNorm);
+        const subjectNames = [...new Set(relevantSubjects.map(s => s.name))].sort();
+
+        // 2. Map assessments into the history
+        const historyEntries = gradeAssessments.map(assessment => {
             const existingMark = marks?.find(m => m.assessmentId === assessment.id);
-            const subject = allSubjects.find(s => s.name === assessment.subjectName);
+            const rawSubj = assessment.subjectName || assessment.subjectname;
+            const subject = allSubjects.find(s => 
+                String(s.name || '').toLowerCase().trim() === String(rawSubj || '').toLowerCase().trim() &&
+                normalizeGrade(s.grade) === studentGradeNorm
+            );
             return {
                 key: assessment.id,
                 assessmentId: assessment.id,
                 assessmentName: assessment.name || 'Unknown',
-                subject: assessment.subjectName || 'Unknown',
+                subject: assessment.subjectName || assessment.subjectname || 'Unknown',
                 semester: subject?.semester || 'Semester I',
                 score: existingMark ? existingMark.score : null,
                 maxScore: assessment.maxScore,
@@ -199,11 +204,33 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                 percentage: existingMark && assessment.maxScore > 0 ? ((existingMark.score / assessment.maxScore) * 100).toFixed(1) : null,
                 hasMark: !!existingMark
             };
-        }).sort((a, b) => {
+        });
+
+        // 3. Add placeholders for subjects that have NO assessments yet
+        subjectNames.forEach(subName => {
+            const hasAssessments = historyEntries.some(h => String(h.subject).toLowerCase().trim() === subName.toLowerCase().trim());
+            if (!hasAssessments) {
+                const subMeta = relevantSubjects.find(s => s.name === subName);
+                historyEntries.push({
+                    key: `empty-${subName}`,
+                    assessmentId: null,
+                    assessmentName: '—',
+                    subject: subName,
+                    semester: subMeta?.semester || 'Semester I',
+                    score: null,
+                    maxScore: '-',
+                    date: '-',
+                    percentage: null,
+                    hasMark: false
+                });
+            }
+        });
+
+        return historyEntries.sort((a, b) => {
             if (a.date === '-' || b.date === '-') return 0;
             return new Date(b.date) - new Date(a.date);
         });
-    }, [gradeAssessments, marks, allSubjects]);
+    }, [gradeAssessments, marks, allSubjects, studentGradeNorm]);
 
     const subjectRows = useMemo(() => {
         if (!student || !activeYearToUse || !gradeAssessments.length) return [];

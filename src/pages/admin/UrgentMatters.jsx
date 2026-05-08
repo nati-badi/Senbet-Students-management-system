@@ -217,17 +217,17 @@ export default function UrgentMatters() {
     return (
         <div className="flex flex-col gap-10 pb-12 font-['Inter']">
             {/* Header Section - Minimalist & Soft */}
-            <div className="relative p-10 rounded-[2.5rem] bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm overflow-hidden">
+            <div className="glass-header">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-400/5 blur-[120px] -mr-40 -mt-40 rounded-full" />
-                <div className="relative flex flex-col md:flex-row md:items-center gap-8">
-                    <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-950/30 rounded-[2rem] flex items-center justify-center border border-indigo-100/50 dark:border-indigo-800/30">
-                        <WarningOutlined className="text-3xl text-indigo-500/80" />
+                <div className="relative flex flex-col md:flex-row md:items-center gap-6 lg:gap-8">
+                    <div className="w-16 h-16 lg:w-20 lg:h-20 bg-indigo-50 dark:bg-indigo-950/30 rounded-[1.5rem] lg:rounded-[2rem] flex items-center justify-center border border-indigo-100/50 dark:border-indigo-800/30">
+                        <WarningOutlined className="text-2xl lg:text-3xl text-indigo-500/80" />
                     </div>
                     <div>
-                        <h2 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-white m-0">
+                        <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-slate-800 dark:text-white m-0">
                             {t('admin.urgentMatters')}
                         </h2>
-                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-2 max-w-xl">
+                        <p className="text-sm lg:text-base text-slate-500 dark:text-slate-400 font-medium mt-2 max-w-xl">
                             {t('admin.urgentMattersDesc')}
                         </p>
                     </div>
@@ -283,8 +283,8 @@ export default function UrgentMatters() {
                                 if (!student.portalCode && !student.portalcode) missing.push(t('admin.portalCode', 'Portal Code'));
 
                                 return (
-                                    <div key={student.id} className="group p-8 rounded-[2.5rem] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-rose-500/20 dark:hover:border-rose-400/20 transition-all duration-500 hover:shadow-2xl hover:shadow-rose-500/5">
-                                        <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-center">
+                                    <div key={student.id} className="glass-card hover:border-rose-500/20 dark:hover:border-rose-400/20 transition-all duration-500 hover:shadow-2xl hover:shadow-rose-500/5">
+                                        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start lg:items-center">
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-3 mb-3 flex-wrap">
                                                     <h4 className="text-xl font-bold text-slate-800 dark:text-white m-0">

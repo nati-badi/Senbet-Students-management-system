@@ -10,6 +10,8 @@ import {
   normS,
   isConduct,
   fmtGrade,
+  getSubj,
+  getMax,
 } from "../utils";
 import { computeEthiopianYear } from "../dateUtils";
 import { calculateRankings, calculateGroupAverage } from "../analyticsEngine";
@@ -62,6 +64,7 @@ export const AnalyticsTab = React.memo(
       () =>
         allStudents.filter(
           (st) => {
+            if (getSubj(st)) return false; // Safety: exclude assessments
             const isMatchGrade = selectedGrade === 'All' || normG(st.grade) === normG(selectedGrade);
             return isMatchGrade && (!hasTeacherAssignedGrades || myGrades.some(mg => normG(mg) === normG(st.grade)));
           }
@@ -72,7 +75,7 @@ export const AnalyticsTab = React.memo(
     const semesterAssessments = useMemo(
       () =>
         allAssessments.filter((a) => {
-          const assessmentSubjectName = a.subjectname || (a as any).subjectName;
+          const assessmentSubjectName = getSubj(a);
           const assessmentGradeNorm = normG(a.grade);
           
           const isGradeMatch = selectedGrade === 'All' || assessmentGradeNorm === normG(selectedGrade);
@@ -112,13 +115,18 @@ export const AnalyticsTab = React.memo(
     }, [hasTeacherAssignedGrades, myGrades, allStudents]);
 
     const subjectOptions = useMemo(() => {
-        const filteredSubs = subjects.filter(s => s.semester === selectedSemester);
+        const mySubKeys = new Set((mySubjects || []).map(normS));
+        const filteredSubs = subjects.filter(s => 
+          s.semester === selectedSemester && 
+          normG(s.grade) === normG(selectedGrade) &&
+          mySubKeys.has(normS(s.name))
+        );
         const uniqueNames = [...new Set(filteredSubs.map(s => s.name))];
         return [
             { key: 'All', label: t('admin.allSubjects', 'All Subjects') },
-            ...uniqueNames.map(n => ({ key: n, label: n }))
+            ...uniqueNames.map(n => ({ key: normS(n), label: n }))
         ];
-    }, [subjects, selectedSemester, t]);
+    }, [subjects, selectedSemester, selectedGrade, mySubjects, t]);
 
     const semesterOptions = useMemo(() => [
         { key: 'Semester I', label: t('admin.semester1') },
@@ -314,8 +322,8 @@ export const AnalyticsTab = React.memo(
             );
 
             const avgPerc =
-              aMarks.length > 0 && ass.maxscore > 0
-                ? (total / (aMarks.length * ass.maxscore)) * 100
+              aMarks.length > 0 && getMax(ass) > 0
+                ? (total / (aMarks.length * getMax(ass))) * 100
                 : 0;
             return (
               <View key={i} style={{ marginBottom: 16 }}>

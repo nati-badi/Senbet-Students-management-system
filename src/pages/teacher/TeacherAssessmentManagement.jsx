@@ -47,6 +47,9 @@ export default function TeacherAssessmentManagement({ teacher }) {
         mySubjects.some(ms => normalizeSubject(ms) === normalizeSubject(a.subjectName))
     );
 
+    const settings = useLiveQuery(() => db.settings.toArray()) || [];
+    const currentAcademicYear = settings.find(s => s.key === 'currentAcademicYear')?.value;
+
     const handleSave = async (values) => {
         try {
             // Extra security check: ensure the teacher is actually assigned to this grade/subject
@@ -59,7 +62,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
                 return;
             }
 
-            const subject = allSubjects.find(s => s.name === values.subjectName);
+            const subject = allSubjects.find(s => s.name === values.subjectName && normalizeGrade(s.grade) === normalizeGrade(values.grade));
             const semester = subject?.semester || 'Semester I';
 
             const data = {
@@ -69,6 +72,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
                 maxScore: parseFloat(values.maxScore),
                 date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
                 semester: semester,
+                academicYear: currentAcademicYear,
                 synced: 0
             };
 

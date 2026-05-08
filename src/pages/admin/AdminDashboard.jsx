@@ -13,7 +13,7 @@ import {
     CheckCircleOutlined,
     NotificationOutlined
 } from '@ant-design/icons';
-import { Layout, Menu, Typography, Badge, Tag } from 'antd';
+import { Layout, Menu, Typography, Badge, Tag, Button, Modal, Space } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { formatEthiopianDate, formatEthiopianTime } from '../../utils/dateUtils';
 import { useState, useEffect } from 'react';
@@ -61,21 +61,21 @@ const EthiopicClockWidget = () => {
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[60px] -mr-32 -mt-32 rounded-full" />
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-rose-500/5 blur-[40px] -ml-24 -mb-24 rounded-full" />
                 
-                <div className="relative flex flex-col md:flex-row items-center justify-between py-10 px-12 gap-8 md:gap-4">
+                <div className="relative flex flex-col md:flex-row items-center justify-between py-6 px-8 lg:py-10 lg:px-12 gap-8 md:gap-4">
                     <div className="flex flex-col items-center md:items-start">
                         <div className="flex items-baseline gap-3">
-                            <span className="text-7xl font-black tracking-tighter bg-gradient-to-br from-slate-800 to-slate-500 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">
+                            <span className="text-5xl lg:text-7xl font-black tracking-tighter bg-gradient-to-br from-slate-800 to-slate-500 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">
                                 {etTime}
                             </span>
-                            <span className="text-2xl text-indigo-500 dark:text-indigo-400 font-bold uppercase tracking-widest">{etSuffix}</span>
+                            <span className="text-xl lg:text-2xl text-indigo-500 dark:text-indigo-400 font-bold uppercase tracking-widest">{etSuffix}</span>
                         </div>
                     </div>
 
                     <div className="hidden md:block w-px h-24 bg-gradient-to-b from-transparent via-slate-200 dark:via-slate-700 to-transparent mx-8 opacity-50"></div>
 
                     <div className="flex flex-col items-center md:items-end text-right">
-                        <span className="text-3xl text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.2em] mb-2">{ethDayName}</span>
-                        <span className="text-5xl font-black tracking-tight text-slate-800 dark:text-white">{ethpoianDateStr}</span>
+                        <span className="text-xl lg:text-3xl text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.2em] mb-2">{ethDayName}</span>
+                        <span className="text-3xl lg:text-5xl font-black tracking-tight text-slate-800 dark:text-white">{ethpoianDateStr}</span>
                         <div className="mt-4 flex items-center gap-2">
                              <div className="h-1 w-12 bg-rose-500/30 rounded-full" />
                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ፍኖተ ብርሃን ሰ/ቤት</span>
@@ -91,6 +91,7 @@ export default function AdminDashboard() {
     const location = useLocation();
     const navigate = useNavigate();
     const { t } = useTranslation();
+    const [isDrawerVisible, setIsDrawerVisible] = useState(false);
 
     const menuItems = React.useMemo(() => [
         {
@@ -217,15 +218,24 @@ export default function AdminDashboard() {
                     pointer-events: none;
                 }
             `}</style>
-            {/* Tablet/Mobile Navigation (Sidebar is lg+) */}
-            <div className="lg:hidden mb-4 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-                <Menu
-                    mode="horizontal"
-                    selectedKeys={[location.pathname]}
-                    items={menuItems}
-                    onClick={({ key }) => navigate(key)}
-                    className="admin-sidebar border-none w-full overflow-x-auto flex-nowrap hide-scrollbar"
-                />
+            {/* Tablet/Mobile Navigation Header */}
+            <div className="lg:hidden mb-6 glass-card flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center">
+                        <DatabaseOutlined className="text-indigo-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold m-0">{t('admin.portal')}</h2>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-widest">{t('admin.management')}</span>
+                    </div>
+                </div>
+                <Button 
+                    icon={<BookOutlined />} 
+                    onClick={() => setIsDrawerVisible(true)}
+                    className="rounded-lg"
+                >
+                    {t('admin.menu')}
+                </Button>
             </div>
 
             <div className="mb-6">
@@ -233,9 +243,30 @@ export default function AdminDashboard() {
             </div>
 
             <Layout className="bg-transparent">
+            <Modal
+                title={t('admin.menu')}
+                open={isDrawerVisible}
+                onCancel={() => setIsDrawerVisible(false)}
+                footer={null}
+                className="lg:hidden"
+                width={280}
+                style={{ top: 20, left: 20, margin: 0 }}
+            >
+                <Menu
+                    mode="inline"
+                    selectedKeys={[location.pathname]}
+                    items={menuItems}
+                    onClick={({ key }) => {
+                        navigate(key);
+                        setIsDrawerVisible(false);
+                    }}
+                    className="admin-sidebar border-none"
+                />
+            </Modal>
+
             <Sider
                 width={240}
-                className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-6 hidden lg:block overflow-hidden"
+                className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 mr-4 lg:mr-6 hidden lg:block overflow-hidden"
             >
                 <Menu
                     mode="inline"

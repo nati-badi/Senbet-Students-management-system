@@ -608,6 +608,7 @@ export default function StudentRegistration() {
                 dataSource={filteredStudents}
                 rowKey="id"
                 loading={isLoadingStudents}
+                scroll={{ x: 'max-content' }}
                 pagination={{
                     pageSize: 10,
                     showSizeChanger: true,

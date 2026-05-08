@@ -216,7 +216,7 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
       } finally {
         // Schema migration: force full re-sync when data model changes
         // Bump this version whenever Supabase queries change (e.g. new columns like archived, academicyear)
-        const CURRENT_SCHEMA_VERSION = '3';
+        const CURRENT_SCHEMA_VERSION = '4';
         const storedVersion = await AsyncStorage.getItem('senbet_schema_version');
         if (storedVersion !== CURRENT_SCHEMA_VERSION) {
           console.log('📦 Schema version changed, clearing stale cache and forcing full re-sync...');
@@ -275,12 +275,32 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
         await AsyncStorage.setItem('senbet_teacher_auth', JSON.stringify(tRes));
       }
 
-      const syncAnchor = (lastSyncIso && students.length === 0) ? null : lastSyncIso;
-      const stQ = supabase.from('students').select('id, name, grade, baptismalname, parentcontact, academicyear, portalcode, archived, updated_at');
-      const asQ = supabase.from('assessments').select('id, name, subjectname, grade, maxscore, date, academicyear, updated_at');
+      // --- 0. OBTAIN SERVER TIME FOR CURSOR ---
+      let serverSyncStart = new Date().toISOString();
+      try {
+        const { data: pingData } = await supabase
+          .from('settings')
+          .upsert({ key: 'sys_sync_ping_mobile', value: serverSyncStart })
+          .select('updated_at')
+          .single();
+        if (pingData?.updated_at) {
+          serverSyncStart = pingData.updated_at;
+        }
+      } catch (e) { console.warn("Could not get strict server time, falling back to local."); }
+
+      // Use a 2-minute "safety buffer" to ensure we don't miss records due to replication lag
+      let syncAnchor = lastSyncIso;
+      if (syncAnchor && students.length > 0) {
+        syncAnchor = new Date(new Date(syncAnchor).getTime() - 120000).toISOString();
+      } else {
+        syncAnchor = null;
+      }
+
+      const stQ = supabase.from('students').select('*');
+      const asQ = supabase.from('assessments').select('*');
       const maQ = supabase.from('marks').select('id, score, subject, semester, studentid, assessmentid, assessmentdate, last_modified_by, updated_at');
       const atQ = supabase.from('attendance').select('id, date, status, semester, studentid, last_modified_by, updated_at');
-      const suQ = supabase.from('subjects').select('id, name, semester, updated_at');
+      const suQ = supabase.from('subjects').select('id, name, grade, semester, updated_at');
       const seQ = supabase.from('settings').select('key, value, updated_at');
       const deQ = supabase.from('deleted_records').select('*');
 
@@ -300,8 +320,14 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
         newData.forEach(item => {
           const id = item.id || item.key;
           const existing = map.get(id);
-          if (!existing || !existing.updated_at || (item.updated_at && item.updated_at > existing.updated_at)) {
-            map.set(id, item);
+          
+          // Conflict Resolution: Use 2-second buffer to protect local unsynced changes
+          const serverTime = item.updated_at ? new Date(item.updated_at).getTime() : 0;
+          const localTime = (existing && existing.updated_at) ? new Date(existing.updated_at).getTime() : 0;
+          const TIME_BUFFER_MS = 2000;
+
+          if (!existing || serverTime > (localTime + TIME_BUFFER_MS)) {
+            map.set(id, { ...item, synced: 1 });
           }
         });
         return Array.from(map.values());
@@ -389,12 +415,7 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
         ...(setRes.status === 'fulfilled' && (setRes as any).value?.data ? (setRes as any).value.data : []),
       ];
 
-      let nextAnchor = lastSyncIso;
-      if (allNew.length > 0) {
-        const maxAt = allNew.reduce((max, r) => (r.updated_at && r.updated_at > max) ? r.updated_at : max, '');
-        if (maxAt) nextAnchor = maxAt;
-      }
-      if (!nextAnchor) nextAnchor = new Date().toISOString();
+      let nextAnchor = serverSyncStart;
 
       const now = formatEthiopianTime(new Date());
       setLastSync(now);

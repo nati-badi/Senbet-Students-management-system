@@ -41,21 +41,35 @@
   --glass-border: rgba(30, 41, 59, 0.6); /* Slate 800/60 */
   --glass-shadow: 0 15px 35px -12px rgba(0, 0, 0, 0.5);
 
+  --card-padding: 1.5rem;
+  --card-radius: 1.5rem;
+
   color-scheme: dark;
+}
+
+@media (min-width: 1024px) {
+  :root, .dark {
+    --card-padding: 2.5rem;
+    --card-radius: 2.5rem;
+  }
 }
 
 /* Glassmorphism Utilities */
 @layer components {
   .glass-card {
-    @apply bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm rounded-[2.5rem];
+    @apply bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm transition-all;
+    padding: var(--card-padding);
+    border-radius: var(--card-radius);
   }
   
   .glass-header {
-    @apply relative p-10 rounded-[2.5rem] bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm overflow-hidden;
+    @apply relative bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/60 dark:border-slate-800/60 shadow-sm overflow-hidden;
+    padding: var(--card-padding);
+    border-radius: var(--card-radius);
   }
   
   .btn-primary {
-    @apply h-14 px-10 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 border-none shadow-xl shadow-indigo-500/25 text-white font-bold flex items-center justify-center gap-3 transition-all hover:scale-[1.03] active:scale-95;
+    @apply h-12 lg:h-14 px-6 lg:px-10 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 border-none shadow-xl shadow-indigo-500/25 text-white font-bold flex items-center justify-center gap-3 transition-all hover:scale-[1.03] active:scale-95;
   }
   
   .badge-indigo {

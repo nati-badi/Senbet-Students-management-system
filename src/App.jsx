@@ -189,7 +189,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
   return (
     <Layout className="min-h-screen w-full flex flex-col bg-slate-50 dark:bg-slate-950" style={{ minHeight: '100vh' }}>
       <Header
-        className="px-4 md:px-8 flex items-center justify-between sticky top-0 z-50 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800"
+        className="px-4 lg:px-8 flex items-center justify-between sticky top-0 z-50 shadow-sm bg-white border-b border-slate-100 dark:bg-slate-900 dark:border-slate-800"
         style={{ height: '64px' }}
       >
         <Space align="center" size="small">
@@ -274,7 +274,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
         </div>
       </Header>
 
-      <Content className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full min-h-[70vh]">
+      <Content className="flex-1 flex flex-col p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-h-[70vh]">
         <Routes>
           <Route path="/" element={<Home activeRole={activeRole} isDesktop={!!window.__TAURI_INTERNALS__} />} />
           <Route 
@@ -454,8 +454,8 @@ function AdminLogin({ onLogin }) {
             <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/5 blur-[80px] rounded-full -mr-48 -mt-48" />
             <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-rose-500/5 blur-[60px] rounded-full -ml-32 -mb-32" />
 
-            <div className="relative w-full max-w-md px-6">
-                <div className="p-10 rounded-[3rem] bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/20 dark:border-slate-800/40 shadow-2xl shadow-indigo-500/10">
+            <div className="relative w-full max-w-md px-4">
+                <div className="glass-card">
                     <div className="flex flex-col items-center text-center mb-10">
                         <div className="w-20 h-20 bg-indigo-500/10 rounded-[2rem] flex items-center justify-center mb-6 border border-indigo-500/20">
                             <LockOutlined className="text-4xl text-indigo-500" />

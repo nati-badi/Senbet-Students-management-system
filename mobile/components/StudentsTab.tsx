@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList, RefreshControl } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Users } from 'lucide-react-native';
-import { Student, Teacher, normG, fmtGrade, paginate } from '../utils';
+import { Student, Teacher, normG, fmtGrade, paginate, getSubj } from '../utils';
 
 export const StudentsTab = React.memo(({ teacher, students: allStudents, onRefresh, C, s, onStudentPress }: {
   teacher: Teacher, students: Student[], onRefresh: () => Promise<void>, C: any, s: any, onStudentPress: (s: Student) => void
@@ -14,7 +14,11 @@ export const StudentsTab = React.memo(({ teacher, students: allStudents, onRefre
   const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
   
   const students = useMemo(() => 
-    allStudents.filter(st => st.archived !== 1 && (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))),
+    allStudents.filter(st => 
+      st.archived !== 1 && 
+      !getSubj(st) && // Safety: exclude assessments
+      (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))
+    ),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
 

@@ -3,7 +3,7 @@ import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndic
 import { useTranslation } from 'react-i18next';
 import { Users, CalendarCheck, AlertTriangle, RefreshCw, TrendingUp, ChevronRight, Clock, BarChart3 } from 'lucide-react-native';
 import { formatEthiopianDate, formatEthiopianTime, getEthiopianYear } from '../dateUtils';
-import { Teacher, Student, Assessment, normG, normS } from '../utils';
+import { Teacher, Student, Assessment, normG, normS, getSubj, getMax } from '../utils';
 import { useToast } from './ToastContext';
 import { EthiopicClockWidget } from './EthiopicClockWidget';
 
@@ -23,16 +23,20 @@ export const DashboardTab = React.memo(({ teacher, students: allStudents, assess
   const mySubjects = hasTeacherAssignedSubjects ? assignedSubjectsRaw : [];
   
   const students = useMemo(() => 
-    allStudents.filter(st => st.archived !== 1 && (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))),
+    allStudents.filter(st => 
+      st.archived !== 1 && 
+      !getSubj(st) && // Safety: exclude assessments (which have subject/subjectname/subjectName)
+      (!hasTeacherAssignedGrades || myGrades.includes(normG(st.grade)) || myGrades.includes(st.grade))
+    ),
     [allStudents, hasTeacherAssignedGrades, myGrades]
   );
   
   const assessments = useMemo(() => 
     allAssessments.filter(a => {
       const isGradeMatch = !hasTeacherAssignedGrades || myGrades.includes(normG(a.grade)) || myGrades.includes(a.grade);
-      const isSubjectMatch = !hasTeacherAssignedSubjects || mySubjects.includes(a.subjectname);
+      const isSubjectMatch = !hasTeacherAssignedSubjects || mySubjects.includes(getSubj(a));
       
-      const subject = subjects.find(sub => normS(sub.name) === normS(a.subjectname));
+      const subject = subjects.find(sub => normS(sub.name) === normS(getSubj(a)));
       const assessmentSemester = subject?.semester || 'Semester I';
       const isSemesterMatch = assessmentSemester === (settings.currentSemester || 'Semester I');
 

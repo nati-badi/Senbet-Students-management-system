@@ -21,12 +21,23 @@ export interface Student {
 export interface Assessment {
   id: string;
   name: string;
-  subjectname: string;
+  subjectname?: string;
+  subjectName?: string;
   grade: string;
-  maxscore: number;
+  maxscore?: number;
+  maxScore?: number;
   date: string;
   academicyear?: string;
+  academicYear?: string;
 }
+
+// ── Property Access Helpers (Handle case inconsistencies) ──────
+export const getSubj = (obj: any) => obj?.subjectname ?? obj?.subjectName ?? obj?.subject ?? '';
+export const getMax = (obj: any) => obj?.maxscore ?? obj?.maxScore ?? 0;
+export const getYear = (obj: any) => obj?.academicyear ?? obj?.academicYear ?? '';
+export const getBaptismal = (obj: any) => obj?.baptismalname ?? obj?.baptismalName ?? '';
+export const getContact = (obj: any) => obj?.parentcontact ?? obj?.parentContact ?? '';
+export const getPortal = (obj: any) => obj?.portalcode ?? obj?.portalCode ?? '';
 
 export interface Teacher {
   id: string;
