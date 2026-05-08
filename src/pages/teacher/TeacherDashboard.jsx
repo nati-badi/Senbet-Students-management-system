@@ -172,12 +172,12 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
         {
             key: '/teacher/analytics',
             icon: <BarChartOutlined />,
-            label: t('admin.analyticsDashboard', 'Analytics Dashboard')
+            label: t('teacher.analyticsDashboard', 'Analytics Dashboard')
         },
         {
             key: '/teacher/urgent',
             icon: <Badge dot color="red"><WarningOutlined /></Badge>,
-            label: <span className="text-red-500 font-bold">{t('admin.urgentMatters', 'Urgent Matters')}</span>,
+            label: <span className="text-red-500 font-bold">{t('teacher.urgentMatters', 'Urgent Matters')}</span>,
             className: 'menu-item-urgent'
         },
         {
@@ -188,7 +188,7 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
         ...(canManageAssessments ? [{
             key: '/teacher/assessments',
             icon: <BookOutlined />,
-            label: t('admin.assessments', 'Assessments')
+            label: t('teacher.myAssessments', 'Assessments')
         }] : []),
         {
             key: '/teacher/attendance-soon',
@@ -205,8 +205,8 @@ export default function TeacherDashboard({ teacherSession, setTeacherSession, to
 
     const mobileNavItems = [
         { key: '/teacher/mark-entry', icon: <EditOutlined />, label: t('teacher.markEntry') },
-        { key: '/teacher/analytics', icon: <BarChartOutlined />, label: t('admin.analytics') },
-        { key: '/teacher/urgent', icon: <WarningOutlined />, label: t('admin.urgent') },
+        { key: '/teacher/analytics', icon: <BarChartOutlined />, label: t('teacher.analyticsDashboard') },
+        { key: '/teacher/urgent', icon: <WarningOutlined />, label: t('teacher.urgentMatters') },
     ];
 
     return (
@@ -429,7 +429,7 @@ function TeacherLogin({ onLogin }) {
                     <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
                         <Form.Item
                             name="teacherName"
-                            label={<span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{t('admin.name')}</span>}
+                            label={<span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">{t('teacher.fullNameLabel')}</span>}
                             rules={[{ required: true, message: t('teacher.enterNameRequired') }]}
                         >
                             <Input 
@@ -1094,8 +1094,8 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     };
 
     const columns = [
-        { title: t('admin.name'), dataIndex: 'name', key: 'name' },
-        { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
+        { title: t('common.name'), dataIndex: 'name', key: 'name' },
+        { title: t('teacher.gradeLabel'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
         {
             title: selectedAssessment ? `${t('teacher.score')} (/${selectedAssessment.maxScore})` : t('teacher.score'),
             key: 'score',
@@ -1201,7 +1201,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                         filteredAssessments.reduce((acc, a) => {
                                             const subject = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(a.subjectName));
                                             const sem = subject?.semester || 'Semester I';
-                                            const semText = t(`admin.${sem === 'Semester I' ? 'semester1' : 'semester2'}`, sem);
+                                            const semText = t(`teacher.${sem === 'Semester I' ? 'semesterI' : 'semesterII'}`, sem);
                                             const groupLabel = semText;
                                             
                                             if (!acc[groupLabel]) acc[groupLabel] = [];
@@ -1226,7 +1226,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                         onClick={() => navigate('/teacher/assessments')}
                                         className="w-full h-10 rounded-xl"
                                     >
-                                        {t('admin.assessments')}
+                                        {t('teacher.myAssessments')}
                                     </Button>
                                 </Form.Item>
                             </Col>
@@ -1236,7 +1236,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                                 <Form.Item label="&nbsp;" style={{ marginBottom: 0 }}>
                                     <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded flex flex-col justify-center h-10">
                                         <Text strong className="text-blue-700 dark:text-blue-300 text-[15px]">
-                                            {t('admin.maxScore')}: {selectedAssessment.maxScore}
+                                            {t('teacher.maxScore')}: {selectedAssessment.maxScore}
                                         </Text>
                                     </div>
                                 </Form.Item>
@@ -1335,7 +1335,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                             pageSizeOptions: ['10', '20', '50', '100'],
                             showQuickJumper: true,
                             position: ['bottomRight'],
-                            showTotal: (total, range) => `${range[0]}-${range[1]} ${t('admin.target')} ${total}`,
+                            showTotal: (total, range) => `${range[0]}-${range[1]} ${t('common.paginationOf')} ${total}`,
                         }}
                         scroll={{ x: 'max-content', y: 500 }}
                         className="students-table w-full"
@@ -1624,8 +1624,8 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
     };
 
     const columns = [
-        { title: t('admin.name'), dataIndex: 'name', key: 'name' },
-        { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
+        { title: t('common.name'), dataIndex: 'name', key: 'name' },
+        { title: t('teacher.gradeLabel'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
         {
             title: t('teacher.attendance'),
             key: 'status',
@@ -1781,7 +1781,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                                     style={{ width: '100%' }}
                                     value={dayjs(attendanceDate)}
                                     onChange={(date) => setAttendanceDate(date ? date.format('YYYY-MM-DD') : '')}
-                                    placeholder={t('admin.selectDate')}
+                                    placeholder={t('teacher.selectDate')}
                                 />
                                 {attendanceDate && (
                                     <div className="mt-1 text-xs text-slate-500 italic">
@@ -1863,7 +1863,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                             pageSizeOptions: ['10', '20', '50', '100'],
                             showQuickJumper: true,
                             position: ['bottomRight'],
-                            showTotal: (total, range) => `${range[0]}-${range[1]} ${t('admin.target')} ${total}`,
+                            showTotal: (total, range) => `${range[0]}-${range[1]} ${t('common.paginationOf')} ${total}`,
                         }}
                         scroll={{ x: 'max-content', y: 500 }}
                         className="students-table w-full"

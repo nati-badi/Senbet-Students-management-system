@@ -88,7 +88,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
                     ...data,
                     updated_at: new Date().toISOString()
                 });
-                message.success(t('admin.assessmentAdded'));
+                message.success(t('teacher.assessmentAdded'));
             }
             form.resetFields();
             setEditingId(null);
@@ -111,24 +111,24 @@ export default function TeacherAssessmentManagement({ teacher }) {
         try {
             await db.assessments.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'assessments', recordId: id });
-            message.success(t('admin.assessmentDeleted'));
+            message.success(t('teacher.assessmentDeleted'));
         } catch (err) {
             message.error(t('teacher.deleteError'));
         }
     };
 
     const columns = [
-        { title: t('admin.name'), dataIndex: 'name', key: 'name' },
-        { title: t('admin.subjects'), dataIndex: 'subjectName', key: 'subjectName' },
-        { title: t('admin.grade'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
-        { title: t('admin.maxScore'), dataIndex: 'maxScore', key: 'maxScore' },
+        { title: t('common.name'), dataIndex: 'name', key: 'name' },
+        { title: t('teacher.subjects'), dataIndex: 'subjectName', key: 'subjectName' },
+        { title: t('teacher.gradeLabel'), dataIndex: 'grade', key: 'grade', render: (text) => formatGrade(text) },
+        { title: t('teacher.maxScore'), dataIndex: 'maxScore', key: 'maxScore' },
         { 
-            title: t('admin.semester'), 
+            title: t('teacher.semester'), 
             key: 'semester', 
             render: (_, record) => {
                 const subject = allSubjects.find(s => s.name === record.subjectName && normalizeGrade(s.grade) === normalizeGrade(record.grade));
                 const sem = subject?.semester || 'Semester I';
-                return <Tag color="gold">{t(`admin.${sem === 'Semester II' ? 'semester2' : 'semester1'}`, sem)}</Tag>;
+                return <Tag color="gold">{t(`teacher.${sem === 'Semester II' ? 'semesterII' : 'semesterI'}`, sem)}</Tag>;
             }
         },
         { 
@@ -149,7 +149,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
                         type="text"
                     />
                     <Popconfirm
-                        title={t('admin.deleteAssessmentConfirm')}
+                        title={t('common.deleteConfirm')}
                         onConfirm={() => handleDelete(record.id)}
                     >
                         <Button
@@ -183,12 +183,12 @@ export default function TeacherAssessmentManagement({ teacher }) {
                     onClick={() => setIsFormModalOpen(true)}
                     className="rounded-xl shadow-md h-12 px-6 flex items-center gap-2 font-bold"
                 >
-                    {t('admin.addAssessment')}
+                    {t('teacher.addAssessment')}
                 </Button>
             </div>
 
             <Modal
-                title={<Title level={3} className="m-0">{editingId ? t('teacher.editAssessment') : t('admin.addAssessment')}</Title>}
+                title={<Title level={3} className="m-0">{editingId ? t('teacher.editAssessment') : t('teacher.addAssessment')}</Title>}
                 open={isFormModalOpen}
                 onCancel={closeModal}
                 footer={null}
@@ -203,13 +203,13 @@ export default function TeacherAssessmentManagement({ teacher }) {
                             <Col xs={24} md={12}>
                                 <Form.Item
                                     name="grade"
-                                    label={t('admin.grade')}
+                                    label={t('teacher.gradeLabel')}
                                     rules={[{ required: true }]}
                                 >
                                     <Select 
                                         options={availableGradeOptions} 
                                         showSearch 
-                                        placeholder={t('admin.selectGrade')}
+                                        placeholder={t('teacher.chooseGrade')}
                                         onChange={() => {
                                             form.setFieldsValue({ subjectName: undefined });
                                         }}
@@ -220,13 +220,13 @@ export default function TeacherAssessmentManagement({ teacher }) {
                             <Col xs={24} md={12}>
                                 <Form.Item
                                     name="subjectName"
-                                    label={t('admin.subjects')}
+                                    label={t('teacher.subjectLabel')}
                                     rules={[{ required: true }]}
                                 >
                                     <Select 
                                         showSearch
                                         disabled={!selectedGrade}
-                                        placeholder={!selectedGrade ? t('admin.selectGradeFirst') : t('admin.selectSubjectFirst')}
+                                        placeholder={!selectedGrade ? t('teacher.selectGradeFirst') : t('teacher.chooseSubject')}
                                         className="h-10"
                                     >
                                         {subjects.map(s => (
@@ -238,11 +238,11 @@ export default function TeacherAssessmentManagement({ teacher }) {
                             <Col xs={24} md={12}>
                                 <Form.Item
                                     name="name"
-                                    label={t('admin.assessmentName')}
+                                    label={t('teacher.assessmentName')}
                                     rules={[{ required: true }]}
                                 >
                                     <Input 
-                                        placeholder={!selectedSubject ? t('admin.selectSubjectFirst') : t('admin.assessmentNamePlaceholder')} 
+                                        placeholder={!selectedSubject ? t('teacher.chooseSubject') : t('teacher.assessmentNamePlaceholder')} 
                                         disabled={!selectedSubject} 
                                         className="h-10"
                                     />
@@ -252,7 +252,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
                             <Col xs={24} md={12}>
                                 <Form.Item
                                     name="maxScore"
-                                    label={t('admin.maxScore')}
+                                    label={t('teacher.maxScore')}
                                     rules={[{ required: true }]}
                                 >
                                     <Input type="number" disabled={!selectedSubject} min={0} className="h-10" />
@@ -263,7 +263,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
                                     name="date"
                                     label={t('teacher.date')}
                                 >
-                                    <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} placeholder={t('admin.selectDate')} className="h-10" />
+                                    <DatePicker style={{ width: '100%' }} disabled={!selectedSubject} placeholder={t('teacher.selectDate')} className="h-10" />
                                     {form.getFieldValue('date') && (
                                         <div className="mt-1 text-xs text-slate-500 italic">
                                             {formatEthiopianDate(form.getFieldValue('date').toDate())}
@@ -274,10 +274,10 @@ export default function TeacherAssessmentManagement({ teacher }) {
                         </Row>
                         <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 dark:border-slate-800 mt-4">
                             <Button onClick={closeModal} size="large" className="rounded-xl px-6">
-                                {t('admin.cancel')}
+                                {t('common.cancel')}
                             </Button>
                             <Button type="primary" htmlType="submit" size="large" className="rounded-xl px-10 font-bold">
-                                {editingId ? t('common.save') : t('admin.addAssessment')}
+                                {editingId ? t('common.save') : t('teacher.addAssessment')}
                             </Button>
                         </div>
                     </Form>
@@ -295,7 +295,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
                     pageSizeOptions: ['10', '20', '50', '100'],
                     showQuickJumper: true,
                     position: ['bottomRight'],
-                    showTotal: (total, range) => `${range[0]}-${range[1]} ${t('admin.target')} ${total}`,
+                    showTotal: (total, range) => `${range[0]}-${range[1]} ${t('common.paginationOf')} ${total}`,
                 }}
                 className="shadow-sm rounded-xl overflow-hidden"
             />

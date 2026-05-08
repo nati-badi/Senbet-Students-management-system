@@ -18,6 +18,7 @@ const resources = {
                 "actions": "Actions",
                 "delete": "Delete",
                 "searchPlaceholder": "Search by name...",
+                "name": "Name",
                 "logout": "Logout",
                 "studentName": "Student Full Name",
                 "password": "Master Password",
@@ -531,7 +532,15 @@ const resources = {
                 "markExceedsMax": "Mark for this student exceeds max score of {{max}}. Mark ignored.",
                 "studentWrongGrade": "Student is from {{from}}, not {{to}}",
                 "transcriptSubtitle": "Student Results Transcript",
-                "deleteError": "Failed to delete!"
+                "deleteError": "Failed to delete!",
+                "urgentMatters": "Urgent Matters",
+                "addAssessment": "Add Assessment",
+                "assessmentAdded": "Assessment added successfully!",
+                "assessmentDeleted": "Assessment deleted successfully!",
+                "assessmentName": "Assessment Name",
+                "assessmentNamePlaceholder": "e.g. Midterm exam",
+                "maxScore": "Max Score",
+                "semester": "Semester"
             },
             "parent": {
                 "title": "Parent & Student Portal",
@@ -605,6 +614,7 @@ const resources = {
                 "actions": "እርምጃዎች",
                 "delete": "ሰርዝ",
                 "searchPlaceholder": "በስም ፈልግ...",
+                "name": "ስም",
                 "logout": "ውጣ",
                 "studentName": "የተማሪው ሙሉ ስም",
                 "password": "ዋና የይለፍ ቃል",
@@ -1117,7 +1127,15 @@ const resources = {
                 "markExceedsMax": "የዚህ ተማሪ ውጤት ከከፍተኛ ውጤት {{max}} በላይ ነው። ውጤቱ ተቀባይነት አላገኘም።",
                 "studentWrongGrade": "ተማሪው ከ{{from}} ነው፣ ከ{{to}} አይደለም",
                 "transcriptSubtitle": "የተማሪዎች ውጤት መግለጫ",
-                "deleteError": "መሰረዝ አልተቻለም!"
+                "deleteError": "መሰረዝ አልተቻለም!",
+                "urgentMatters": "አስቸኳይ ጉዳዮች",
+                "addAssessment": "ምዘና ጨምር",
+                "assessmentAdded": "ምዘና በተሳካ ሁኔታ ተጨምሯል!",
+                "assessmentDeleted": "ምዘና በተሳካ ሁኔታ ተሰርዟል!",
+                "assessmentName": "የምዘና ስም",
+                "assessmentNamePlaceholder": "ለምሳሌ አጋማሽ ፈተና",
+                "maxScore": "ከፍተኛ ውጤት",
+                "semester": "መንፈቀ ትምህርት"
             },
             "parent": {
                 "title": "የወላጅ እና የተማሪ ፖርታል",

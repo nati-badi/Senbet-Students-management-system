@@ -92,7 +92,7 @@ export default function TeacherUrgentMatters({ teacher }) {
                     </div>
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-white m-0">
-                            {t('admin.urgentMatters')}
+                            {t('teacher.urgentMatters')}
                         </h2>
                         <div className="flex flex-wrap items-center gap-3 mt-3">
                             <p className="text-slate-500 dark:text-slate-400 font-medium m-0">
