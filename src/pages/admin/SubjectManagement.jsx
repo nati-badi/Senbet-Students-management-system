@@ -3,7 +3,7 @@ import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, messag
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
-import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
+import { GRADE_OPTIONS, formatGrade, normalizeGrade, normalizeSubject } from '../../utils/gradeUtils';
 import { syncData } from '../../utils/sync';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 
@@ -60,11 +60,82 @@ export default function SubjectManagement() {
 
     const handleDelete = async (id) => {
         try {
-            await db.subjects.delete(id);
-            await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'subjects', recordId: id });
+            const subject = await db.subjects.get(id);
+            if (!subject) return;
+
+            // Perform cascading delete in a transaction
+            await db.transaction('rw', [db.subjects, db.assessments, db.marks, db.teachers, db.deleted_records], async () => {
+                // 1. Find all assessments for this subject, grade, and semester
+                const matchingAssessments = await db.assessments
+                    .where('subjectName').equals(subject.name)
+                    .filter(a => normalizeGrade(a.grade) === normalizeGrade(subject.grade) && a.semester === subject.semester)
+                    .toArray();
+
+                for (const assessment of matchingAssessments) {
+                    // 2. Delete all marks for each assessment
+                    const marks = await db.marks.where('assessmentId').equals(assessment.id).toArray();
+                    for (const mark of marks) {
+                        await db.marks.delete(mark.id);
+                        await db.deleted_records.add({ 
+                            id: crypto.randomUUID(), 
+                            tableName: 'marks', 
+                            recordId: mark.id,
+                            deleted_at: new Date().toISOString()
+                        });
+                    }
+
+                    // 3. Delete the assessment itself
+                    await db.assessments.delete(assessment.id);
+                    await db.deleted_records.add({ 
+                        id: crypto.randomUUID(), 
+                        tableName: 'assessments', 
+                        recordId: assessment.id,
+                        deleted_at: new Date().toISOString()
+                    });
+                }
+
+                // 4. Update teachers who are assigned to this subject
+                const allSubjects = await db.subjects.toArray();
+                const otherInstancesOfThisSubject = allSubjects.filter(s => 
+                    s.id !== id && normalizeSubject(s.name) === normalizeSubject(subject.name)
+                );
+
+                const teachers = await db.teachers.toArray();
+                for (const teacher of teachers) {
+                    const assignedSubs = teacher.assignedSubjects || [];
+                    const assignedGrades = teacher.assignedGrades || [];
+
+                    if (assignedSubs.some(s => normalizeSubject(s) === normalizeSubject(subject.name))) {
+                        // Check if the teacher still needs this subject assignment for their other grades
+                        const stillNeedsSubject = otherInstancesOfThisSubject.some(s => 
+                            assignedGrades.some(ag => normalizeGrade(ag) === normalizeGrade(s.grade))
+                        );
+
+                        if (!stillNeedsSubject) {
+                            const newAssignedSubs = assignedSubs.filter(s => normalizeSubject(s) !== normalizeSubject(subject.name));
+                            await db.teachers.update(teacher.id, {
+                                assignedSubjects: newAssignedSubs,
+                                synced: 0,
+                                updated_at: new Date().toISOString()
+                            });
+                        }
+                    }
+                }
+
+                // 5. Finally delete the subject
+                await db.subjects.delete(id);
+                await db.deleted_records.add({ 
+                    id: crypto.randomUUID(), 
+                    tableName: 'subjects', 
+                    recordId: id,
+                    deleted_at: new Date().toISOString()
+                });
+            });
+
             message.success(t('admin.subjectDeleted'));
             await syncData().catch(console.error);
         } catch (err) {
+            console.error("Failed to delete subject cascadingly:", err);
             message.error(t('admin.subjectDeleteError'));
         }
     };

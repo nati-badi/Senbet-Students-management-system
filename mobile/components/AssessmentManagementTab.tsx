@@ -237,7 +237,7 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
                     selectedKey={selectedSubject} 
                     onSelect={setSelectedSubject} 
                     C={C} s={s} 
-                    disabled={!selectedGrade}
+                    disabled={!selectedGrade || filteredSubjects.length === 0}
                   />
 
                   <Text style={s.inputLabel}>{t('assessment.assessmentName')}</Text>

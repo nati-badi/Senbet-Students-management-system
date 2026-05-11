@@ -106,13 +106,8 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
       }
     });
 
-    // Fallback: If no metadata matches, show all assigned subjects to avoid "disappearing" data
-    if (allowedSubjectKeyToLabel.size === 0 && (mySubjects || []).length > 0) {
-      (mySubjects || []).forEach(subj => {
-        const key = normS(subj);
-        if (key && !allowedSubjectKeyToLabel.has(key)) allowedSubjectKeyToLabel.set(key, subj);
-      });
-    }
+    // Desktop parity: Do NOT fallback. If no metadata exists for this grade, the list should be empty.
+
 
     return [...allowedSubjectKeyToLabel.entries()].map(([key, label]) => ({ key, label }));
   }, [mySubjects, subjects, selectedGrade, settings.currentSemester]);
@@ -439,10 +434,10 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
         </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}>
-            <PremiumDropdown label={t('assessment.subject', 'Subject')} placeholder={t('common.selectSubject', 'Select Subject')} items={gradeSubjects} selectedKey={selectedSubjectKey} onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }} C={C} s={s} disabled={!selectedGrade} />
+            <PremiumDropdown label={t('assessment.subject', 'Subject')} placeholder={t('common.selectSubject', 'Select Subject')} items={gradeSubjects} selectedKey={selectedSubjectKey} onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }} C={C} s={s} disabled={!selectedGrade || gradeSubjects.length === 0} />
           </View>
           <View style={{ flex: 1 }}>
-            <PremiumDropdown label={t('assessment.label', 'Assessment')} placeholder={t('common.selectAssessment', 'Select Assessment')} items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))} selectedKey={selectedAssessment?.id || null} onSelect={(key) => { const a = filteredAssessments.find(ax => ax.id === key); if (a) { setSelectedSubject(normS(getSubj(a))); setSelectedAssessment(a); } }} C={C} s={s} disabled={!selectedSubjectKey} />
+            <PremiumDropdown label={t('assessment.label', 'Assessment')} placeholder={t('common.selectAssessment', 'Select Assessment')} items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))} selectedKey={selectedAssessment?.id || null} onSelect={(key) => { const a = filteredAssessments.find(ax => ax.id === key); if (a) { setSelectedSubject(normS(getSubj(a))); setSelectedAssessment(a); } }} C={C} s={s} disabled={!selectedSubjectKey || filteredAssessments.length === 0} />
           </View>
         </View>
         <TextInput style={[s.searchInput, { margin: 0, marginBottom: 16 }]} placeholder={t('common.searchStudents')} placeholderTextColor={C.muted} value={search} onChangeText={setSearch} />
