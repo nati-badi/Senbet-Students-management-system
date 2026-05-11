@@ -375,7 +375,7 @@ export default function AcademicSetup() {
                                             dataSource={displayedStudents}
                                             columns={promotionColumns}
                                             rowKey="id"
-                                            pagination={{ pageSize: 10 }}
+                                            pagination={{ defaultPageSize: 10 }}
                                             size="small"
                                             className="mb-4"
                                         />

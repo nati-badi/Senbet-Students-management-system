@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Typography, Card, Table, Button, Space, Modal, Form, Input, Select, Popconfirm, message, Tag, Tooltip, Switch } from 'antd';
+import { Typography, Card, Table, Button, Space, Modal, Form, Input, Select, Popconfirm, App, Tag, Tooltip, Switch } from 'antd';
 import { UserAddOutlined, EditOutlined, DeleteOutlined, KeyOutlined, CopyOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -14,6 +14,7 @@ export default function TeacherManagement() {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingTeacher, setEditingTeacher] = useState(null);
     const [form] = Form.useForm();
+    const { message } = App.useApp();
     const settingsRows = useLiveQuery(() => db.settings?.toArray()) || [];
     const currentSemester = settingsRows.find(r => r.key === 'currentSemester')?.value || 'Semester I';
 
@@ -67,6 +68,10 @@ export default function TeacherManagement() {
         try {
             const myGrades = values.assignedGrades || [];
             const mySubjects = values.assignedSubjects || [];
+            
+            // Normalize inputs once
+            const normMyGrades = myGrades.map(g => normalizeGrade(g));
+            const normMySubjects = mySubjects.map(s => normalizeSubject(s));
 
             // Check for conflicts with other teachers
             for (const teacher of teachers) {
@@ -92,39 +97,48 @@ export default function TeacherManagement() {
                 const otherGrades = teacher.assignedGrades || [];
                 const otherSubjects = teacher.assignedSubjects || [];
 
-                const overlapGrades = otherGrades.filter(og => 
-                    myGrades.some(mg => normalizeGrade(mg) === normalizeGrade(og))
+                const hasGradeOverlap = otherGrades.some(og => 
+                    normMyGrades.includes(normalizeGrade(og))
                 );
-                const overlapSubjects = otherSubjects.filter(os => 
-                    mySubjects.some(ms => normalizeSubject(ms) === normalizeSubject(os))
-                );
+                
+                if (hasGradeOverlap) {
+                    const overlapSubjects = otherSubjects.filter(os => 
+                        normMySubjects.includes(normalizeSubject(os))
+                    );
 
-                if (overlapGrades.length > 0 && overlapSubjects.length > 0) {
-                    const gradeList = overlapGrades.map(g => formatGrade(g)).join(', ');
-                    const subjectList = overlapSubjects.join(', ');
-                    message.error(t('admin.teacherConflict', { name: teacher.name, subjects: subjectList, grades: gradeList }));
-                    return; // Block save
+                    if (overlapSubjects.length > 0) {
+                        const gradeList = otherGrades.filter(og => normMyGrades.includes(normalizeGrade(og))).map(g => formatGrade(g)).join(', ');
+                        const subjectList = overlapSubjects.join(', ');
+                        message.error(t('admin.teacherConflict', { name: teacher.name, subjects: subjectList, grades: gradeList }));
+                        return; // Block save
+                    }
                 }
             }
 
-            if (editingTeacher) {
-                await db.teachers.update(editingTeacher.id, { 
-                    ...values, 
-                    synced: 0,
-                    updated_at: new Date().toISOString()
-                });
-                message.success(t('admin.teacherUpdated'));
-            } else {
-                await db.teachers.add({
-                    id: crypto.randomUUID(),
-                    ...values,
-                    synced: 0,
-                    updated_at: new Date().toISOString()
-                });
-                message.success(t('admin.teacherAdded'));
-            }
-            await syncData().catch(console.error);
+            // Close modal immediately for snappy UI
             handleCancel();
+
+            await db.transaction('rw', db.teachers, async () => {
+                if (editingTeacher) {
+                    await db.teachers.update(editingTeacher.id, { 
+                        ...values, 
+                        synced: 0,
+                        updated_at: new Date().toISOString()
+                    });
+                    message.success(t('admin.teacherUpdated'));
+                } else {
+                    await db.teachers.add({
+                        id: crypto.randomUUID(),
+                        ...values,
+                        synced: 0,
+                        updated_at: new Date().toISOString()
+                    });
+                    message.success(t('admin.teacherAdded'));
+                }
+            });
+
+            // Run sync in the background
+            syncData().catch(err => console.error('Background sync failed:', err));
         } catch (error) {
             console.error('Error saving teacher:', error);
             message.error(t('admin.teacherSaveFailed'));
@@ -166,7 +180,7 @@ export default function TeacherManagement() {
             await db.teachers.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'teachers', recordId: id });
             message.success(t('admin.teacherDeleted'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (error) {
             console.error('Error deleting teacher:', error);
             message.error(t('admin.teacherDeleteFailed'));
@@ -263,7 +277,7 @@ export default function TeacherManagement() {
                     columns={columns} 
                     dataSource={teachers}
                     rowKey="id"
-                    pagination={{ pageSize: 15 }}
+                    pagination={{ defaultPageSize: 15 }}
                     scroll={{ x: 'max-content' }}
                 />
             </Card>

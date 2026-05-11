@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Typography, Row, Col, Card, Input, Empty, Descriptions, Tag, Space, Table, Alert, Divider, List, Avatar, Button, Tabs, Form, message, Switch, Segmented, Skeleton } from 'antd';
+import { Typography, Row, Col, Card, Input, Empty, Descriptions, Tag, Space, Table, Alert, Divider, List, Avatar, Button, Tabs, Form, App, Switch, Segmented, Skeleton } from 'antd';
 import {
     SearchOutlined,
     UserOutlined,
@@ -43,6 +43,7 @@ const { Title, Text, Paragraph } = Typography;
 
 export default function ParentPortal({ toggleTheme, toggleLanguage, handleSync, isDarkMode }) {
     const { t, i18n } = useTranslation();
+    const { message } = App.useApp();
     const [activeTab, setActiveTab] = useState('home');
     const [loggedInStudentId, setLoggedInStudentId] = useState(() => {
         const saved = sessionStorage.getItem('senbet_parent_auth');

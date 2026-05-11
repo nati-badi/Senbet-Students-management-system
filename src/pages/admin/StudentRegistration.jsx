@@ -31,7 +31,7 @@ export default function StudentRegistration() {
             return '';
         }
     });
-    const [filterGrade, setFilterGrade] = useState('');
+    const [filterGrade, setFilterGrade] = useState(undefined);
     const [isFormValid, setIsFormValid] = useState(false);
     const [profileStudentId, setProfileStudentId] = useState(null);
     const [activeTab, setActiveTab] = useState('active');
@@ -99,7 +99,7 @@ export default function StudentRegistration() {
             form.setFieldsValue({ dateOfEntry: dayjs() });
             setIsFormValid(false);
             message.success(t('admin.studentRegistered'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             message.error(t('admin.studentRegisterFailed'));
         }
@@ -110,7 +110,7 @@ export default function StudentRegistration() {
             await db.students.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'students', recordId: id });
             message.success(t('admin.studentDeleted'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             message.error(t('admin.deleteFailed'));
         }
@@ -124,7 +124,7 @@ export default function StudentRegistration() {
                 updated_at: new Date().toISOString() 
             });
             message.success(t('admin.studentArchived'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             message.error(t('admin.archiveFailed'));
         }
@@ -143,7 +143,7 @@ export default function StudentRegistration() {
                         updated_at: new Date().toISOString() 
                     });
                     message.success(t('admin.studentRestored'));
-                    await syncData().catch(console.error);
+                    syncData().catch(console.error);
                 } catch (err) {
                     message.error(t('admin.restoreFailed'));
                 }
@@ -173,7 +173,7 @@ export default function StudentRegistration() {
             });
             setIsEditModalVisible(false);
             message.success(t('admin.studentUpdated'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             console.error("Failed to edit student:", err);
         }
@@ -216,7 +216,7 @@ export default function StudentRegistration() {
             
             setIsPromoteModalVisible(false);
             message.success(t('admin.promotedSuccess', { name: promotingStudent.name }));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             console.error("Promotion failed:", err);
         }
@@ -380,7 +380,7 @@ export default function StudentRegistration() {
             }
             
             message.success(t('admin.codesGenerated', { count: missing.length }));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (error) {
             console.error('Error generating codes:', error);
             message.error(t('admin.codesGenerateFailed'));
@@ -401,7 +401,7 @@ export default function StudentRegistration() {
                 updated_at: new Date().toISOString()
             });
             message.success(t('admin.codeGenerated'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (error) {
             message.error(t('admin.codeGenerateFailed'));
         }
@@ -610,7 +610,7 @@ export default function StudentRegistration() {
                 loading={isLoadingStudents}
                 scroll={{ x: 'max-content' }}
                 pagination={{
-                    pageSize: 10,
+                    defaultPageSize: 10,
                     showSizeChanger: true,
                     pageSizeOptions: ['10', '20', '50', '100'],
                     showQuickJumper: true,
@@ -699,7 +699,7 @@ export default function StudentRegistration() {
                     dataSource={importPreview}
                     rowKey="id"
                     size="small"
-                    pagination={{ pageSize: 10 }}
+                    pagination={{ defaultPageSize: 10 }}
                     scroll={{ x: 700 }}
                     rowClassName={(record) => record._issues?.length ? 'bg-red-50 dark:bg-red-950/20' : 'bg-green-50 dark:bg-green-950/20'}
                     columns={[

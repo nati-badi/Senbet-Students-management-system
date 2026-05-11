@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, message, Row, Col, Select, DatePicker, Tag, Modal } from 'antd';
+import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, App, Row, Col, Select, DatePicker, Tag, Modal } from 'antd';
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -14,6 +14,7 @@ const { Title, Text, Paragraph } = Typography;
 export default function AssessmentManagement() {
     const { t, i18n } = useTranslation();
     const [modal, contextHolder] = Modal.useModal();
+    const { message } = App.useApp();
     const [form] = Form.useForm();
     const [editingId, setEditingId] = useState(null);
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -76,7 +77,7 @@ export default function AssessmentManagement() {
             form.resetFields();
             setEditingId(null);
             setIsFormModalOpen(false);
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             message.error(t('admin.assessmentSaveError'));
         }
@@ -96,7 +97,7 @@ export default function AssessmentManagement() {
             await db.assessments.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'assessments', recordId: id });
             message.success(t('admin.assessmentDeleted'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             message.error(t('admin.assessmentDeleteError'));
         }
@@ -278,7 +279,7 @@ export default function AssessmentManagement() {
                 rowKey="id"
                 scroll={{ x: 'max-content' }}
                 pagination={{
-                    pageSize: 10,
+                    defaultPageSize: 10,
                     showSizeChanger: true,
                     pageSizeOptions: ['10', '20', '50', '100'],
                     showQuickJumper: true,

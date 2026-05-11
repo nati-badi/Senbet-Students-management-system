@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, message, Select, Tag, Modal, Row, Col } from 'antd';
+import { Typography, Card, Form, Input, Button, Space, Table, Popconfirm, App, Select, Tag, Modal, Row, Col } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/database';
@@ -14,6 +14,7 @@ export default function SubjectManagement() {
     const [form] = Form.useForm();
     const [editingId, setEditingId] = useState(null);
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+    const { message } = App.useApp();
 
     const subjects = useLiveQuery(() => db.subjects.toArray()) || [];
 
@@ -42,7 +43,7 @@ export default function SubjectManagement() {
             form.resetFields();
             setEditingId(null);
             setIsFormModalOpen(false);
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             message.error(t('admin.subjectSaveError'));
         }
@@ -133,7 +134,7 @@ export default function SubjectManagement() {
             });
 
             message.success(t('admin.subjectDeleted'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             console.error("Failed to delete subject cascadingly:", err);
             message.error(t('admin.subjectDeleteError'));
@@ -262,7 +263,7 @@ export default function SubjectManagement() {
                 rowKey="id"
                 scroll={{ x: 'max-content' }}
                 pagination={{
-                    pageSize: 10,
+                    defaultPageSize: 10,
                     showSizeChanger: true,
                     pageSizeOptions: ['10', '20', '50', '100'],
                     showQuickJumper: true,

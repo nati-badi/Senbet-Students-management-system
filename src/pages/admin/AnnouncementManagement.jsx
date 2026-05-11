@@ -45,7 +45,7 @@ export default function AnnouncementManagement() {
                 message.success(t('admin.announcementAdded', 'Announcement added successfully'));
             }
             closeModal();
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             message.error(t('common.saveError', 'Failed to save announcement'));
         }
@@ -66,7 +66,7 @@ export default function AnnouncementManagement() {
             await db.announcements.delete(id);
             await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'announcements', recordId: id });
             message.success(t('admin.announcementDeleted', 'Announcement deleted successfully'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             message.error(t('common.deleteError', 'Failed to delete'));
         }
@@ -237,7 +237,7 @@ export default function AnnouncementManagement() {
                 columns={columns}
                 dataSource={announcements}
                 rowKey="id"
-                pagination={{ pageSize: 10 }}
+                pagination={{ defaultPageSize: 10 }}
                 className="shadow-sm rounded-xl overflow-hidden"
             />
         </div>

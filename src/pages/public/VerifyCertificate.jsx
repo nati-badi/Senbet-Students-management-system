@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Spin, Typography, message } from 'antd';
+import { Spin, Typography, App } from 'antd';
 import { DownloadOutlined, SafetyCertificateFilled, CheckCircleFilled } from '@ant-design/icons';
 import { QRCodeCanvas } from 'qrcode.react';
 import dayjs from 'dayjs';
@@ -14,6 +14,7 @@ const { Text } = Typography;
 
 export default function VerifyCertificate() {
   const { id } = useParams();
+  const { message } = App.useApp();
   const certRef = useRef(null);
   const hiddenCertRef = useRef(null); // Hidden full-scale ref for capture
   const containerRef = useRef(null);

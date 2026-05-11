@@ -129,13 +129,14 @@ export const calculateSingleStudentRank = (
   assessments: UnifiedAssessment[],
   marks: UnifiedMark[],
   activeSemester: string,
-  subjects: any[]
+  subjects: any[],
+  targetGrade?: string
 ) => {
   if (!student || !allStudents || !assessments || !marks || !subjects) {
     return { classRank: 'N/A', overallRank: 'N/A', totalInClass: 0, totalInGrade: 0 };
   }
 
-  const studentGradeNorm = normalizeGrade(student.grade);
+  const studentGradeNorm = targetGrade ? normalizeGrade(targetGrade) : normalizeGrade(student.grade);
 
   // 1. Filter assessments by Grade, Conduct status, and Semester
   const filteredAssessments = assessments.filter(a => {
@@ -207,11 +208,12 @@ export const calculateSubjectRows = (
   assessments: UnifiedAssessment[],
   marks: UnifiedMark[],
   subjects: any[],
-  activeSemester: string
+  activeSemester: string,
+  targetGrade?: string
 ) => {
   if (!student) return [];
 
-  const gradeNorm = normalizeGrade(student.grade);
+  const gradeNorm = targetGrade ? normalizeGrade(targetGrade) : normalizeGrade(student.grade);
   
   const gradeAssessments = assessments.filter(a => {
     const isTargetGrade = !student.grade || normalizeGrade(a.grade) === gradeNorm;

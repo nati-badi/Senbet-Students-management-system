@@ -475,7 +475,7 @@ function TeacherLogin({ onLogin }) {
                                 className="h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border-none font-bold text-[10px] uppercase tracking-widest hover:bg-rose-500/20"
                                 onClick={async () => {
                                     message.loading(t('common.syncingCloud'), 1.5);
-                                    await syncData();
+                                    syncData().catch(console.error);
                                     window.dispatchEvent(new Event('syncComplete'));
                                 }}
                             >
@@ -875,7 +875,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
             setModifiedMarks(new Set());
             message.success(t('teacher.saveSuccess', 'Marks saved successfully!'));
-            await syncData().catch(console.error);
+            syncData().catch(console.error);
         } catch (err) {
             console.error("Save failed:", err);
             message.error(t('teacher.saveError', 'Failed to save marks!'));
@@ -1858,7 +1858,7 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
                         dataSource={studentsInGrade}
                         rowKey="id"
                         pagination={{
-                            pageSize: 10,
+                            defaultPageSize: 10,
                             showSizeChanger: true,
                             pageSizeOptions: ['10', '20', '50', '100'],
                             showQuickJumper: true,

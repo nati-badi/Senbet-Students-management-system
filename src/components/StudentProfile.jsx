@@ -156,13 +156,35 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
     // --- Academic Data ---
     // Filter assessments relevant only to this student's grade
-    const studentGradeNorm = useMemo(() => normalizeGrade(student?.grade), [student]);
+    // Resolve the grade for the selected year. 
+    // If the selected year is the student's current year, use their current grade.
+    // Otherwise, try to find their grade from that year's assessments/marks.
+    const activeGradeNorm = useMemo(() => {
+        if (!student || !activeYearToUse) return '';
+        const selectedYearNum = getEthiopianYear(activeYearToUse);
+        const studentYearNum = getEthiopianYear(student.academicYear);
+
+        if (selectedYearNum === studentYearNum) return normalizeGrade(student.grade);
+
+        // Find a mark from this year to identify the grade
+        const yearMark = marks.find(m => getEthiopianYear(m.academicYear) === selectedYearNum && m.assessmentId);
+        if (yearMark) {
+            const ass = allAssessments.find(a => a.id === yearMark.assessmentId);
+            if (ass) return normalizeGrade(ass.grade);
+        }
+
+        // Fallback: If no marks found for that year, we might be looking at a year 
+        // with no records or just subjects. We stay with student's current grade 
+        // if we can't find a better match.
+        return normalizeGrade(student.grade);
+    }, [student, activeYearToUse, marks, allAssessments]);
+
     const gradeAssessments = useMemo(() => {
-        if (!allAssessments || !studentGradeNorm || !activeYearToUse) return [];
+        if (!allAssessments || !activeGradeNorm || !activeYearToUse) return [];
         const targetYearNum = getEthiopianYear(activeYearToUse);
 
         return allAssessments.filter(a => {
-            if (normalizeGrade(a.grade) !== studentGradeNorm) return false;
+            if (normalizeGrade(a.grade) !== activeGradeNorm) return false;
             
             const assessmentYearNum = a.academicYear ? getEthiopianYear(a.academicYear) : null;
             
@@ -176,12 +198,12 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
 
             return matchesYear;
         }).filter(a => !isConductAssessment(a));
-    }, [allAssessments, studentGradeNorm, activeYearToUse]);
+    }, [allAssessments, activeGradeNorm, activeYearToUse]);
 
     // Map marks to assessments
     const markHistory = useMemo(() => {
         // 1. Get all subjects for this grade
-        const relevantSubjects = allSubjects.filter(s => normalizeGrade(s.grade) === studentGradeNorm);
+        const relevantSubjects = allSubjects.filter(s => normalizeGrade(s.grade) === activeGradeNorm);
         const subjectNames = [...new Set(relevantSubjects.map(s => s.name))].sort();
 
         // 2. Map assessments into the history
@@ -190,7 +212,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             const rawSubj = assessment.subjectName || assessment.subjectname;
             const subject = allSubjects.find(s => 
                 String(s.name || '').toLowerCase().trim() === String(rawSubj || '').toLowerCase().trim() &&
-                normalizeGrade(s.grade) === studentGradeNorm
+                normalizeGrade(s.grade) === activeGradeNorm
             );
             return {
                 key: assessment.id,
@@ -206,17 +228,20 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             };
         });
 
-        // 3. Add placeholders for subjects that have NO assessments yet
-        subjectNames.forEach(subName => {
-            const hasAssessments = historyEntries.some(h => String(h.subject).toLowerCase().trim() === subName.toLowerCase().trim());
-            if (!hasAssessments) {
-                const subMeta = relevantSubjects.find(s => s.name === subName);
+        // 3. Add placeholders for subjects that have NO assessments yet for specific semesters
+        relevantSubjects.forEach(subjectObj => {
+            const hasAssessmentsInSem = historyEntries.some(h => 
+                String(h.subject).toLowerCase().trim() === String(subjectObj.name).toLowerCase().trim() &&
+                h.semester === subjectObj.semester
+            );
+            
+            if (!hasAssessmentsInSem) {
                 historyEntries.push({
-                    key: `empty-${subName}`,
+                    key: `empty-${subjectObj.id}-${subjectObj.name}-${subjectObj.semester}`,
                     assessmentId: null,
                     assessmentName: '—',
-                    subject: subName,
-                    semester: subMeta?.semester || 'Semester I',
+                    subject: subjectObj.name,
+                    semester: subjectObj.semester || 'Semester I',
                     score: null,
                     maxScore: '-',
                     date: '-',
@@ -230,7 +255,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             if (a.date === '-' || b.date === '-') return 0;
             return new Date(b.date) - new Date(a.date);
         });
-    }, [gradeAssessments, marks, allSubjects, studentGradeNorm]);
+    }, [gradeAssessments, marks, allSubjects, activeGradeNorm]);
 
     const subjectRows = useMemo(() => {
         if (!student || !activeYearToUse || !gradeAssessments.length) return [];
@@ -245,8 +270,8 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             return false;
         });
         
-        return calculateSubjectRows(student, gradeAssessments, yearMarks, allSubjects, activeSemester);
-    }, [student, gradeAssessments, allMarks, allSubjects, activeSemester, activeYearToUse]);
+        return calculateSubjectRows(student, gradeAssessments, yearMarks, allSubjects, activeSemester, activeGradeNorm);
+    }, [student, gradeAssessments, allMarks, allSubjects, activeSemester, activeYearToUse, activeGradeNorm]);
 
     const rankingInfo = useMemo(() => {
         if (!student || !activeYearToUse || !gradeAssessments.length) {
@@ -262,8 +287,8 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
             return false;
         });
         
-        return calculateSingleStudentRank(student, allStudents, gradeAssessments, yearMarks, activeSemester, allSubjects);
-    }, [student, allStudents, gradeAssessments, allMarks, activeSemester, allSubjects, activeYearToUse]);
+        return calculateSingleStudentRank(student, allStudents, gradeAssessments, yearMarks, activeSemester, allSubjects, activeGradeNorm);
+    }, [student, allStudents, gradeAssessments, allMarks, activeSemester, allSubjects, activeYearToUse, activeGradeNorm]);
 
     const academicStats = useMemo(() => {
         const stats = rankingInfo.stats || { totalScore: 0, totalMax: 0, percentage: 0 };
@@ -547,7 +572,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                             <div className="flex gap-16 text-right">
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">{t('teacher.gradeLabel')} / GRADE</span>
-                                    <span className="text-2xl font-bold text-[#2c1810] mt-1">{student?.grade}</span>
+                                    <span className="text-2xl font-bold text-[#2c1810] mt-1">{formatGrade(activeGradeNorm)}</span>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-[11px] text-[#8c7361] font-bold uppercase tracking-widest">{t('teacher.yearLabel')} / YEAR</span>
