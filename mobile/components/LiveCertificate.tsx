@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Platform, RefreshControl } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useTranslation } from 'react-i18next';
 import { Student, Assessment, isConduct } from '../utils';
@@ -13,7 +13,9 @@ export const LiveCertificate = React.memo(({
   allStudents, 
   subjects, 
   settings, 
-  C 
+  C,
+  onRefresh,
+  refreshing
 }: { 
   student: Student, 
   assessments: Assessment[], 
@@ -21,7 +23,9 @@ export const LiveCertificate = React.memo(({
   allStudents?: Student[], 
   subjects?: any[], 
   settings?: any, 
-  C: any 
+  C: any,
+  onRefresh?: () => void,
+  refreshing?: boolean
 }) => {
   const { t } = useTranslation();
 
@@ -75,6 +79,7 @@ export const LiveCertificate = React.memo(({
         style={styles.container} 
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={onRefresh ? <RefreshControl refreshing={refreshing || false} onRefresh={onRefresh} tintColor="#d4af37" /> : undefined}
     >
         <View style={styles.certificateOuter}>
             {/* Border Decorations */}

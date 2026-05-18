@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image as RNImage, Linking, Animated, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback
+  StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image as RNImage, Linking, Animated, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback, useWindowDimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import NetInfo from "@react-native-community/netinfo";
@@ -42,6 +42,98 @@ import Svg, { Rect, Circle, Path } from 'react-native-svg';
 
 const Tab = createBottomTabNavigator();
 const Drawer = createDrawerNavigator();
+
+// ── Stable Screen Components to prevent state loss on re-render ────────────────
+const MainTabsLayout = React.memo(({ teacher, students, assessments, marks, attendance, subjects, settings, onSync, isSyncing, isOnline, lastSync, setMarks, setAttendance, setProfileStudent, C, s, t, showToast }: any) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const { width: windowWidth } = useWindowDimensions();
+
+  const tabs = [
+    { name: 'Dashboard', icon: Home, render: () => <DashboardTab teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} subjects={subjects} settings={settings} C={C} s={s} setTab={(t: any) => { const idx = tabs.findIndex(tab => tab.name === t); if (idx !== -1) { setActiveIndex(idx); scrollRef.current?.scrollTo({ x: idx * windowWidth, animated: true }); } }} onSync={onSync} isSyncing={isSyncing} isOnline={isOnline} lastSync={lastSync} /> },
+    { name: 'Students', icon: Users, render: () => <StudentsTab teacher={teacher!} students={students} onRefresh={onSync} C={C} s={s} onStudentPress={setProfileStudent} /> },
+    { name: 'Attendance', icon: CalendarCheck, render: () => <AttendanceTab teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={onSync} C={C} s={s} settings={settings} />, disabled: true },
+    { name: 'Marks', icon: BarChart3, render: () => <MarksTab teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={onSync} C={C} s={s} onStudentPress={setProfileStudent} settings={settings} subjects={subjects} /> }
+  ];
+
+  const handleTabPress = (index: number) => {
+    if (tabs[index].disabled) {
+      showToast(t('common.comingSoon', 'Coming Soon'), 'info');
+      return;
+    }
+    setActiveIndex(index);
+    scrollRef.current?.scrollTo({ x: index * windowWidth, animated: true });
+  };
+
+  const onScroll = (event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(offsetX / windowWidth);
+    if (index !== activeIndex) {
+       setActiveIndex(index);
+    }
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={onScroll}
+        bounces={false}
+        scrollEventThrottle={16}
+      >
+        {tabs.map((tab, index) => (
+          <View key={tab.name} style={{ width: windowWidth, flex: 1 }}>
+            {tab.render()}
+          </View>
+        ))}
+      </ScrollView>
+      
+      <View style={{
+        flexDirection: 'row',
+        borderTopWidth: 1,
+        borderTopColor: C.border,
+        backgroundColor: C.card,
+        height: Platform.OS === 'ios' ? 88 : 64,
+        paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+        paddingTop: 8,
+        alignItems: 'center',
+        justifyContent: 'space-around'
+      }}>
+        {tabs.map((tab, index) => {
+          const Icon = tab.icon;
+          const isActive = activeIndex === index;
+          const color = isActive ? C.accent : C.muted;
+          const size = isActive ? 24 : 20;
+
+          return (
+            <TouchableOpacity 
+              key={tab.name} 
+              onPress={() => handleTabPress(index)}
+              style={{ alignItems: 'center', justifyContent: 'center', flex: 1, opacity: tab.disabled ? 0.4 : 1 }}
+            >
+              <Icon size={size} color={color} strokeWidth={isActive ? 2.5 : 2} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+});
+
+const AnalyticsScreen = React.memo(({ teacher, students, assessments, marks, C, s, onSync, settings, subjects }: any) => (
+  <AnalyticsTab teacher={teacher} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={onSync} settings={settings} subjects={subjects} />
+));
+
+const UrgentScreen = React.memo(({ teacher, students, assessments, marksData, subjects, settings, C, s, onRefresh }: any) => (
+  <UrgentMattersTab teacher={teacher} students={students} assessments={assessments} marksData={marksData} subjects={subjects} settings={settings} C={C} s={s} onRefresh={onRefresh} />
+));
+
+const AssessmentMgmtScreen = React.memo(({ teacher, assessments, subjects, settings, C, s, onRefresh }: any) => (
+  <AssessmentManagementTab teacher={teacher} assessments={assessments} subjects={subjects} settings={settings} C={C} s={s} onRefresh={onRefresh} />
+));
 
 const EthiopianCross = ({ size = 48, color = '#d4af37', style }: { size?: number, color?: string, style?: any }) => (
   <View style={[{ width: size, height: size }, style]}>
@@ -622,63 +714,17 @@ function AppContent({ isDark, setIsDark }: { isDark: boolean, setIsDark: (v: boo
               drawerLabel: t('dashboard.title')
             }}
           >
-            {(props: any) => (
-              <Tab.Navigator
-                screenOptions={({ route }) => ({
-                  headerShown: false,
-                  tabBarStyle: {
-                    borderTopWidth: 1,
-                    borderTopColor: C.border,
-                    backgroundColor: C.card,
-                    height: Platform.OS === 'ios' ? 88 : 64,
-                    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-                    paddingTop: 8,
-                    elevation: 0,
-                    shadowOpacity: 0
-                  },
-                  tabBarActiveTintColor: C.accent,
-                  tabBarInactiveTintColor: C.muted,
-                  tabBarShowLabel: false,
-                  tabBarIcon: ({ color, focused }) => {
-                    const size = focused ? 24 : 20;
-                    if (route.name === 'Dashboard') return <Home size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                    if (route.name === 'Students') return <Users size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                    if (route.name === 'Attendance') return (
-                      <View style={{ opacity: 0.4 }}>
-                        <CalendarCheck size={size} color={color} strokeWidth={focused ? 2.5 : 2} />
-                      </View>
-                    );
-                    if (route.name === 'Marks') return <BarChart3 size={size} color={color} strokeWidth={focused ? 2.5 : 2} />;
-                    return null;
-                  }
-                })}
-              >
-                <Tab.Screen name="Dashboard">{(props: any) => <DashboardTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} attendance={attendance} subjects={subjects} settings={settings} C={C} s={s} setTab={(t: any) => props.navigation.navigate(t)} onSync={() => syncData()} isSyncing={syncing} isOnline={isOnline} lastSync={lastSync} />}</Tab.Screen>
-                <Tab.Screen name="Students">{(props: any) => <StudentsTab {...props} teacher={teacher!} students={students} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} />}</Tab.Screen>
-                <Tab.Screen
-                  name="Attendance"
-                  listeners={{
-                    tabPress: (e) => {
-                      e.preventDefault();
-                      showToast(t('common.comingSoon', 'Coming Soon'), 'info');
-                    },
-                  }}
-                >
-                  {(props: any) => <AttendanceTab {...props} teacher={teacher!} students={students} attendanceData={attendance} setAttendanceData={setAttendance} onRefresh={() => syncData()} C={C} s={s} settings={settings} />}
-                </Tab.Screen>
-                <Tab.Screen name="Marks">{(props: any) => <MarksTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} setMarksData={setMarks} onRefresh={() => syncData()} C={C} s={s} onStudentPress={setProfileStudent} settings={settings} subjects={subjects} />}</Tab.Screen>
-              </Tab.Navigator>
-            )}
+            {(props: any) => <MainTabsLayout {...props} teacher={teacher} students={students} assessments={assessments} marks={marks} attendance={attendance} subjects={subjects} settings={settings} onSync={syncData} isSyncing={syncing} isOnline={isOnline} lastSync={lastSync} setMarks={setMarks} setAttendance={setAttendance} setProfileStudent={setProfileStudent} C={C} s={s} t={t} showToast={showToast} />}
           </Drawer.Screen>
           <Drawer.Screen name="Analytics" options={{ title: t('teacher.analytics'), drawerIcon: ({ color }) => <TrendingUp size={18} color={color} />, drawerLabel: t('teacher.analytics') }}>
-            {(props: any) => <AnalyticsTab {...props} teacher={teacher!} students={students} assessments={assessments} marks={marks} C={C} s={s} onRefresh={() => syncData()} settings={settings} subjects={subjects} />}
+            {(props: any) => <AnalyticsScreen {...props} teacher={teacher} students={students} assessments={assessments} marks={marks} C={C} s={s} onSync={syncData} settings={settings} subjects={subjects} />}
           </Drawer.Screen>
           <Drawer.Screen name="Urgent" options={{ title: t('teacher.urgent'), drawerIcon: ({ color }) => <AlertTriangle size={18} color={color} />, drawerLabel: t('teacher.urgent') }}>
-            {(props: any) => <UrgentMattersTab {...props} teacher={teacher!} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}
+            {(props: any) => <UrgentScreen {...props} teacher={teacher} students={students} assessments={assessments} marksData={marks} subjects={subjects} settings={settings} C={C} s={s} onRefresh={syncData} />}
           </Drawer.Screen>
           {!!(teacher!.cancreateassessments || teacher!.canCreateAssessments) && (
             <Drawer.Screen name="AssessmentsMgmt" options={{ title: 'Assessments', drawerIcon: ({ color }) => <FileText size={18} color={color} />, drawerLabel: 'Assessments' }}>
-              {(props: any) => <AssessmentManagementTab {...props} teacher={teacher!} assessments={assessments} subjects={subjects} settings={settings} C={C} s={s} onRefresh={() => syncData()} />}
+              {(props: any) => <AssessmentMgmtScreen {...props} teacher={teacher} assessments={assessments} subjects={subjects} settings={settings} C={C} s={s} onRefresh={syncData} />}
             </Drawer.Screen>
           )}
         </Drawer.Navigator>

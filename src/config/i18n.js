@@ -595,7 +595,10 @@ const resources = {
                 "subject": "Subject",
                 "message": "Message",
                 "loginDesc": "Enter details to view academic progress",
-                "masterPwdExtra": "Secure administrator-only access for school management."
+                "masterPwdExtra": "Secure administrator-only access for school management.",
+                "transcript": "Transcript",
+                "details": "Details",
+                "detailedNotice": "Detailed view shows individual assessment scores for each subject."
             }
         }
     },
@@ -1190,7 +1193,10 @@ const resources = {
                 "subject": "ጉዳዩ",
                 "message": "መልዕክት",
                 "loginDesc": "የትምህርት እድገትን ለማየት ዝርዝሮችን ያስገቡ",
-                "masterPwdExtra": "ለትምህርት ቤት አስተዳደር ደህንነቱ የተጠበቀ የአስተዳዳሪ ብቻ መግቢያ።"
+                "masterPwdExtra": "ለትምህርት ቤት አስተዳደር ደህንነቱ የተጠበቀ የአስተዳዳሪ ብቻ መግቢያ።",
+                "transcript": "ውጤት",
+                "details": "ዝርዝር",
+                "detailedNotice": "ዝርዝር እይታ ለእያንዳንዱ የትምህርት አይነት ነጠላ የምዘና ውጤቶችን ያሳያል።"
             }
         }
     }

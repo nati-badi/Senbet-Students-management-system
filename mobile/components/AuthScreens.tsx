@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
     View, Text, ScrollView, TouchableOpacity, TextInput, Image as RNImage, 
     KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, 
-    ActivityIndicator, Alert, Modal 
+    ActivityIndicator, Alert, Modal, RefreshControl, useWindowDimensions 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
@@ -92,6 +92,8 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
   const [accessCode, setAccessCode] = useState('');
   const [showCode, setShowCode] = useState(false);
   const { showToast } = useToast();
+  const scrollRef = useRef<ScrollView>(null);
+  const { width: windowWidth } = useWindowDimensions();
 
   const doSearch = async () => {
     setErrorMsg('');
@@ -209,9 +211,9 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
           setRes.data.forEach((r: any) => { sMap[r.key] = r.value; });
           setSettings(sMap);
       }
-      Alert.alert('✅ ' + t('common.syncComplete'));
+      showToast(t('common.syncComplete', 'Sync complete'), 'success');
     } catch (e) {
-      Alert.alert('❌ ' + t('common.syncFailed'));
+      showToast(t('common.syncFailed', 'Sync failed'), 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -339,7 +341,11 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
     const greeting = hour < 12 ? t('common.goodMorning') : hour < 18 ? t('common.goodAfternoon') : t('common.goodEvening');
 
     return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        refreshControl={<RefreshControl refreshing={isSyncing} onRefresh={handleSync} tintColor={C.accent} />}
+      >
           <EthiopicClockWidget C={C} />
           
           <View style={[s.dashboardCard, { marginBottom: 24, padding: 0, backgroundColor: C.card, overflow: 'hidden', borderWidth: 1, borderColor: C.border }]}>
@@ -422,17 +428,147 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
     );
   };
 
+  const DetailedMarksSection = ({ marks, assessments, subjects, C }: { marks: any[], assessments: Assessment[], subjects: any[], C: any }) => {
+    const { t } = useTranslation();
+    
+    const subjectGroups = useMemo(() => {
+        const groups: Record<string, { subject: string, assessments: any[] }> = {};
+        
+        subjects.forEach(sub => {
+            const subName = sub.name;
+            const subAssessments = assessments.filter(a => {
+                const aSub = (a as any).subject || (a as any).subjectname;
+                return aSub === subName && a.grade === student?.grade;
+            });
+            
+            if (subAssessments.length > 0) {
+                const assessmentData = subAssessments.map(a => {
+                    const mark = marks.find(m => (m.assessmentid || m.assessmentId) === a.id);
+                    return {
+                        ...a,
+                        mark: mark ? mark.score : null
+                    };
+                });
+                
+                groups[subName] = {
+                    subject: subName,
+                    assessments: assessmentData
+                };
+            }
+        });
+        
+        return Object.values(groups);
+    }, [marks, assessments, subjects, student?.grade]);
+
+    if (subjectGroups.length === 0) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+                <BarChart3 size={48} color={C.muted} />
+                <Text style={{ color: C.muted, marginTop: 16, textAlign: 'center' }}>{t('parent.noAssessments', 'No assessments recorded yet.')}</Text>
+            </View>
+        );
+    }
+
+    return (
+        <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            contentContainerStyle={{ paddingBottom: 100 }}
+            refreshControl={<RefreshControl refreshing={isSyncing} onRefresh={handleSync} tintColor={C.accent} />}
+        >
+            <View style={{ backgroundColor: C.accent + '10', padding: 16, borderRadius: 16, marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: C.accent + '20' }}>
+                <Info size={20} color={C.accent} />
+                <Text style={{ color: C.accent, fontSize: 13, flex: 1, fontWeight: '600' }}>
+                    {t('parent.detailedNotice', 'Detailed view shows individual assessment scores for each subject.')}
+                </Text>
+            </View>
+
+            {subjectGroups.map((group, idx) => (
+                <View key={idx} style={[s.dashboardCard, { padding: 0, marginBottom: 20, overflow: 'hidden' }]}>
+                    <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.bg }}>
+                        <Text style={{ color: C.text, fontSize: 16, fontWeight: '800' }}>{group.subject}</Text>
+                    </View>
+                    <View style={{ padding: 16 }}>
+                        {group.assessments.map((ass, aIdx) => {
+                            const maxScore = (ass as any).maxscore || (ass as any).maxScore || 100;
+                            const hasMark = ass.mark !== null;
+                            const percentage = hasMark ? (ass.mark / maxScore) * 100 : 0;
+                            
+                            return (
+                                <View key={ass.id || aIdx} style={{ marginBottom: aIdx === group.assessments.length - 1 ? 0 : 16 }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                        <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{ass.name}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <Text style={{ color: hasMark ? C.text : C.red, fontSize: 14, fontWeight: '800' }}>
+                                                {hasMark ? ass.mark : t('profile.missing', 'MISSING')}
+                                            </Text>
+                                            <Text style={{ color: C.muted, fontSize: 12 }}>/ {maxScore}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={{ height: 6, backgroundColor: C.border + '50', borderRadius: 3, overflow: 'hidden' }}>
+                                        <View 
+                                            style={{ 
+                                                height: '100%', 
+                                                width: `${Math.min(100, percentage)}%`, 
+                                                backgroundColor: hasMark ? (percentage >= 50 ? C.accent : C.amber) : C.border,
+                                                borderRadius: 3 
+                                            }} 
+                                        />
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </View>
+                </View>
+            ))}
+        </ScrollView>
+    );
+  };
+
+  const [viewMode, setViewMode] = useState<'transcript' | 'details'>('details');
+
   const renderMarks = () => (
     <View style={{ flex: 1, padding: 16 }}>
-        <LiveCertificate 
-            student={student!}
-            marks={allMarksInGrade.length > 0 ? allMarksInGrade : marks}
-            assessments={assessments}
-            allStudents={allStudentsInGrade}
-            subjects={subjects}
-            settings={settings}
-            C={C}
-        />
+        <View style={{ flexDirection: 'row', backgroundColor: C.card, borderRadius: 12, padding: 4, marginBottom: 16, borderWidth: 1, borderColor: C.border }}>
+            <TouchableOpacity 
+                onPress={() => setViewMode('transcript')}
+                style={{ 
+                    flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center',
+                    backgroundColor: viewMode === 'transcript' ? C.accent : 'transparent'
+                }}
+            >
+                <Text style={{ color: viewMode === 'transcript' ? '#fff' : C.muted, fontWeight: '800', fontSize: 13 }}>{t('parent.transcript', 'Transcript')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+                onPress={() => setViewMode('details')}
+                style={{ 
+                    flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center',
+                    backgroundColor: viewMode === 'details' ? C.accent : 'transparent'
+                }}
+            >
+                <Text style={{ color: viewMode === 'details' ? '#fff' : C.muted, fontWeight: '800', fontSize: 13 }}>{t('parent.details', 'Details')}</Text>
+            </TouchableOpacity>
+        </View>
+
+        {viewMode === 'transcript' ? (
+            <LiveCertificate 
+                student={student!}
+                marks={allMarksInGrade.length > 0 ? allMarksInGrade : marks}
+                assessments={assessments}
+                allStudents={allStudentsInGrade}
+                subjects={subjects}
+                settings={settings}
+                C={C}
+                onRefresh={handleSync}
+                refreshing={isSyncing}
+            />
+        ) : (
+            <DetailedMarksSection 
+                marks={marks}
+                assessments={assessments}
+                subjects={subjects}
+                C={C}
+            />
+        )}
     </View>
   );
 
@@ -441,7 +577,10 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
   );
 
   const renderProfile = () => (
-    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
+    <ScrollView 
+        contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
+        refreshControl={<RefreshControl refreshing={isSyncing} onRefresh={handleSync} tintColor={C.accent} />}
+    >
         <View style={[s.dashboardCard, { padding: 24, marginBottom: 24 }]}>
              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <Text style={{ fontSize: 18, fontWeight: '800', color: C.text }}>{t('teacher.profile', 'Student Profile')}</Text>
@@ -627,10 +766,26 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
         )
       ) : (
             <View style={{ flex: 1 }}>
-                {activeTab === 'home' && renderDashboard()}
-                {activeTab === 'marks' && renderMarks()}
-                {activeTab === 'info' && renderSchoolInfo()}
-                {activeTab === 'profile' && renderProfile()}
+                <ScrollView
+                    ref={scrollRef}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={(e) => {
+                        const index = Math.round(e.nativeEvent.contentOffset.x / windowWidth);
+                        const tabIds: ('home' | 'marks' | 'info' | 'profile')[] = ['home', 'marks', 'info', 'profile'];
+                        if (tabIds[index] !== activeTab) {
+                            setActiveTab(tabIds[index]);
+                        }
+                    }}
+                    bounces={false}
+                    scrollEventThrottle={16}
+                >
+                    <View style={{ width: windowWidth }}>{renderDashboard()}</View>
+                    <View style={{ width: windowWidth }}>{renderMarks()}</View>
+                    <View style={{ width: windowWidth }}>{renderSchoolInfo()}</View>
+                    <View style={{ width: windowWidth }}>{renderProfile()}</View>
+                </ScrollView>
 
                 <View style={{ 
                     position: 'absolute', bottom: 24, left: 20, right: 20, height: 64, 
@@ -640,16 +795,27 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
                     shadowOpacity: 0.1, shadowRadius: 15, borderWidth: 1, borderColor: C.border
                 }}>
                     {[
-                        { id: 'home', icon: <Home size={22} color={activeTab === 'home' ? C.accent : C.muted} />, label: t('parent.home', 'Home') },
-                        { id: 'marks', icon: <BarChart3 size={22} color={activeTab === 'marks' ? C.accent : C.muted} />, label: t('teacher.marks', 'Marks') },
-                        { id: 'info', icon: <Info size={22} color={activeTab === 'info' ? C.accent : C.muted} />, label: t('parent.schoolInfo', 'Info') },
-                        { id: 'profile', icon: <User size={22} color={activeTab === 'profile' ? C.accent : C.muted} />, label: t('teacher.profile', 'Profile') },
-                    ].map(item => (
-                        <TouchableOpacity key={item.id} onPress={() => setActiveTab(item.id as any)} style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                            {item.icon}
-                            <Text style={{ fontSize: 9, fontWeight: '800', marginTop: 4, color: activeTab === item.id ? C.accent : C.muted }}>{item.label}</Text>
-                        </TouchableOpacity>
-                    ))}
+                        { id: 'home', icon: Home, label: t('parent.home', 'Home') },
+                        { id: 'marks', icon: BarChart3, label: t('teacher.marks', 'Marks') },
+                        { id: 'info', icon: Info, label: t('parent.schoolInfo', 'Info') },
+                        { id: 'profile', icon: User, label: t('teacher.profile', 'Profile') },
+                    ].map((item, index) => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === item.id;
+                        return (
+                            <TouchableOpacity 
+                                key={item.id} 
+                                onPress={() => {
+                                    setActiveTab(item.id as any);
+                                    scrollRef.current?.scrollTo({ x: index * windowWidth, animated: true });
+                                }} 
+                                style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}
+                            >
+                                <Icon size={22} color={isActive ? C.accent : C.muted} />
+                                <Text style={{ fontSize: 9, fontWeight: '800', marginTop: 4, color: isActive ? C.accent : C.muted }}>{item.label}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
             </View>
       )}

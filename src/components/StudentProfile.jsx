@@ -50,6 +50,15 @@ const EthiopianCross = ({ className }) => (
     </svg>
 );
 
+const getScoreColor = (score) => {
+    const s = parseFloat(String(score));
+    if (isNaN(s)) return '#2c1810';
+    if (s >= 85) return '#059669'; // Excellent - Dark Green
+    if (s >= 70) return '#10b981'; // Good - Bright Green
+    if (s >= 50) return '#d97706'; // Satisfactory - Amber
+    return '#dc2626';             // Needs Improvement - Red
+};
+
 const StudentProfile = ({ studentId, visible, onClose }) => {
     const { t } = useTranslation();
     const [selectedYear, setSelectedYear] = useState(null);
@@ -614,7 +623,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                                             <td className="py-3.5 px-4 text-[#2c1810] font-medium">{row.subject}</td>
                                             <td className="py-3.5 px-4 text-center text-[#5c4033]">{row.semI}</td>
                                             <td className="py-3.5 px-4 text-center text-[#5c4033]">{row.semII}</td>
-                                            <td className="py-3.5 px-4 text-center font-semibold text-[#2c1810]">{row.avg}</td>
+                                            <td className="py-3.5 px-4 text-center font-semibold" style={{ color: getScoreColor(row.avg) }}>{row.avg}</td>
                                         </tr>
                                     ))
                                 )}
@@ -627,7 +636,7 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                                 <span className="text-sm font-bold text-[#2c1810] uppercase tracking-widest">
                                     {t('teacher.grandTotal')} / GRAND TOTAL
                                 </span>
-                                <span className="text-3xl font-black text-[#8b0000]">{averagePercentage}%</span>
+                                <span className="text-3xl font-black" style={{ color: getScoreColor(averagePercentage) }}>{averagePercentage}%</span>
                             </div>
 
                             {totalInClass > 0 && (

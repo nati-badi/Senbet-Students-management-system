@@ -287,6 +287,7 @@ function HomeSection({ onNavigate, handleSync }) {
 function MarksSection({ student }) {
     const { t } = useTranslation();
     const [selectedYear, setSelectedYear] = useState(student?.academicYear);
+    const [viewMode, setViewMode] = useState('details'); // 'transcript' or 'details'
     
     // Core data hooks
     const marks = useLiveQuery(() => student?.id ? db.marks.where('studentId').equals(student.id).toArray() : [], [student?.id]) || [];
@@ -343,28 +344,133 @@ function MarksSection({ student }) {
     if (isLoading) return <Skeleton active paragraph={{ rows: 8 }} />;
 
     return (
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
             <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800">
                 <Title level={4} style={{ margin: 0 }}><PieChartOutlined className="text-forest-600 mr-2" />{t('teacher.marksHistory')}</Title>
-                <Tag color="purple" className="rounded-full px-3 py-1 font-bold">{averagePercentage}% AVG</Tag>
+                <Space>
+                    <Segmented
+                        value={viewMode}
+                        onChange={setViewMode}
+                        options={[
+                            { label: t('parent.transcript', 'Transcript'), value: 'transcript', icon: <FileProtectOutlined /> },
+                            { label: t('parent.details', 'Details'), value: 'details', icon: <BookOutlined /> },
+                        ]}
+                        className="bg-slate-100 dark:bg-slate-800 rounded-xl"
+                    />
+                    <Tag color="purple" className="rounded-full px-3 py-1 font-bold">{averagePercentage}% AVG</Tag>
+                </Space>
             </div>
 
-            <LiveCertificate 
-                student={student}
-                subjectRows={subjectRows}
-                rankingInfo={rankingInfo}
-                missingAssessments={missingAssessments}
-                activeYearToUse={selectedYear}
-                averagePercentage={averagePercentage}
-                gradeAssessments={gradeAssessments}
-            />
+            {viewMode === 'transcript' ? (
+                <LiveCertificate 
+                    student={student}
+                    subjectRows={subjectRows}
+                    rankingInfo={rankingInfo}
+                    missingAssessments={missingAssessments}
+                    activeYearToUse={selectedYear}
+                    averagePercentage={averagePercentage}
+                    gradeAssessments={gradeAssessments}
+                />
+            ) : (
+                <DetailedMarksSection 
+                    student={student}
+                    gradeAssessments={gradeAssessments}
+                    marks={marks}
+                />
+            )}
 
             <Alert
-                message={t('parent.certificateNotice', 'This is a live preview of your current assessments. Final certificates are issued by the school administration.')}
+                message={viewMode === 'transcript' 
+                    ? t('parent.certificateNotice', 'This is a live preview of your current assessments. Final certificates are issued by the school administration.')
+                    : t('parent.detailedNotice', 'Detailed view shows individual assessment scores for each subject.')
+                }
                 type="info"
                 showIcon
                 className="rounded-2xl border-none shadow-sm"
             />
+        </div>
+    );
+}
+
+function DetailedMarksSection({ student, gradeAssessments, marks }) {
+    const { t } = useTranslation();
+
+    const groupedData = useMemo(() => {
+        const subjectsMap = {};
+        
+        gradeAssessments.forEach(assessment => {
+            if (!subjectsMap[assessment.subjectName]) {
+                subjectsMap[assessment.subjectName] = {
+                    name: assessment.subjectName,
+                    assessments: []
+                };
+            }
+            
+            const mark = marks.find(m => m.assessmentId === assessment.id);
+            subjectsMap[assessment.subjectName].assessments.push({
+                ...assessment,
+                score: mark?.score,
+                isMissing: !mark
+            });
+        });
+
+        return Object.values(subjectsMap).sort((a, b) => a.name.localeCompare(b.name));
+    }, [gradeAssessments, marks]);
+
+    if (groupedData.length === 0) {
+        return (
+            <Card className="rounded-[2.5rem] border-none shadow-xl py-12 text-center">
+                <Empty description={t('teacher.noAssessmentsDefined')} />
+            </Card>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {groupedData.map(subject => (
+                <Card 
+                    key={subject.name}
+                    className="shadow-xl border-none rounded-[2rem] overflow-hidden"
+                    title={<span className="font-bold text-forest-700">{subject.name}</span>}
+                    extra={<Tag color="green" className="border-none font-bold uppercase text-[10px]">{subject.assessments.length} {t('admin.assessments')}</Tag>}
+                >
+                    <List
+                        itemLayout="horizontal"
+                        dataSource={subject.assessments}
+                        renderItem={item => (
+                            <List.Item className="px-4 py-3 border-none hover:bg-slate-50 dark:hover:bg-slate-800/40 rounded-2xl transition-all mb-2">
+                                <List.Item.Meta
+                                    title={<span className="text-sm font-bold text-slate-700 dark:text-slate-300">{item.name}</span>}
+                                    description={
+                                        <Space split={<Divider type="vertical" />} className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                                            <span>{item.semester}</span>
+                                            <span>{formatEthiopianDate(item.date)}</span>
+                                        </Space>
+                                    }
+                                />
+                                <div className="text-right">
+                                    {item.isMissing ? (
+                                        <Tag color="red" className="m-0 border-none rounded-lg px-3 py-1 font-bold text-[10px]">{t('common.missing', 'MISSING')}</Tag>
+                                    ) : (
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-lg font-black text-forest-600">
+                                                {item.score} <span className="text-xs text-slate-300 font-normal">/ {item.maxScore}</span>
+                                            </span>
+                                            <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full mt-1 overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-forest-500 rounded-full" 
+                                                    style={{ width: `${(item.score / item.maxScore) * 100}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-slate-400 mt-0.5">{((item.score / item.maxScore) * 100).toFixed(0)}%</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </List.Item>
+                        )}
+                    />
+                </Card>
+            ))}
         </div>
     );
 }

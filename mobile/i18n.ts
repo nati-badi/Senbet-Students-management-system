@@ -41,7 +41,10 @@ const resources = {
         "loginFailed": "Incorrect name or portal access code. Please try again.",
         "home": "Home",
         "portalCode": "Portal Code",
-        "schoolInfo": "School Info"
+        "schoolInfo": "School Info",
+        "transcript": "Transcript",
+        "details": "Details",
+        "detailedNotice": "Detailed view shows individual assessment scores for each subject."
       },
       "school": {
         "aboutUs": "About Our School",
@@ -293,7 +296,10 @@ const resources = {
         "loginFailed": "የተሳሳተ ስም ወይም የመግቢያ ኮድ። እባክዎ እንደገና ይሞክሩ።",
         "home": "መነሻ",
         "portalCode": "የመግቢያ ኮድ",
-        "schoolInfo": "ስለ ትምህርት ቤቱ"
+        "schoolInfo": "ስለ ትምህርት ቤቱ",
+        "transcript": "ውጤት",
+        "details": "ዝርዝር",
+        "detailedNotice": "ዝርዝር እይታ ለእያንዳንዱ የትምህርት አይነት ነጠላ የምዘና ውጤቶችን ያሳያል።"
       },
       "school": {
         "aboutUs": "ስለ ሰንበት ትምህርት ቤታችን",

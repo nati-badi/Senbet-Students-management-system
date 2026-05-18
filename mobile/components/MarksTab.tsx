@@ -147,27 +147,29 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
   }, [highlightEmptyData]);
 
   useEffect(() => {
-    const nonce = route.params?.nonce;
-    if (route.params?.assessmentId && lastRoutedNonce.current !== nonce) {
-      const ass = myAssessments.find(a => a.id === route.params.assessmentId);
+    const nonce = route?.params?.nonce;
+    if (lastRoutedNonce.current === nonce) return;
+
+    if (route?.params?.assessmentId) {
+      const ass = myAssessments.find(a => a.id === route?.params?.assessmentId);
       if (ass) {
         setSelectedGrade(String(ass.grade));
         setSelectedSubject(normS(getSubj(ass)));
         setSelectedAssessment(ass);
+        lastRoutedNonce.current = nonce;
       }
-    } else if (route.params?.grade && !route.params.assessmentId) {
-      setSelectedGrade(String(route.params.grade));
+    } else if (route?.params?.grade) {
+      setSelectedGrade(String(route?.params?.grade));
+      lastRoutedNonce.current = nonce;
     }
     
-    if (route.params?.highlightEmpty && route.params?.assessmentId) {
-      if (lastRoutedNonce.current === nonce) return;
+    if (route?.params?.highlightEmpty && route?.params?.assessmentId && lastRoutedNonce.current === nonce) {
       setPage(99); 
       setTimeout(() => {
         if (filteredStudents.length > 0) {
           const firstMissingIndex = filteredStudents.findIndex(st => !marks[st.id] || marks[st.id] === '');
           if (firstMissingIndex !== -1) {
             flatListRef.current?.scrollToIndex({ index: firstMissingIndex, animated: true, viewPosition: 0 });
-            lastRoutedNonce.current = nonce;
             setTimeout(() => {
               setHighlightEmptyData(true);
               setTimeout(() => setHighlightEmptyData(false), 2000);
@@ -176,7 +178,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
         }
       }, 800);
     }
-  }, [route.params, myAssessments, marks, filteredStudents.length]); 
+  }, [route?.params, myAssessments]); 
 
   useEffect(() => {
     if (!selectedGrade && grades.length > 0) setSelectedGrade(grades[0]);
