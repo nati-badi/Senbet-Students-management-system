@@ -203,7 +203,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
     marksData
       .filter(m => (m.assessmentid || m.assessmentId) === (selectedAssessment.id || (selectedAssessment as any).assessmentId))
       .forEach(m => { 
-        map[m.studentid || m.studentId] = String(m.score);
+        map[m.studentid || m.studentId] = m.score === null || m.score === undefined ? '' : String(m.score);
         idMap[m.studentid || m.studentId] = m.id;
       });
     setMarks(map);
@@ -231,6 +231,8 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
           score,
           assessmentdate: selectedAssessment.date,
           semester: settings.currentSemester || 'Semester I',
+          subject: getSubj(selectedAssessment),
+          academicyear: (student as any).academicyear || (student as any).academicYear || settings.currentAcademicYear,
           last_modified_by: teacher.id,
           updated_at: new Date().toISOString()
         };
