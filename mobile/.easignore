@@ -1,0 +1,16 @@
+# Ignore dependencies (EAS will install them on the cloud)
+node_modules/
+
+# Ignore builds and cache
+.expo/
+dist/
+web-build/
+
+# Ignore large logs
+android-error.json
+android-error.log
+
+# Ignore native folders if you want EAS to generate them
+# (Remove these if you are doing a bare workflow and need your custom native code)
+android/
+ios/

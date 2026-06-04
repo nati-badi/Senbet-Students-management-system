@@ -25,3 +25,10 @@ dist-ssr
 
 .vercel
 .env*.local
+
+# Ignore large build directories to speed up EAS Build
+src-tauri/target/
+.expo/
+tmp/
+scratch/
+database/

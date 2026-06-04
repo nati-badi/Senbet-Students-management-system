@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Senbet School Manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "identifier": "et.finotebirhan.senbet",
   "build": {
     "frontendDist": "../dist",

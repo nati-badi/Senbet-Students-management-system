@@ -3,10 +3,15 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import tailwindcss from "@tailwindcss/vite";
 
-export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
+const isTauri = !!process.env.TAURI_ENV_PLATFORM;
+
+const plugins = [
+  react(),
+  tailwindcss(),
+];
+
+if (!isTauri) {
+  plugins.push(
     VitePWA({
       registerType: "autoUpdate",
       workbox: {
@@ -18,8 +23,12 @@ export default defineConfig({
         theme_color: "#ffffff",
         icons: [{ src: "icon-192.png", sizes: "192x192", type: "image/png" }],
       },
-    }),
-  ],
+    })
+  );
+}
+
+export default defineConfig({
+  plugins,
   build: {
     chunkSizeWarningLimit: 4000, // suppress chunk size warnings for antd
   },

@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "5da49273-098e-4c1d-afe1-2308989f8abf"
+      }
+    },
+    "android": {
+      "package": "com.badi_nati.senbetstudentsmanagementsystem"
+    }
+  }
+}
