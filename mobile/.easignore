@@ -10,7 +10,4 @@ web-build/
 android-error.json
 android-error.log
 
-# Ignore native folders if you want EAS to generate them
-# (Remove these if you are doing a bare workflow and need your custom native code)
-android/
-ios/
+# Native folders are included so EAS uses the pre-configured native projects
