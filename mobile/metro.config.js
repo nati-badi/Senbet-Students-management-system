@@ -6,19 +6,22 @@ const workspaceRoot = path.resolve(projectRoot, '..');
 
 const config = getDefaultConfig(projectRoot);
 
-// 1. Watch all files in the workspace root (including /shared)
-config.watchFolders = [workspaceRoot];
+// 1. Only watch the /shared folder (not the entire parent workspace which has its own react-native)
+config.watchFolders = [path.resolve(workspaceRoot, 'shared')];
 
-// 2. Let Metro know where to find packages
+// 2. Let Metro know where to find packages — mobile's node_modules FIRST
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
-  path.resolve(workspaceRoot, 'node_modules'),
 ];
 
 // 3. Force Metro to resolve the @shared alias to the actual folder
 config.resolver.extraNodeModules = {
   '@shared': path.resolve(workspaceRoot, 'shared'),
-  'react-native-reanimated/plugin': path.resolve(projectRoot, 'node_modules/react-native-reanimated/plugin'),
 };
+
+// 4. Block the parent's node_modules from being resolved
+config.resolver.blockList = [
+  new RegExp(path.resolve(workspaceRoot, 'node_modules').replace(/[/\\]/g, '[/\\\\]') + '.*'),
+];
 
 module.exports = config;
