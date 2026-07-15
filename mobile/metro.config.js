@@ -19,7 +19,6 @@ config.resolver.nodeModulesPaths = [
 config.resolver.extraNodeModules = {
   '@shared': path.resolve(workspaceRoot, 'shared'),
   'react-native-reanimated/plugin': path.resolve(projectRoot, 'node_modules/react-native-reanimated/plugin'),
-  'react-native-worklets/plugin': path.resolve(projectRoot, 'node_modules/react-native-worklets/plugin'),
 };
 
 module.exports = config;
