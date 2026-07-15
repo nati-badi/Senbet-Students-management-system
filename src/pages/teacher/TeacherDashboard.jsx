@@ -524,14 +524,12 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const hasTeacherAssignedGrades = Array.isArray(teacher?.assignedGrades);
 
     const teacherStudents = useLiveQuery(async () => {
-        if (!hasTeacherAssignedGrades) return db.students.toArray();
-        if (normalizedAllowedGrades.length === 0) return [];
+        if (!hasTeacherAssignedGrades || normalizedAllowedGrades.length === 0) return [];
         return db.students.where('grade').anyOf(normalizedAllowedGrades).toArray();
     }, [syncKey, normalizedAllowedGrades, hasTeacherAssignedGrades]) || [];
 
     const assessmentsData = useLiveQuery(async () => {
-        if (!hasTeacherAssignedGrades) return db.assessments.toArray();
-        if (normalizedAllowedGrades.length === 0) return [];
+        if (!hasTeacherAssignedGrades || normalizedAllowedGrades.length === 0) return [];
         return db.assessments.where('grade').anyOf(normalizedAllowedGrades).toArray();
     }, [syncKey, normalizedAllowedGrades, hasTeacherAssignedGrades]);
 
@@ -1429,11 +1427,9 @@ function AttendanceModule({ setProfileStudentId, teacher }) {
 
     const normalizedAllowedGrades2 = allowedGrades.map(g => normalizeGrade(g));
     const hasTeacherAssignedGrades2 = Array.isArray(teacher?.assignedGrades);
-    const teacherStudents = hasTeacherAssignedGrades2
-        ? (normalizedAllowedGrades2.length > 0
-            ? allStudents.filter(s => normalizedAllowedGrades2.includes(normalizeGrade(s.grade)))
-            : [])
-        : allStudents;
+    const teacherStudents = hasTeacherAssignedGrades2 && normalizedAllowedGrades2.length > 0
+        ? allStudents.filter(s => normalizedAllowedGrades2.includes(normalizeGrade(s.grade)))
+        : [];
 
     const gradeOptions2Unrestricted = [...GRADE_OPTIONS, ...extraGradeOptions2];
     const gradeOptions2 = Array.isArray(teacher?.assignedGrades) && allowedGrades.length > 0
