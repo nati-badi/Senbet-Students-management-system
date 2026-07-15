@@ -65,11 +65,26 @@ export default function TeacherAssessmentManagement({ teacher }) {
             const subject = allSubjects.find(s => s.name === values.subjectName && normalizeGrade(s.grade) === normalizeGrade(values.grade));
             const semester = subject?.semester || 'Semester I';
 
+            const currentMaxScore = parseFloat(values.maxScore);
+            const existingAssessments = allAssessments.filter(a => 
+                (!currentAcademicYear || !a.academicYear || String(a.academicYear) === String(currentAcademicYear)) &&
+                normalizeSubject(a.subjectName) === normalizeSubject(values.subjectName) && 
+                normalizeGrade(a.grade) === normalizeGrade(values.grade) &&
+                a.id !== editingId
+            );
+            
+            const totalExistingScore = existingAssessments.reduce((sum, a) => sum + (parseFloat(a.maxScore) || 0), 0);
+            
+            if (totalExistingScore + currentMaxScore > 100) {
+                message.error(t('teacher.maxScoreExceeded', { defaultValue: `Total assessment score cannot exceed 100. Current allocated is ${totalExistingScore}.` }));
+                return;
+            }
+
             const data = {
                 name: values.name,
                 subjectName: values.subjectName,
                 grade: values.grade,
-                maxScore: parseFloat(values.maxScore),
+                maxScore: currentMaxScore,
                 date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
                 semester: semester,
                 academicYear: currentAcademicYear,

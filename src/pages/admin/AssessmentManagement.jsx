@@ -49,14 +49,30 @@ export default function AssessmentManagement() {
             const subject = allSubjects.find(s => s.name === values.subjectName);
             const semester = subject?.semester || 'Semester I';
 
+            const currentMaxScore = parseFloat(values.maxScore);
+            const targetAcademicYear = currentYear || computeEthiopianYear().toString();
+            
+            const existingAssessments = assessments.filter(a => 
+                (a.subjectName || '').toLowerCase().trim() === (values.subjectName || '').toLowerCase().trim() && 
+                normalizeGrade(a.grade) === normalizeGrade(values.grade) &&
+                a.id !== editingId
+            );
+            
+            const totalExistingScore = existingAssessments.reduce((sum, a) => sum + (parseFloat(a.maxScore) || 0), 0);
+            
+            if (totalExistingScore + currentMaxScore > 100) {
+                message.error(t('admin.maxScoreExceeded', { defaultValue: `Total assessment score cannot exceed 100. Current allocated is ${totalExistingScore}.` }));
+                return;
+            }
+
             const data = {
                 name: values.name,
                 subjectName: values.subjectName,
                 grade: values.grade,
-                maxScore: parseFloat(values.maxScore),
+                maxScore: currentMaxScore,
                 date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
                 semester: semester,
-                academicYear: currentYear || computeEthiopianYear().toString(),
+                academicYear: targetAcademicYear,
                 synced: 0
             };
 

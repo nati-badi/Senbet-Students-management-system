@@ -407,18 +407,20 @@ export default function StudentRegistration() {
         }
     };
 
-    const filteredStudents = students.filter(s => {
-        // Filter by Tab (Active vs Archive)
-        const isArchived = s.archived === 1;
-        if (activeTab === 'active' && isArchived) return false;
-        if (activeTab === 'archive' && !isArchived) return false;
-
+    const baseFilteredStudents = students.filter(s => {
         const query = (searchQuery || "").toLowerCase();
         const matchesSearch = (s.name || "").toLowerCase().includes(query) ||
             (s.baptismalName || s.baptismalname || "").toLowerCase().includes(query) ||
             (s.parentContact || s.parentcontact || "").includes(searchQuery);
         const matchesGrade = !filterGrade || String(s.grade) === String(filterGrade);
         return matchesSearch && matchesGrade;
+    });
+
+    const filteredStudents = baseFilteredStudents.filter(s => {
+        const isArchived = s.archived === 1;
+        if (activeTab === 'active' && isArchived) return false;
+        if (activeTab === 'archive' && !isArchived) return false;
+        return true;
     });
 
     useEffect(() => {
@@ -587,7 +589,7 @@ export default function StudentRegistration() {
                         label: (
                             <span className="flex items-center gap-2 px-2">
                                 <TeamOutlined /> {t('admin.activeStudents', 'Active Students')}
-                                <Badge count={students.filter(s => !s.archived).length} className="ml-1" overflowCount={999} style={{ backgroundColor: '#10b981' }} />
+                                <Badge count={baseFilteredStudents.filter(s => s.archived !== 1).length} className="ml-1" overflowCount={999} style={{ backgroundColor: '#10b981' }} />
                             </span>
                         )
                     },
@@ -596,7 +598,7 @@ export default function StudentRegistration() {
                         label: (
                             <span className="flex items-center gap-2 px-2">
                                 <ExportOutlined /> {t('admin.archiveGraduated', 'Archive (Graduated)')}
-                                <Badge count={students.filter(s => s.archived === 1).length} className="ml-1" overflowCount={999} style={{ backgroundColor: '#f59e0b' }} />
+                                <Badge count={baseFilteredStudents.filter(s => s.archived === 1).length} className="ml-1" overflowCount={999} style={{ backgroundColor: '#f59e0b' }} />
                             </span>
                         )
                     }
