@@ -10,7 +10,7 @@ import { Student, Teacher, normG, fmtGrade, generateUUID, getSubj } from '../uti
 import { useToast } from './ToastContext';
 
 export const AttendanceTab = React.memo(({ route, navigation, teacher, students: allStudents, attendanceData, setAttendanceData, onRefresh, C, s, settings }: {
-  route: any, navigation: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, settings: any
+  route?: any, navigation?: any, teacher: Teacher, students: Student[], attendanceData: any[], setAttendanceData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, settings: any
 }) => {
   const { t } = useTranslation();
   const { showToast } = useToast();

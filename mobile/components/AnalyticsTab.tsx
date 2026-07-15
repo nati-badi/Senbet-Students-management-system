@@ -19,6 +19,8 @@ import { PremiumDropdown } from "./PremiumDropdown";
 
 export const AnalyticsTab = React.memo(
   ({
+    route,
+    navigation,
     teacher,
     students: allStudents,
     assessments: allAssessments,
@@ -29,6 +31,8 @@ export const AnalyticsTab = React.memo(
     settings,
     subjects,
   }: {
+    route?: any;
+    navigation?: any;
     teacher: Teacher;
     students: Student[];
     assessments: Assessment[];

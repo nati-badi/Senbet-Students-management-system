@@ -5,8 +5,8 @@ import { AlertTriangle, Users, BarChart3, TrendingUp } from 'lucide-react-native
 import { Student, Assessment, Teacher, normG, normS, isConduct, fmtGrade, getSubj, getMax } from '../utils';
 import { getEthiopianYear } from '../dateUtils';
 
-export const UrgentMattersTab = React.memo(({ navigation, teacher, students: allStudents, assessments: allAssessments, marksData, subjects, settings, C, s, onRefresh }: {
-  navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, onRefresh?: () => Promise<void> | void
+export const UrgentMattersTab = React.memo(({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, subjects, settings, C, s, onRefresh }: {
+  route?: any, navigation?: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], subjects: any[], settings: Record<string, string>, C: any, s: any, onRefresh?: () => Promise<void> | void
 }) => {
   const { t } = useTranslation();
   const assignedGradesRaw = (teacher as any)?.assignedgrades ?? (teacher as any)?.assignedGrades;

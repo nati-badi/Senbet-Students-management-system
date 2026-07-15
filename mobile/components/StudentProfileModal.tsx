@@ -116,12 +116,13 @@ export const StudentProfileModal = React.memo(({ student, onClose, assessments, 
                   <View style={{ gap: 12 }}>
                     {assessments.filter(a => normG(a.grade) === normG(student.grade) && !isConduct(a)).map((ass, idx) => {
                       const mark = studentMarks.find(m => (m.assessmentid || m.assessmentId) === ass.id);
-                      const perc = mark ? (Number(mark.score) / ass.maxscore) * 100 : 0;
+                      const maxScore = ass.maxscore || ass.maxScore || 100;
+                      const perc = mark ? (Number(mark.score) / maxScore) * 100 : 0;
                       return (
                         <View key={idx} style={[s.dashboardCard, { borderRadius: 16, padding: 16, borderStyle: mark ? 'solid' : 'dashed', borderColor: mark ? C.border : C.amber + '44' }]}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <View style={{ flex: 1 }}><Text style={{ color: C.text, fontWeight: '800', fontSize: 15 }}>{ass.name}</Text><Text style={{ color: C.muted, fontSize: 12 }}>{ass.subjectname}</Text></View>
-                            <View style={{ alignItems: 'flex-end' }}>{mark ? (<><Text style={{ color: C.accent, fontWeight: '900', fontSize: 18 }}>{mark.score}</Text><Text style={{ color: C.muted, fontSize: 11 }}>/ {ass.maxscore}</Text></>) : (<View style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}><Text style={{ color: C.amber, fontWeight: '900', fontSize: 12 }}>{t('profile.missing').toUpperCase()}</Text></View>)}</View>
+                            <View style={{ flex: 1 }}><Text style={{ color: C.text, fontWeight: '800', fontSize: 15 }}>{ass.name}</Text><Text style={{ color: C.muted, fontSize: 12 }}>{ass.subjectname || ass.subjectName}</Text></View>
+                            <View style={{ alignItems: 'flex-end' }}>{mark ? (<><Text style={{ color: C.accent, fontWeight: '900', fontSize: 18 }}>{mark.score}</Text><Text style={{ color: C.muted, fontSize: 11 }}>/ {maxScore}</Text></>) : (<View style={{ backgroundColor: C.amber + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}><Text style={{ color: C.amber, fontWeight: '900', fontSize: 12 }}>{t('profile.missing').toUpperCase()}</Text></View>)}</View>
                           </View>
                           {mark ? (<View style={{ height: 4, backgroundColor: C.border, borderRadius: 2 }}><View style={{ height: 4, backgroundColor: perc > 50 ? C.green : C.amber, borderRadius: 2, width: `${perc}%` }} /></View>) : null}
                         </View>

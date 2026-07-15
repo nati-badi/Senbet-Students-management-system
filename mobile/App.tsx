@@ -25,7 +25,8 @@ import {
 import { BlurView } from 'expo-blur';
 
 // ── Extracted Optimized Components ──────────────────────────────
-import { DashboardTab, EthiopicClockWidget } from './components/DashboardTab';
+import { DashboardTab } from './components/DashboardTab';
+import { EthiopicClockWidget } from './components/EthiopicClockWidget';
 import { StudentsTab } from './components/StudentsTab';
 import { AttendanceTab } from './components/AttendanceTab';
 import { MarksTab } from './components/MarksTab';
@@ -767,11 +768,8 @@ function makeStyles(C: any) {
       borderRadius: 12, 
       padding: 14, 
       fontSize: 16,
-      borderWidth: 1,
-      borderColor: C.border + '20',
-      /* @ts-ignore */
-      outlineStyle: 'none',
-    },
+      borderColor: '#e2e8f0'
+  },
     loginBtn: { backgroundColor: C.accent, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 32 },
     loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
     header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },

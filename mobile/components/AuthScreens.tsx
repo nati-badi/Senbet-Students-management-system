@@ -157,12 +157,16 @@ export const ParentPortal = React.memo(({ isDark, onBack, isOnline, toggleTheme,
       setAllStudentsInGrade(studentsInGrade);
       setAllMarksInGrade(allMarksRes.data || []);
       
-      supabase.from('announcements').select('*').eq('active', 1).order('date', { ascending: false })
-        .then(({ data }) => {
-            setAnnouncements(data || []);
-            if (data) AsyncStorage.setItem('senbet_announcements', JSON.stringify(data));
-        })
-        .finally(() => setLoadingAnns(false));
+      const fetchAnns = async () => {
+        try {
+          const { data } = await supabase.from('announcements').select('*').eq('active', 1).order('date', { ascending: false });
+          setAnnouncements(data || []);
+          if (data) AsyncStorage.setItem('senbet_announcements', JSON.stringify(data));
+        } finally {
+          setLoadingAnns(false);
+        }
+      };
+      fetchAnns();
       
       if (setRes.data) {
         const sMap: any = {};

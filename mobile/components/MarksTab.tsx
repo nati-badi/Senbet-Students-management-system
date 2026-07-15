@@ -10,7 +10,7 @@ import { PremiumDropdown } from './PremiumDropdown';
 import { useToast } from './ToastContext';
 
 export const MarksTab = React.memo(({ route, navigation, teacher, students: allStudents, assessments: allAssessments, marksData, setMarksData, onRefresh, C, s, onStudentPress, settings, subjects }: {
-  route: any, navigation: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, settings: any, subjects: any[]
+  route?: any, navigation?: any, teacher: Teacher, students: Student[], assessments: Assessment[], marksData: any[], setMarksData: (data: any[]) => void, onRefresh: () => void, C: any, s: any, onStudentPress: (s: Student) => void, settings: any, subjects: any[]
 }) => {
   const { t } = useTranslation();
   const { showToast } = useToast();

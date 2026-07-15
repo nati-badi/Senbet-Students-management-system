@@ -69,7 +69,7 @@ export const LiveCertificate = React.memo(({
 
   const subjectRows = useMemo(() => {
     if (!student) return [];
-    return calculateSubjectRows(student, assessments, marks, subjects, activeSemester);
+    return calculateSubjectRows(student, assessments, marks, subjects || [], activeSemester);
   }, [student?.id, student?.grade, assessments, marks, subjects, activeSemester]);
 
   if (!student) return null;
