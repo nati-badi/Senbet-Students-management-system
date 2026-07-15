@@ -108,6 +108,8 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
         maxscore: ms,
         maxScore: ms, // Save both variants
         date: new Date().toISOString().split('T')[0],
+        academicyear: settings.currentAcademicYear,
+        academicYear: settings.currentAcademicYear,
         updated_at: new Date().toISOString()
       };
 
@@ -127,8 +129,35 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
 
   const handleDelete = async (id: string) => {
     try {
+      // 1. Fetch marks linked to this assessment
+      const { data: marksData } = await supabase.from('marks').select('id').eq('assessmentid', id);
+      
+      if (marksData && marksData.length > 0) {
+        const markIds = marksData.map((m: any) => m.id);
+        // 2. Delete the marks
+        const { error: markErr } = await supabase.from('marks').delete().in('id', markIds);
+        if (markErr) throw markErr;
+        
+        // 3. Record tombstones for marks
+        const tombstones = markIds.map((mid: string) => ({
+          table_name: 'marks',
+          record_id: mid,
+          deleted_at: new Date().toISOString()
+        }));
+        await supabase.from('deleted_records').insert(tombstones);
+      }
+
+      // 4. Delete the assessment itself
       const { error } = await supabase.from('assessments').delete().eq('id', id);
       if (error) throw error;
+      
+      // 5. Record tombstone for assessment
+      await supabase.from('deleted_records').insert([{
+        table_name: 'assessments',
+        record_id: id,
+        deleted_at: new Date().toISOString()
+      }]);
+
       showToast(`${t('assessment.deletedSuccess')}`, 'success');
       setDeleteConfirmId(null);
       if (onRefresh) onRefresh();

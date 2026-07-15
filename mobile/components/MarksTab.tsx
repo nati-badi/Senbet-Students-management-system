@@ -232,7 +232,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
           assessmentdate: selectedAssessment.date,
           semester: settings.currentSemester || 'Semester I',
           subject: getSubj(selectedAssessment),
-          academicyear: (student as any).academicyear || (student as any).academicYear || settings.currentAcademicYear,
+          academicyear: (selectedAssessment as any).academicyear || (selectedAssessment as any).academicYear || settings.currentAcademicYear,
           last_modified_by: teacher.id,
           updated_at: new Date().toISOString()
         };

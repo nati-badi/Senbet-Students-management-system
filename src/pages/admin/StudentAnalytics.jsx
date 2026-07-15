@@ -51,6 +51,11 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
     const [selectedSemester, setSelectedSemester] = useState('Semester I');
     const [selectedSubject, setSelectedSubject] = useState('All');
 
+    // Reset subject when semester or grade changes
+    useEffect(() => {
+        setSelectedSubject('All');
+    }, [selectedSemester, selectedGrade]);
+
     // Calculate Top Students
     const studentRankings = useMemo(() => {
         if (!students.length || !marks.length || !assessments.length) return [];
@@ -81,7 +86,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
             
             if (isConductAssessment(a)) return false;
             
-            const isMatchSub = selectedSubject === 'All' || (a.subjectName || a.subjectname) === selectedSubject;
+            const isMatchSub = selectedSubject === 'All' || normalizeSubject(a.subjectName || a.subjectname) === normalizeSubject(selectedSubject);
             return isMatchSem && isMatchSub;
         });
 
@@ -113,7 +118,7 @@ export default function StudentAnalytics({ isTeacherView = false, teacher = null
         }
 
         return filteredRankings.sort((a, b) => b.percentage - a.percentage);
-    }, [students, marks, assessments, attendance, selectedGrade, selectedSemester, selectedSubject, subjects]);
+    }, [students, marks, assessments, attendance, selectedGrade, selectedSemester, selectedSubject, subjects, currentYear]);
 
     const top10Students = studentRankings.slice(0, 10);
     const schoolAverage = useMemo(

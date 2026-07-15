@@ -831,13 +831,16 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                     continue;
                 }
 
+                const currentAcademicYear = settingsRows.find(s => s.key === 'currentAcademicYear')?.value;
+                const targetAcademicYear = selectedAssessment.academicYear || currentAcademicYear;
+
                 if (existingMark) {
                     await db.marks.update(existingMark.id, { 
                         score,
                         subject: selectedAssessment.subjectName,
                         assessmentDate: selectedAssessment.date,
                         semester: currentSemesterSetting,
-                        academicYear: studentYear || existingMark.academicYear,
+                        academicYear: targetAcademicYear || existingMark.academicYear,
                         markedBy: teacher.id,
                         synced: 0,
                         updated_at: new Date().toISOString()
@@ -861,7 +864,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         markedBy: teacher.id,
                         synced: 0,
                         semester: currentSemesterSetting,
-                        academicYear: studentYear,
+                        academicYear: targetAcademicYear || studentYear,
                         updated_at: new Date().toISOString()
                     });
                 }

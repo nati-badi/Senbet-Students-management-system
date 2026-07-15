@@ -110,11 +110,32 @@ export default function AssessmentManagement() {
 
     const handleDelete = async (id) => {
         try {
-            await db.assessments.delete(id);
-            await db.deleted_records.add({ id: crypto.randomUUID(), tableName: 'assessments', recordId: id });
+            await db.transaction('rw', [db.assessments, db.marks, db.deleted_records], async () => {
+                // 1. Delete all marks associated with this assessment
+                const marks = await db.marks.where('assessmentId').equals(id).toArray();
+                for (const mark of marks) {
+                    await db.marks.delete(mark.id);
+                    await db.deleted_records.add({ 
+                        id: crypto.randomUUID(), 
+                        tableName: 'marks', 
+                        recordId: mark.id,
+                        deleted_at: new Date().toISOString()
+                    });
+                }
+
+                // 2. Delete the assessment itself
+                await db.assessments.delete(id);
+                await db.deleted_records.add({ 
+                    id: crypto.randomUUID(), 
+                    tableName: 'assessments', 
+                    recordId: id,
+                    deleted_at: new Date().toISOString()
+                });
+            });
             message.success(t('admin.assessmentDeleted'));
             syncData().catch(console.error);
         } catch (err) {
+            console.error("Failed to delete assessment cascadingly:", err);
             message.error(t('admin.assessmentDeleteError'));
         }
     };

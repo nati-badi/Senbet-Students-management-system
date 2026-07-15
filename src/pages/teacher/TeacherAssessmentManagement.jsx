@@ -43,6 +43,7 @@ export default function TeacherAssessmentManagement({ teacher }) {
 
     const allAssessments = useLiveQuery(() => db.assessments.toArray()) || [];
     const assessments = allAssessments.filter(a => 
+        (!currentAcademicYear || !a.academicYear || String(a.academicYear) === String(currentAcademicYear)) &&
         myGrades.some(g => normalizeGrade(g) === normalizeGrade(a.grade)) &&
         mySubjects.some(ms => normalizeSubject(ms) === normalizeSubject(a.subjectName))
     );

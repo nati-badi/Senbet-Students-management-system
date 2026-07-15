@@ -44,6 +44,9 @@ export const AnalyticsTab = React.memo(
     const hasTeacherAssignedGrades = Array.isArray(assignedGradesRaw) && assignedGradesRaw.length > 0;
     const myGrades = hasTeacherAssignedGrades ? assignedGradesRaw : [];
 
+    const assignedSubjectsRaw = (teacher as any)?.assignedsubjects ?? (teacher as any)?.assignedSubjects;
+    const mySubjects = Array.isArray(assignedSubjectsRaw) ? assignedSubjectsRaw : [];
+
     const etYear = computeEthiopianYear();
     const [refreshing, setRefreshing] = useState(false);
     
@@ -53,6 +56,10 @@ export const AnalyticsTab = React.memo(
     });
     const [selectedSemester, setSelectedSemester] = useState<string>(settings.currentSemester || "Semester I");
     const [selectedSubject, setSelectedSubject] = useState<string>("All");
+
+    // Reset subject filter when grade or semester changes (desktop parity)
+    const handleGradeChange = (g: string) => { setSelectedGrade(g); setSelectedSubject('All'); };
+    const handleSemesterChange = (s: string) => { setSelectedSemester(s); setSelectedSubject('All'); };
 
     const handleRefresh = async () => {
       setRefreshing(true);
@@ -179,7 +186,7 @@ export const AnalyticsTab = React.memo(
                 placeholder={t('admin.selectGrade')} 
                 items={gradeOptions} 
                 selectedKey={selectedGrade} 
-                onSelect={setSelectedGrade} 
+                onSelect={handleGradeChange} 
                 C={C} s={s} 
               />
             </View>
@@ -189,7 +196,7 @@ export const AnalyticsTab = React.memo(
                 placeholder={t('admin.selectSemester')} 
                 items={semesterOptions} 
                 selectedKey={selectedSemester} 
-                onSelect={setSelectedSemester} 
+                onSelect={handleSemesterChange} 
                 C={C} s={s} 
               />
             </View>

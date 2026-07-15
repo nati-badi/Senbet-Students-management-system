@@ -58,7 +58,7 @@ export const DashboardTab = React.memo(({ teacher, students: allStudents, assess
     
     // Optimization: Create a Set of "studentId:assessmentId" for O(1) lookups
     const recordedMarksSet = new Set(
-      marks.map(m => `${m.studentid}:${m.assessmentid}`)
+      marks.map(m => `${m.studentid || m.studentId}:${m.assessmentid || m.assessmentId}`)
     );
 
     return students.reduce((acc, st) => {
