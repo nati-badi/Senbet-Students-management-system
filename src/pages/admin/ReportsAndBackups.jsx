@@ -261,8 +261,8 @@ export default function ReportsAndBackups() {
             assessmentColumns.forEach(ac => {
                 headerValues.push(`${ac.assessmentName} (${ac.maxScore})`);
             });
-            headerValues.push(`Total (${overallMax})`);
-            headerValues.push('Percentage');
+            headerValues.push('Total');
+            headerValues.push('Percentage (100%)');
 
             const headerRow = worksheet.getRow(4);
             headerRow.values = headerValues;
@@ -334,7 +334,7 @@ export default function ReportsAndBackups() {
             filteredResults.forEach((result, idx) => {
                 const rowValues = [result.rank, result.student.name, ...result.scores];
 
-                rowValues.push(result.totalMax > 0 ? `${result.totalScore}/${result.totalMax}` : '-');
+                rowValues.push(result.totalMax > 0 ? result.totalScore : '-');
                 rowValues.push(result.totalMax > 0 ? result.pct : '-');
 
                 const row = worksheet.addRow(rowValues);
