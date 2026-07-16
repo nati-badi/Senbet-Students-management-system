@@ -2,6 +2,7 @@
   "expo": {
     "name": "በግ/ደ/አ/ቅ/አርሴማ ፍኖተ ብርሃን ሰ/ቤት",
     "slug": "mobile",
+    "owner": "nati_badi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
@@ -41,11 +42,6 @@
           "locationAlwaysAndWhenInUsePermission": "Allow this app to use your location."
         }
       ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "0ba018e1-b2ad-41ff-a4fe-5f3a2c30dc76"
-      }
-    }
+    ]
   }
 }
