@@ -24,7 +24,8 @@ import {
     GlobalOutlined,
     MoonOutlined,
     SunOutlined,
-    LogoutOutlined
+    LogoutOutlined,
+    PlusOutlined
 } from '@ant-design/icons';
 import {
     Layout,
@@ -50,7 +51,8 @@ import {
     Switch,
     Segmented,
     Descriptions,
-    Radio
+    Radio,
+    Checkbox
 } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -506,6 +508,9 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const lastRoutedNonce = useRef(null);
     const [modal, contextHolder] = Modal.useModal();
     const { message } = App.useApp();
+    const [isBonusModalVisible, setIsBonusModalVisible] = useState(false);
+    const [bonusAmount, setBonusAmount] = useState('');
+    const [isGraceMarksOnly, setIsGraceMarksOnly] = useState(true);
 
     // Keep sessionStorage in sync
     useEffect(() => { sessionStorage.setItem('sem_mark_grade', selectedGrade); }, [selectedGrade]);
@@ -535,6 +540,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
 
     const subjectsData = useLiveQuery(() => db.subjects.toArray(), [syncKey]);
     const settingsRows = useLiveQuery(() => db.settings?.toArray(), [syncKey]) || [];
+    const allMarks = useLiveQuery(() => db.marks.toArray(), [syncKey]) || [];
 
     const allAssessments = assessmentsData || [];
     const allSubjects = subjectsData || [];
@@ -638,6 +644,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
     const [highlightEmptyData, setHighlightEmptyData] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
+
 
     const studentsInGrade = teacherStudents
         .filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade))
@@ -885,10 +892,128 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         }
     };
 
+    const handleAddBonus = () => {
+        if (!selectedAssessment) return;
+        const amount = parseFloat(bonusAmount);
+        if (isNaN(amount) || amount <= 0) {
+            message.warning(t('teacher.invalidScoreRange', { max: selectedAssessment.maxScore }));
+            return;
+        }
+
+        const newMarks = { ...marks };
+        const newlyModified = new Set(modifiedMarks);
+        let count = 0;
+        
+        const currentAcademicYear = settingsRows.find(s => s.key === 'currentAcademicYear')?.value;
+        const targetAcademicYear = selectedAssessment.academicYear || currentAcademicYear;
+        const targetYearNum = targetAcademicYear ? getEthiopianYear(targetAcademicYear) : null;
+
+        // Find all assessments that belong to the SAME SUBJECT and SAME SEMESTER as the selected assessment.
+        const subjectObj = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(selectedAssessment.subjectName));
+        const activeSemester = subjectObj?.semester || 'Semester I';
+
+        const relevantAssessments = allAssessments.filter(a => {
+            if (normalizeGrade(a.grade) !== normalizeGrade(selectedGrade)) return false;
+            if (a.isConduct) return false;
+
+            const sName = a.subjectName || a.subjectname;
+            const aSubjectObj = allSubjects.find(s => normalizeSubject(s.name) === normalizeSubject(sName));
+            const subjSem = aSubjectObj?.semester || 'Semester I';
+
+            if (activeSemester === 'Semester I') {
+                if (subjSem !== 'Semester I' && subjSem !== 'Both') return false;
+            } else if (activeSemester === 'Semester II') {
+                if (subjSem !== 'Semester II' && subjSem !== 'Both') return false;
+            }
+            
+            if (normalizeSubject(sName) !== normalizeSubject(selectedAssessment.subjectName)) return false;
+
+            const aYearNum = a.academicYear ? getEthiopianYear(a.academicYear) : null;
+            if (targetYearNum && aYearNum) {
+                if (aYearNum !== targetYearNum && !(aYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም')) return false;
+            }
+            return true;
+        });
+
+        for (const student of studentsInGrade) {
+            let eligible = true;
+            if (isGraceMarksOnly) {
+                let totalMaxBefore = 0;
+                let totalScoreBefore = 0;
+                
+                let totalMaxAfter = 0;
+                let totalScoreAfter = 0;
+
+                relevantAssessments.forEach(a => {
+                    const isCurrentAssessment = a.id === selectedAssessmentId;
+                    
+                    let existingMarkValue = null;
+                    if (isCurrentAssessment) {
+                        existingMarkValue = marks[student.id];
+                    } else {
+                        const m = allMarks.find(m => m.assessmentId === a.id && m.studentId === student.id);
+                        if (m) existingMarkValue = m.score;
+                    }
+
+                    const mScore = Number(a.maxScore || 0);
+
+                    if (existingMarkValue !== null && existingMarkValue !== undefined && existingMarkValue !== '') {
+                        totalMaxBefore += mScore;
+                        totalScoreBefore += Number(existingMarkValue);
+                        
+                        totalMaxAfter += mScore;
+                        if (isCurrentAssessment) {
+                            totalScoreAfter += Math.min(Number(existingMarkValue) + amount, mScore);
+                        } else {
+                            totalScoreAfter += Number(existingMarkValue);
+                        }
+                    } else if (isCurrentAssessment) {
+                        totalMaxAfter += mScore;
+                        totalScoreAfter += Math.min(amount, mScore);
+                    }
+                });
+
+                const avgBefore = totalMaxBefore > 0 ? (totalScoreBefore / totalMaxBefore) * 100 : 0;
+                const avgAfter = totalMaxAfter > 0 ? (totalScoreAfter / totalMaxAfter) * 100 : 0;
+
+                if (!(avgBefore < 50 && avgAfter >= 50)) {
+                    eligible = false;
+                }
+            }
+
+            if (eligible) {
+                const existingVal = marks[student.id];
+                const existingScore = (existingVal !== undefined && existingVal !== null && existingVal !== '') ? parseFloat(existingVal) : 0;
+                const newScore = Math.min(existingScore + amount, selectedAssessment.maxScore);
+                newMarks[student.id] = newScore.toString();
+                newlyModified.add(student.id);
+                count++;
+            }
+        }
+
+        setMarks(newMarks);
+        setModifiedMarks(newlyModified);
+        setIsBonusModalVisible(false);
+        setBonusAmount('');
+
+        if (count > 0) {
+            (async () => {
+                try {
+                    await handleSaveMarks(newMarks, newlyModified);
+                    message.success(t('teacher.saveSuccess', 'Marks saved successfully!'));
+                } catch (e) {
+                    console.error("Bonus failed:", e);
+                }
+            })();
+        } else {
+            message.info(t('teacher.noChanges', 'No changes to save.'));
+        }
+    };
+
     const handleFillConstantMark = () => {
         if (!selectedAssessment) return;
 
-        const studentsWithoutMarks = studentsInGrade.filter(s => marks[s.id] === undefined || marks[s.id] === '');
+        const studentsWithoutMarks = studentsInGrade.filter(s => marks[s.id] === undefined || marks[s.id] === null || marks[s.id] === '');
         if (studentsWithoutMarks.length === 0) {
             message.info(t('teacher.fullyGraded', 'All students already have marks.'));
             return;
@@ -996,7 +1121,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
         if (!selectedAssessment) return;
 
         const allStudentsInGrade = teacherStudents.filter(s => normalizeGrade(s.grade) === normalizeGrade(selectedGrade));
-        const studentsWithoutMarks = allStudentsInGrade.filter(s => marks[s.id] === undefined || marks[s.id] === '');
+        const studentsWithoutMarks = allStudentsInGrade.filter(s => marks[s.id] === undefined || marks[s.id] === null || marks[s.id] === '');
         if (studentsWithoutMarks.length === 0) {
             message.info(t('teacher.fullyGraded'));
             return;
@@ -1270,7 +1395,7 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         disabled={!selectedGrade}
                     />
                 {selectedAssessment && (
-                    <Space>
+                    <Space wrap>
                         <Button
                             type="primary"
                             icon={<SaveOutlined />}
@@ -1302,10 +1427,48 @@ function SpeedEntryMarks({ teacher, setProfileStudentId }) {
                         >
                             {t('teacher.clearMarks')}
                         </Button>
+                        <Button
+                            icon={<PlusOutlined />}
+                            type="dashed"
+                            onClick={() => setIsBonusModalVisible(true)}
+                            disabled={!selectedAssessmentId || studentsInGrade.length === 0}
+                        >
+                            {t('teacher.addBonus', 'Add Bonus')}
+                        </Button>
                     </Space>
                 )}
                 </div>
             </div>
+
+            <Modal
+                title={t('teacher.addBonus', 'Add Bonus')}
+                open={isBonusModalVisible}
+                onOk={handleAddBonus}
+                onCancel={() => { setIsBonusModalVisible(false); setBonusAmount(''); }}
+                okText={t('teacher.applyBonus', 'Apply Bonus')}
+            >
+                <div className="py-4 flex flex-col gap-4">
+                    <div>
+                        <Text>{t('teacher.bonusAmount', 'Bonus points to add')} (max: {selectedAssessment?.maxScore})</Text>
+                        <Input
+                            type="number"
+                            min={0.1}
+                            max={selectedAssessment?.maxScore}
+                            step={0.5}
+                            value={bonusAmount}
+                            onChange={e => setBonusAmount(e.target.value)}
+                            className="mt-2"
+                            placeholder="e.g. 2"
+                        />
+                    </div>
+                    <Checkbox
+                        checked={isGraceMarksOnly}
+                        onChange={e => setIsGraceMarksOnly(e.target.checked)}
+                    >
+                        {t('teacher.graceMarksOnly', 'Only apply to students who would pass with this bonus (grace marks)')}
+                    </Checkbox>
+                </div>
+            </Modal>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden w-full">
                 {isLoading ? (

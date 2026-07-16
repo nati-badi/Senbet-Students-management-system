@@ -232,8 +232,8 @@ const StudentProfile = ({ studentId, visible, onClose }) => {
                 score: existingMark ? existingMark.score : null,
                 maxScore: assessment.maxScore,
                 date: assessment.date || existingMark?.assessmentDate || '-',
-                percentage: existingMark && assessment.maxScore > 0 ? ((existingMark.score / assessment.maxScore) * 100).toFixed(1) : null,
-                hasMark: !!existingMark
+                percentage: existingMark && existingMark.score !== null && existingMark.score !== '' && assessment.maxScore > 0 ? ((existingMark.score / assessment.maxScore) * 100).toFixed(1) : null,
+                hasMark: !!existingMark && existingMark.score !== null && existingMark.score !== undefined && existingMark.score !== ''
             };
         });
 
