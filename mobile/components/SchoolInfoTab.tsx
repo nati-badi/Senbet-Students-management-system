@@ -62,7 +62,7 @@ export const SchoolInfoTab = React.memo(({ C, s }: { C: any, s: any }) => {
       {/* Hero Section */}
       <View style={styles.heroContainer}>
         <LazyImage 
-          source={require('../assets/branding/hero.png')} 
+          source={require('../assets/branding/hero.jpg')} 
           style={styles.heroImage}
           C={C}
         />
@@ -98,7 +98,7 @@ export const SchoolInfoTab = React.memo(({ C, s }: { C: any, s: any }) => {
 
         {/* Heritage Section */}
         <View style={[styles.imageSection, { backgroundColor: C.card, borderColor: C.border }]}>
-            <LazyImage source={require('../assets/branding/heritage.png')} style={styles.sectionImage} C={C} />
+            <LazyImage source={require('../assets/branding/heritage.jpg')} style={styles.sectionImage} C={C} />
             <View style={styles.imageContent}>
                 <Text style={[styles.imageTitle, { color: C.text }]}>{t('school.spiritualHeritage', 'Rich Spiritual Heritage')}</Text>
                 <Text style={[styles.imageDesc, { color: C.muted }]}>
@@ -109,7 +109,7 @@ export const SchoolInfoTab = React.memo(({ C, s }: { C: any, s: any }) => {
 
         {/* Academic Section */}
         <View style={[styles.imageSection, { backgroundColor: C.card, borderColor: C.border, marginTop: 20 }]}>
-            <LazyImage source={require('../assets/branding/students.png')} style={styles.sectionImage} C={C} />
+            <LazyImage source={require('../assets/branding/students.jpg')} style={styles.sectionImage} C={C} />
             <View style={styles.imageContent}>
                 <Text style={[styles.imageTitle, { color: C.text }]}>{t('school.modernLearning', 'Standardized Learning')}</Text>
                 <Text style={[styles.imageDesc, { color: C.muted }]}>
