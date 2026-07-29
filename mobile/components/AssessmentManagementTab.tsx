@@ -103,13 +103,10 @@ export const AssessmentManagementTab = React.memo(({ teacher, assessments: allAs
         id: editingId || generateUUID(),
         name: name.trim(),
         subjectname: selectedSubject,
-        subjectName: selectedSubject, // Save both variants for consistency
         grade: selectedGrade,
         maxscore: ms,
-        maxScore: ms, // Save both variants
         date: new Date().toISOString().split('T')[0],
         academicyear: settings.currentAcademicYear,
-        academicYear: settings.currentAcademicYear,
         updated_at: new Date().toISOString()
       };
 

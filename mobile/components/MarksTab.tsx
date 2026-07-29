@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, TextInput, FlatList, TouchableOpacity, RefreshControl, Modal, TouchableWithoutFeedback, Animated, KeyboardAvoidingView, Platform, ActivityIndicator, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, Edit, Trash2, ChevronRight, Clock } from 'lucide-react-native';
+import { TrendingUp, Edit, Trash2, ChevronRight, Clock, PlusCircle } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { supabase } from '../supabase';
 import { Student, Assessment, Teacher, normG, normS, isConduct, generateUUID, fmtGrade, paginate, getSubj, getMax } from '../utils';
@@ -69,6 +69,9 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
   const [bulkScore, setBulkScore] = useState('');
   const [predictVisible, setPredictVisible] = useState(false);
   const [clearAllVisible, setClearAllVisible] = useState(false);
+  const [bonusVisible, setBonusVisible] = useState(false);
+  const [bonusAmount, setBonusAmount] = useState('');
+  const [isGraceMarksOnly, setIsGraceMarksOnly] = useState(true);
   const [predictDetails, setPredictDetails] = useState<{count: number, subject: string, students: any[]}>({ count: 0, subject: '', students: [] });
   const [page, setPage] = useState(0);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -403,6 +406,123 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
     saveMarksWithData(updates);
   };
 
+  const handleAddBonusClick = () => {
+    if (!selectedAssessment) return;
+    setModalError(null);
+    setBonusVisible(true);
+  };
+
+  const applyBonus = () => {
+    if (!selectedAssessment) return;
+    setModalError(null);
+    const amount = parseFloat(bonusAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setModalError(`❌ ${t('teacher.invalidScoreRange', { max: getMax(selectedAssessment) })}`);
+      return;
+    }
+
+    const currentAcademicYear = settings.currentAcademicYear;
+    const targetAcademicYear = selectedAssessment.academicYear || currentAcademicYear;
+    const targetYearNum = targetAcademicYear ? getEthiopianYear(targetAcademicYear) : null;
+
+    const subjectObj = subjects.find(s => normS(s.name) === normS(selectedAssessment.subjectName || (selectedAssessment as any).subjectname));
+    const activeSemester = subjectObj?.semester || 'Semester I';
+
+    const relevantAssessments = allAssessments.filter(a => {
+        if (normG(a.grade) !== normG(selectedGrade)) return false;
+        if (isConduct(a)) return false;
+
+        const sName = a.subjectName || (a as any).subjectname;
+        const aSubjectObj = subjects.find(s => normS(s.name) === normS(sName));
+        const subjSem = aSubjectObj?.semester || 'Semester I';
+
+        if (activeSemester === 'Semester I') {
+            if (subjSem !== 'Semester I' && subjSem !== 'Both') return false;
+        } else if (activeSemester === 'Semester II') {
+            if (subjSem !== 'Semester II' && subjSem !== 'Both') return false;
+        }
+        
+        if (normS(sName) !== normS(selectedAssessment.subjectName || (selectedAssessment as any).subjectname)) return false;
+
+        const aYearNum = (a as any).academicyear || (a as any).academicYear ? getEthiopianYear((a as any).academicyear || (a as any).academicYear) : null;
+        if (targetYearNum && aYearNum) {
+            if (aYearNum !== targetYearNum && !(aYearNum === '2017 ዓ.ም' && targetYearNum === '2018 ዓ.ም')) return false;
+        }
+        return true;
+    });
+
+    const updates = { ...marks };
+    let count = 0;
+
+    const gradeStudents = myStudents.filter((st) => normG(st.grade) === normG(selectedGrade));
+
+    for (const student of gradeStudents) {
+        let eligible = true;
+        if (isGraceMarksOnly) {
+            let totalMaxBefore = 0;
+            let totalScoreBefore = 0;
+            
+            let totalMaxAfter = 0;
+            let totalScoreAfter = 0;
+
+            relevantAssessments.forEach(a => {
+                const isCurrentAssessment = a.id === selectedAssessment.id;
+                
+                let existingMarkValue = null;
+                if (isCurrentAssessment) {
+                    existingMarkValue = marks[student.id];
+                } else {
+                    const m = marksData.find(m => (m.assessmentid || m.assessmentId) === a.id && (m.studentid || m.studentId) === student.id);
+                    if (m) existingMarkValue = m.score;
+                }
+
+                const mScore = Number(getMax(a) || 0);
+
+                if (existingMarkValue !== null && existingMarkValue !== undefined && existingMarkValue !== '') {
+                    totalMaxBefore += mScore;
+                    totalScoreBefore += Number(existingMarkValue);
+                    
+                    totalMaxAfter += mScore;
+                    if (isCurrentAssessment) {
+                        totalScoreAfter += Math.min(Number(existingMarkValue) + amount, mScore);
+                    } else {
+                        totalScoreAfter += Number(existingMarkValue);
+                    }
+                } else if (isCurrentAssessment) {
+                    totalMaxAfter += mScore;
+                    totalScoreAfter += Math.min(amount, mScore);
+                }
+            });
+
+            const avgBefore = totalMaxBefore > 0 ? (totalScoreBefore / totalMaxBefore) * 100 : 0;
+            const avgAfter = totalMaxAfter > 0 ? (totalScoreAfter / totalMaxAfter) * 100 : 0;
+
+            if (!(avgBefore < 50 && avgAfter >= 50)) {
+                eligible = false;
+            }
+        }
+
+        if (eligible) {
+            const existingVal = marks[student.id];
+            const existingScore = (existingVal !== undefined && existingVal !== null && existingVal !== '') ? parseFloat(existingVal) : 0;
+            const newScore = Math.min(existingScore + amount, getMax(selectedAssessment));
+            updates[student.id] = newScore.toString();
+            count++;
+        }
+    }
+
+    if (count > 0) {
+      setMarks(updates);
+      saveMarksWithData(updates);
+      showToast?.(`🎁 ${t('teacher.saveSuccess', 'Marks saved successfully!')}`, 'success');
+    } else {
+      showToast?.(`ℹ️ ${t('teacher.noChanges', 'No changes to save.')}`, 'info');
+    }
+
+    setBonusVisible(false);
+    setBonusAmount('');
+  };
+
   const renderItem = useMemo(() => ({ item, index }: { item: Student, index: number }) => {
     const isMissing = !marks[item.id] || marks[item.id] === '';
     const shouldHighlight = highlightEmptyData && isMissing;
@@ -480,7 +600,7 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
                   <Text style={{ color: C.accent, fontSize: 11, fontWeight: '800' }}>{t('common.active').toUpperCase()}</Text>
                </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
               <TouchableOpacity onPress={handlePredictMarks} style={s.actionBtn}>
                 <TrendingUp size={18} color={C.accent} />
                 <Text style={s.actionBtnText}>{t('teacher.predict')}</Text>
@@ -488,6 +608,10 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
               <TouchableOpacity onPress={handleFillConstantMark} style={s.actionBtn}>
                 <Edit size={18} color={C.accent} />
                 <Text style={s.actionBtnText}>{t('teacher.constant')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleAddBonusClick} style={s.actionBtn}>
+                <PlusCircle size={18} color={C.accent} />
+                <Text style={s.actionBtnText}>{t('teacher.addBonus', 'Add Bonus')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleClearMarks} style={[s.actionBtn, { backgroundColor: C.red + '11' }]}>
                 <Trash2 size={18} color={C.red} />
@@ -566,6 +690,40 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <TouchableOpacity onPress={() => setClearAllVisible(false)} style={[s.modalBtn, { backgroundColor: C.bg }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
                   <TouchableOpacity onPress={applyClearAllMarks} style={[s.modalBtn, { backgroundColor: C.red + '15' }]}><Text style={[s.modalBtnText, { color: C.red, fontWeight: '800' }]}>{t('common.yes')}</Text></TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal visible={bonusVisible} transparent animationType="fade" onRequestClose={() => { setBonusVisible(false); setBonusAmount(''); }}>
+        <TouchableWithoutFeedback onPress={() => { setBonusVisible(false); setBonusAmount(''); }}>
+          <View style={s.modalOverlay}>
+            <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={C.isDark ? 'dark' : 'light'} />
+            <TouchableWithoutFeedback>
+              <View style={s.modalCard}>
+                <Text style={s.modalTitle}>{t('teacher.addBonus', 'Add Bonus')}</Text>
+                <Text style={s.modalSub}>{t('teacher.bonusAmount', 'Bonus points to add')} (Max: {getMax(selectedAssessment)})</Text>
+
+                {modalError && (
+                  <View style={{ backgroundColor: C.red + '15', padding: 12, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: C.red + '30' }}>
+                    <Text style={{ color: C.red, fontSize: 13, fontWeight: '700', textAlign: 'center' }}>{modalError}</Text>
+                  </View>
+                )}
+
+                <TextInput style={[s.loginInput, { width: '100%', textAlign: 'center', marginBottom: 20, fontSize: 20, fontWeight: '800' }]} keyboardType="numeric" placeholder={`0 - ${getMax(selectedAssessment) || 10}`} placeholderTextColor={C.muted} value={bonusAmount} onChangeText={(val) => { setBonusAmount(val); setModalError(null); }} autoFocus />
+                
+                <TouchableOpacity onPress={() => setIsGraceMarksOnly(!isGraceMarksOnly)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, backgroundColor: C.card, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: isGraceMarksOnly ? C.accent : C.border }}>
+                  <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: isGraceMarksOnly ? C.accent : C.muted, marginRight: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: isGraceMarksOnly ? C.accent : 'transparent' }}>
+                    {isGraceMarksOnly && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✓</Text>}
+                  </View>
+                  <Text style={{ color: C.text, flex: 1, fontSize: 13 }}>{t('teacher.graceMarksOnly', 'Only apply to students who would pass with this bonus (grace marks)')}</Text>
+                </TouchableOpacity>
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={() => { setBonusVisible(false); setBonusAmount(''); }} style={[s.modalBtn, { backgroundColor: C.card }]}><Text style={[s.modalBtnText, { color: C.text }]}>{t('common.cancel')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={applyBonus} style={s.modalBtn}><Text style={s.modalBtnText}>{t('common.apply')}</Text></TouchableOpacity>
                 </View>
               </View>
             </TouchableWithoutFeedback>
