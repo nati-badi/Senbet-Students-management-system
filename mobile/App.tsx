@@ -1,10 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import * as Sentry from '@sentry/react-native';
-
-Sentry.init({
-  dsn: 'https://d46db5f26a2788855364b329edaf6213@o4511818106994688.ingest.de.sentry.io/4511818111320144',
-  debug: false, // If `true`, Sentry will try to print out useful debugging information if something goes wrong with sending the event. Set it to `false` in production
-});
 import {
   StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert, TextInput, ScrollView, Platform, Modal, Image as RNImage, Linking, Animated, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback, useWindowDimensions
 } from 'react-native';
@@ -185,7 +179,7 @@ const WebSafeTouchable = ({ children }: any) => {
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-function App() {
+export default function App() {
   const [isDark, setIsDark] = useState(true);
 
   return (
@@ -825,5 +819,3 @@ function makeStyles(C: any) {
     themeBtn: { backgroundColor: C.border, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   });
 }
-
-export default Sentry.wrap(App);

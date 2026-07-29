@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import * as XLSX from 'xlsx';
 import { formatEthiopianDate, formatEthiopianTime, getEthiopianYear } from '../../utils/dateUtils';
 import { GRADE_OPTIONS, formatGrade, normalizeGrade } from '../../utils/gradeUtils';
+import { performManualBackup } from '../../utils/backup';
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -23,6 +24,24 @@ export default function ReportsAndBackups() {
     const [loadingAction, setLoadingAction] = useState(null); // null, 'students', 'semester1', 'semester2'
     const [successModal, setSuccessModal] = useState({ open: false, fileName: '' });
     const [selectedGrade, setSelectedGrade] = useState(undefined);
+
+    const handleManualBackup = async () => {
+        setLoadingAction('backup');
+        try {
+            const result = await performManualBackup();
+            if (result.success) {
+                if (result.path) {
+                    setSuccessModal({ open: true, fileName: result.path });
+                } else {
+                    message.success('Backup downloaded successfully');
+                }
+            } else if (result.reason !== 'Cancelled') {
+                message.error('Backup failed: ' + (result.reason || result.error?.message));
+            }
+        } finally {
+            setLoadingAction(null);
+        }
+    };
 
     const handleDownloadStudents = async () => {
         if (!selectedGrade) {
@@ -437,6 +456,27 @@ export default function ReportsAndBackups() {
             </Card>
 
             <Row gutter={[24, 24]}>
+                <Col xs={24} md={12}>
+                    <Card
+                        title={<Space><DatabaseOutlined className="text-purple-500" /> Full Database Snapshot (JSON)</Space>}
+                        className="h-full rounded-2xl shadow-sm border-slate-200 dark:border-slate-800"
+                    >
+                        <Paragraph type="secondary" className="mb-6">
+                            Export a complete snapshot of the local database in JSON format. This file uses zero Supabase storage and can be safely kept on your computer as a foolproof daily backup.
+                        </Paragraph>
+                        <Button
+                            type="primary"
+                            icon={<DownloadOutlined />}
+                            onClick={handleManualBackup}
+                            size="large"
+                            className="bg-purple-600 hover:bg-purple-500 border-none w-full sm:w-auto"
+                            loading={loadingAction === 'backup'}
+                        >
+                            Download Full Backup (JSON)
+                        </Button>
+                    </Card>
+                </Col>
+
                 <Col xs={24} md={12}>
                     <Card
                         title={<Space><DatabaseOutlined className="text-blue-500" /> {t('admin.enrolledStudentsData', 'Enrolled Students Data')}</Space>}

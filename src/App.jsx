@@ -23,6 +23,7 @@ import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import ParentPortal from './pages/parent/ParentPortal';
 import VerifyCertificate from './pages/public/VerifyCertificate';
 import { syncData } from './utils/sync';
+import { performAutoBackup } from './utils/backup';
 import { formatEthiopianTime } from './utils/dateUtils';
 
 const { Header, Content, Footer } = Layout;
@@ -159,6 +160,7 @@ function AppContent({ isDarkMode, toggleTheme }) {
     if (!hasSyncedOnLoad.current && isOnline) {
       hasSyncedOnLoad.current = true;
       void handleSync({ silent: true });
+      void performAutoBackup();
     }
   }, [isOnline, handleSync]);
 
