@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, RefreshControl, Modal, TouchableWithoutFeedback, Animated, KeyboardAvoidingView, Platform, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TextInput, FlatList, TouchableOpacity, RefreshControl, Modal, TouchableWithoutFeedback, Animated, KeyboardAvoidingView, Platform, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { TrendingUp, Edit, Trash2, ChevronRight, Clock, PlusCircle } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
@@ -135,6 +135,32 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
   };
 
   const handleRefresh = async () => { setRefreshing(true); if (onRefresh) await onRefresh(); setRefreshing(false); };
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!selectedAssessment) return false;
+    for (const st of filteredStudents) {
+      const origItem = marksData.find(m => (m.studentid || m.studentId) === st.id && (m.assessmentid || m.assessmentId) === (selectedAssessment.id || (selectedAssessment as any).assessmentId));
+      const orig = origItem && origItem.score !== null && origItem.score !== undefined ? String(origItem.score) : '';
+      const curr = marks[st.id] || '';
+      if (orig !== curr) return true;
+    }
+    return false;
+  }, [marks, marksData, filteredStudents, selectedAssessment]);
+
+  const handleDropdownChange = (action: () => void) => {
+    if (hasUnsavedChanges) {
+      Alert.alert(
+        t('teacher.unsavedChangesTitle', 'Unsaved Changes'),
+        t('teacher.unsavedChangesDesc', 'You have entered marks that are not saved. Changing this will discard them. Proceed?'),
+        [
+          { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+          { text: t('common.discard', 'Discard'), style: 'destructive', onPress: action }
+        ]
+      );
+    } else {
+      action();
+    }
+  };
 
   useEffect(() => {
     if (highlightEmptyData) {
@@ -554,14 +580,14 @@ export const MarksTab = React.memo(({ route, navigation, teacher, students: allS
         <Text style={[s.sectionTitle, { marginBottom: 16 }]}>{t('teacher.marks')}</Text>
 
         <View style={{ marginBottom: 12 }}>
-          <PremiumDropdown label={t('profile.grade', 'Grade')} placeholder={t('common.selectGrade', 'Select Grade')} items={grades.map(g => ({ key: g, label: fmtGrade(g) }))} selectedKey={selectedGrade} onSelect={(key) => { setSelectedGrade(key); setSelectedSubject(''); setSelectedAssessment(null); }} C={C} s={s} />
+          <PremiumDropdown label={t('profile.grade', 'Grade')} placeholder={t('common.selectGrade', 'Select Grade')} items={grades.map(g => ({ key: g, label: fmtGrade(g) }))} selectedKey={selectedGrade} onSelect={(key) => handleDropdownChange(() => { setSelectedGrade(key); setSelectedSubject(''); setSelectedAssessment(null); })} C={C} s={s} />
         </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}>
-            <PremiumDropdown label={t('assessment.subject', 'Subject')} placeholder={t('common.selectSubject', 'Select Subject')} items={gradeSubjects} selectedKey={selectedSubjectKey} onSelect={(key) => { setSelectedSubject(key); setSelectedAssessment(null); }} C={C} s={s} disabled={!selectedGrade || gradeSubjects.length === 0} />
+            <PremiumDropdown label={t('assessment.subject', 'Subject')} placeholder={t('common.selectSubject', 'Select Subject')} items={gradeSubjects} selectedKey={selectedSubjectKey} onSelect={(key) => handleDropdownChange(() => { setSelectedSubject(key); setSelectedAssessment(null); })} C={C} s={s} disabled={!selectedGrade || gradeSubjects.length === 0} />
           </View>
           <View style={{ flex: 1 }}>
-            <PremiumDropdown label={t('assessment.label', 'Assessment')} placeholder={t('common.selectAssessment', 'Select Assessment')} items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))} selectedKey={selectedAssessment?.id || null} onSelect={(key) => { const a = filteredAssessments.find(ax => ax.id === key); if (a) { setSelectedSubject(normS(getSubj(a))); setSelectedAssessment(a); } }} C={C} s={s} disabled={!selectedSubjectKey || filteredAssessments.length === 0} />
+            <PremiumDropdown label={t('assessment.label', 'Assessment')} placeholder={t('common.selectAssessment', 'Select Assessment')} items={filteredAssessments.map(a => ({ key: a.id, label: a.name }))} selectedKey={selectedAssessment?.id || null} onSelect={(key) => handleDropdownChange(() => { const a = filteredAssessments.find(ax => ax.id === key); if (a) { setSelectedSubject(normS(getSubj(a))); setSelectedAssessment(a); } })} C={C} s={s} disabled={!selectedSubjectKey || filteredAssessments.length === 0} />
           </View>
         </View>
         <TextInput style={[s.searchInput, { margin: 0, marginBottom: 16 }]} placeholder={t('common.searchStudents')} placeholderTextColor={C.muted} value={search} onChangeText={setSearch} />
