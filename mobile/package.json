@@ -26,6 +26,7 @@
     "expo-location": "~19.0.8",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
+    "expo-updates": "~29.0.19",
     "expo-web-browser": "~15.0.11",
     "i18next": "^23.16.8",
     "intl-pluralrules": "^2.0.1",
